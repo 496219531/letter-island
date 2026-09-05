@@ -1,0 +1,7 @@
+{
+  "name": "gulu-island",
+  "version": "1.0.0",
+  "private": true,
+  "description": "咕噜岛 · 打字奇遇记",
+  "scripts": { "build": "node build.mjs", "dev": "python3 -m http.server 4173 --bind 127.0.0.1" }
+}
