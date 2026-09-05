@@ -1,36 +1,258 @@
 'use strict';
 const $ = (selector) => document.querySelector(selector);
-const worlds = [
-  { name: '萌芽小岛', emoji: '🌱', pool: ['a','s','d','f','j','k','l','g','h','q','w','e','r','t','y','u','i','o','p','z','x','c','v','b','n','m'], filter: 'none', reward: '「初次见面」伙伴贴纸' },
-  { name: '蘑菇森林', emoji: '🍄', pool: ['cat','sun','dog','bee','egg','pig','red','sky','fox','owl','jam','leaf'], filter: 'hue-rotate(24deg) saturate(.92)', reward: '「森林来信」伙伴贴纸' },
-  { name: '星光宇宙', emoji: '🪐', pool: ['s','star','m','moon','u','sun','sky','a','nova','b','orbit','c'], filter: 'hue-rotate(120deg) saturate(.8)', reward: '「星际漫游」伙伴贴纸' }
-];
-const stickers = [{emoji:'🌱',name:'初次见面'},{emoji:'🍄',name:'森林来信'},{emoji:'🪐',name:'星际漫游'},{emoji:'🌈',name:'彩虹朋友'},{emoji:'🦋',name:'蝴蝶来客'},{emoji:'👑',name:'奇遇小队长'}];
-let saved = {stars:0,stickers:[],rounds:0};
-try { const data = JSON.parse(localStorage.getItem('gulu-island-v1')); if(data && Number.isFinite(data.stars) && Array.isArray(data.stickers)) saved = {stars: Math.max(0,data.stars),stickers:data.stickers.filter(x => Number.isInteger(x)&&x>=0&&x<6),rounds:Number.isFinite(data.rounds)?Math.max(0,data.rounds):0}; } catch {}
-const state = { world:0, mode:'relax', status:'ready', hits:0, combo:0, best:0, target:'', typed:0, seconds:60, clock:null, feedbackTimer:null, nextTimer:null, audio:null, sound:false, lastTarget:'', session:0, dialogResume:false };
-const keyboard = $('#keyboard');
-for (const row of ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM']) { const el=document.createElement('div');el.className='key-row';for(const letter of row){const key=document.createElement('button');key.type='button';key.className='key'+('ASDFJKL'.includes(letter)?' home':'');key.dataset.key=letter.toLowerCase();key.textContent=letter;key.setAttribute('aria-label','字母 '+letter);key.addEventListener('click',()=>type(letter.toLowerCase()));el.append(key);}keyboard.append(el); }
-function persist(){try{localStorage.setItem('gulu-island-v1',JSON.stringify(saved));}catch{}}
-function sound(success=true){if(!state.sound)return;try{state.audio??=new(window.AudioContext||window.webkitAudioContext)();state.audio.resume();const now=state.audio.currentTime;const oscillator=state.audio.createOscillator();const gain=state.audio.createGain();oscillator.type='sine';oscillator.frequency.setValueAtTime(success?523.25:280,now);oscillator.frequency.exponentialRampToValueAtTime(success?783.99:330,now+.12);gain.gain.setValueAtTime(.0001,now);gain.gain.exponentialRampToValueAtTime(.08,now+.015);gain.gain.exponentialRampToValueAtTime(.0001,now+.22);oscillator.connect(gain);gain.connect(state.audio.destination);oscillator.start(now);oscillator.stop(now+.24);}catch{state.sound=false;updateSound();}}
-function updateSound(){$('#soundButton').setAttribute('aria-pressed',String(state.sound));$('#soundButton').setAttribute('aria-label',state.sound?'关闭音效':'开启音效');$('.sound-off').hidden=state.sound;}
-function update(){ $('#totalStars').textContent=saved.stars;$('#collectionCount').textContent=saved.stickers.length;$('#missionCounter').innerHTML=state.hits+' <span>/ 8</span>';$('#progressLabel').textContent='✦ '+state.hits+' / 8';$('#missionFill').style.width=state.hits/8*100+'%';$('#missionProgress').setAttribute('aria-valuenow',state.hits);$('#timer').hidden=state.mode!=='challenge';$('#timer').textContent=state.seconds+' 秒';$('#comboLabel').textContent=state.combo>=3?'ϟ '+state.combo+' 连击':'';$('#pauseButton').disabled=!['playing','paused'].includes(state.status);$('#roundLabel').textContent='第 '+(saved.rounds+1)+' 次奇遇';document.querySelectorAll('.key').forEach(key=>{key.classList.toggle('hint',state.status==='playing'&&key.dataset.key===state.target[state.typed]);}); }
-function feedback(text){clearTimeout(state.feedbackTimer);$('#feedback').textContent=text;$('#feedback').classList.add('visible');state.feedbackTimer=setTimeout(()=>$('#feedback').classList.remove('visible'),1500);}
-function burst(big=false){const box=$('#particles');for(let i=0;i<(big?32:12);i++){const p=document.createElement('span');p.className='particle';p.textContent=['✦','✧','●'][i%3];p.style.setProperty('--x',big?(15+Math.random()*70)+'%':'50%');p.style.setProperty('--y',big?'20%':'40%');p.style.setProperty('--dx',(-130+Math.random()*260)+'px');p.style.setProperty('--dy',(-60+Math.random()*220)+'px');p.style.setProperty('--color',['#fff6a2','#fff','#d4ea88','#efb87c'][i%4]);box.append(p);setTimeout(()=>p.remove(),1000);}}
-function nextTarget(){if(state.status!=='playing')return;let pool=worlds[state.world].pool;let target=state.hits===0?(state.world===0?'a':state.world===1?'cat':'s'):pool[Math.floor(Math.random()*pool.length)];if(target===state.lastTarget)target=pool[(pool.indexOf(target)+1)%pool.length];state.target=target;state.lastTarget=target;state.typed=0;drawTarget();update();}
-function drawTarget(){const field=$('#bubbleField');field.replaceChildren();if(!state.target)return;const b=document.createElement('div');b.className='target-bubble'+(state.target.length>1?' word':'');b.setAttribute('aria-label','请敲 '+state.target.toUpperCase());for(let i=0;i<state.target.length;i++){const s=document.createElement('span');s.textContent=state.target[i].toUpperCase();s.className=i<state.typed?'typed-char':'';b.append(s);}field.append(b);$('#keyboardHint').textContent=state.target.length>1?'依次敲出字母，就能收集这颗星星':'找到发光的 '+state.target[state.typed]?.toUpperCase()+' 键';}
-function start(){clearInterval(state.clock);clearTimeout(state.nextTimer);state.session++;state.status='playing';state.hits=0;state.combo=0;state.best=0;state.seconds=60;state.lastTarget='';$('#welcome').classList.add('is-hidden');$('#feedback').classList.remove('visible');$('#companionSpeech').textContent='出发！第一颗星星就在前面！';$('#stageTip').textContent=state.mode==='relax'?'没有倒计时，按你的节奏来':'收集星星，看看 60 秒内的小进步';nextTarget();if(state.mode==='challenge')state.clock=setInterval(()=>{if(state.status!=='playing')return;state.seconds--;update();if(state.seconds<=0)finish(false);},1000);sound();}
-function type(letter){if(state.status!=='playing'||!state.target)return;const key=$('[data-key="'+letter+'"]');if(key){key.classList.add('pressed');setTimeout(()=>key.classList.remove('pressed'),160);}if(letter!==state.target[state.typed]){state.combo=0;feedback('没关系，再找找发光的按键 ✧');const b=$('.target-bubble');if(b){b.classList.remove('wiggle');void b.offsetWidth;b.classList.add('wiggle');}sound(false);update();return;}sound();state.typed++;if(state.typed<state.target.length){drawTarget();update();return;}state.hits++;state.combo++;state.best=Math.max(state.best,state.combo);saved.stars++;persist();$('.target-bubble')?.classList.add('pop');state.target='';burst(state.combo>0&&state.combo%3===0);const phrases=['找到了！星星亮起来啦 ✦','好棒！再往前走一点！','你的手指会变魔法耶！','咕噜为你转了个圈！'];feedback(state.combo>=3?'哇，'+state.combo+' 连击！魔法满满 ✨':phrases[(state.hits-1)%phrases.length]);$('#companionSpeech').textContent=state.hits>=6?'快到家啦！你真是超棒的搭子！':'又一颗星星！谢谢你陪我冒险。';update();const session=state.session;state.nextTimer=setTimeout(()=>{if(session!==state.session)return;if(state.hits>=8){if(state.status==='playing')finish(true);}else nextTarget();},450);}
-function finish(completed){clearInterval(state.clock);clearTimeout(state.nextTimer);state.status='finished';state.target='';$('#bubbleField').replaceChildren();update();let reward='';if(completed){saved.rounds++;let id=state.world;if(saved.stickers.includes(id))id=[3,4,5].find(n=>!saved.stickers.includes(n))??-1;if(id>=0){saved.stickers.push(id);reward='<p>新朋友加入！获得「'+stickers[id].name+'」贴纸。</p>';}else reward='<p>所有伙伴都到齐了！星星还在继续闪耀。</p>';persist();burst(true);update();}$('#companionSpeech').textContent=completed?'我们到家啦！和你一起真开心。':'每一颗星星都算数，下次再一起玩！';showDialog('<div class="dialog-icon">'+(completed?'🎉':'🌟')+'</div><h2>'+(completed?'耶！把星星带回家啦':'收获了一口袋小进步！')+'</h2>'+(completed?reward:'<p>时间到！你找到的 '+state.hits+' 颗星星都留下啦。</p>')+'<div class="result-stats"><div><strong>'+state.hits+'</strong><span>收获星星</span></div><div><strong>'+state.best+'</strong><span>最高连击</span></div></div><button class="primary-button" id="againButton">再来一次奇遇 →</button><button class="secondary-button" id="rewardCollection">看看我的收藏</button>',false);$('#againButton').onclick=()=>{closeDialog(false);start();};$('#rewardCollection').onclick=showCollection;}
-function pause(){if(state.status!=='playing')return;state.status='paused';update();showDialog('<div class="dialog-icon">☁️</div><h2>咕噜陪你歇一会儿</h2><p>星星会乖乖等着。<br>准备好以后，再一起出发。</p><button class="primary-button" id="resumeButton">继续冒险 →</button><button class="secondary-button" id="restartButton">从头再玩一次</button>',true);$('#resumeButton').onclick=()=>closeDialog(true);$('#restartButton').onclick=()=>{closeDialog(false);start();};}
-function showDialog(html,resume=state.status==='playing'){if(state.status==='playing')state.status='paused';state.dialogResume=resume;$('#dialogContent').innerHTML=html;if(!$('#gameDialog').open)$('#gameDialog').showModal();update();}
-function closeDialog(resume=true){$('#gameDialog').close();if(resume&&state.dialogResume){state.status='playing';if(state.hits>=8){state.dialogResume=false;finish(true);return;}if(!state.target)nextTarget();}state.dialogResume=false;if(resume&&state.status==='finished')resetReady();update();}
-function showCollection(){const resume=state.status==='playing'||(state.status==='paused'&&state.dialogResume);showDialog('<div class="dialog-icon">🎒</div><h2>我的伙伴收藏</h2><p>每完成一次奇遇，就有新朋友来敲门。<br>已认识 '+saved.stickers.length+' / 6 位伙伴 · 星星累计 '+saved.stars+' 颗</p><div class="sticker-grid">'+stickers.map((s,i)=>'<div class="sticker '+(saved.stickers.includes(i)?'':'locked')+'"><span>'+s.emoji+'</span><small>'+(saved.stickers.includes(i)?s.name:'等待相遇')+'</small></div>').join('')+'</div><p style="font-size:12px">收藏保存在这台设备的浏览器里</p>',resume);}
-function showHelp(){const resume=state.status==='playing'||(state.status==='paused'&&state.dialogResume);showDialog('<div class="dialog-icon">🪄</div><h2>小小冒险家，欢迎！</h2><div class="help-step"><b>1</b><span>选一座小岛，点击「开始冒险」。<br>初次玩，可以从萌芽小岛开始。</span></div><div class="help-step"><b>2</b><span>看泡泡里的字母，敲键盘上对应的键。<br>也可以点屏幕键盘；单词要依次敲哦。</span></div><div class="help-step"><b>3</b><span>收集 8 颗星星，带新伙伴回家！<br>按错没关系，星星会等你。</span></div><p>小提示：请切换为英文输入。<br>按 Esc 可以暂停，也可以关闭小窗口。</p>',resume);}
-function resetReady(){clearInterval(state.clock);clearTimeout(state.nextTimer);state.session++;state.status='ready';state.hits=0;state.combo=0;state.target='';state.typed=0;state.seconds=60;$('#welcome').classList.remove('is-hidden');$('#bubbleField').innerHTML='<div class="preview-bubble bubble-one">'+(state.world===1?'C':'A')+'<span>✧</span></div><div class="preview-bubble bubble-two">S</div><div class="preview-bubble bubble-three">D</div>';$('#feedback').classList.remove('visible');$('#companionSpeech').textContent='你好呀，一起去找星星吧！';$('#keyboardHint').textContent='找到发光的按键，轻轻敲一下';$('#stageTip').textContent=state.mode==='relax'?'慢慢来，每一步都算数':'60 秒的小挑战，找齐 8 颗星星';update();}
-document.querySelectorAll('[data-world]').forEach(button=>button.addEventListener('click',()=>{const value=Number(button.dataset.world);if(value===state.world)return;state.world=value;document.querySelectorAll('[data-world]').forEach(b=>b.classList.toggle('selected',b===button));$('#locationName').textContent=worlds[value].name;$('#locationEmoji').textContent=worlds[value].emoji;$('#sceneArt').style.filter=worlds[value].filter;$('#rewardName').textContent=worlds[value].reward;resetReady();}));
-document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{if(state.mode===button.dataset.mode)return;state.mode=button.dataset.mode;document.querySelectorAll('[data-mode]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button));});resetReady();}));
-$('#startButton').onclick=start;$('#pauseButton').onclick=pause;$('#soundButton').onclick=()=>{state.sound=!state.sound;updateSound();sound();};$('#collectionNav').onclick=showCollection;$('#helpButton').onclick=showHelp;$('#howtoButton').onclick=showHelp;$('#adventureNav').onclick=()=>{if($('#gameDialog').open)closeDialog(true);$('#stage').scrollIntoView({behavior:'smooth',block:'center'});};$('#closeDialog').onclick=()=>closeDialog(true);$('#gameDialog').addEventListener('cancel',event=>{event.preventDefault();closeDialog(true);});
-document.addEventListener('keydown',event=>{if(event.ctrlKey||event.metaKey||event.altKey||event.repeat||event.isComposing||$('#gameDialog').open)return;if(['INPUT','TEXTAREA','SELECT'].includes(event.target.tagName))return;if(event.key==='Escape'){if(state.status==='playing'){event.preventDefault();pause();}return;}if(event.key==='Enter'&&['ready','finished'].includes(state.status)){if(event.target.tagName!=='BUTTON'){event.preventDefault();start();}return;}if(/^[a-zA-Z]$/.test(event.key)){event.preventDefault();type(event.key.toLowerCase());}if(event.key==='Backspace'&&state.status==='playing'){event.preventDefault();if(state.typed>0){state.typed--;drawTarget();update();}}});
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.status==='playing')pause();});
-update();
+const canvas = $('#gameCanvas');
+const ctx = canvas.getContext('2d');
+const sprite = new Image(); sprite.src = 'assets/zombie.png';
+const particles = [];
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let soundOn = true, audio = null, best = 0, lastTime = 0, lastHud = '', hudClock = 0;
+let toastTimer, bannerTimer, recoil = 0, shake = 0, dialogResume = false;
+try { best = Math.max(0, Number(localStorage.getItem('gulu-shooter-best')) || 0); } catch {}
+$('#bestScore').textContent = best;
+
+function tone(frequency, duration = .1, type = 'sine', volume = .035, end = frequency) {
+  if (!soundOn) return;
+  try {
+    audio ??= new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+    const oscillator = audio.createOscillator(), gain = audio.createGain(), now = audio.currentTime;
+    oscillator.type = type; oscillator.frequency.setValueAtTime(frequency, now);
+    oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, end), now + duration);
+    gain.gain.setValueAtTime(volume, now); gain.gain.exponentialRampToValueAtTime(.0001, now + duration);
+    oscillator.connect(gain); gain.connect(audio.destination); oscillator.start(now); oscillator.stop(now + duration);
+  } catch { soundOn = false; $('#soundButton').setAttribute('aria-pressed', 'false'); }
+}
+function toast(text, time = 2200) {
+  clearTimeout(toastTimer); $('#battleToast').textContent = text; $('#battleToast').classList.add('visible');
+  toastTimer = setTimeout(() => $('#battleToast').classList.remove('visible'), time);
+}
+function puff(x, y, color, count = 10, text = '') {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2, speed = 40 + Math.random() * 160;
+    particles.push({ x, y, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed-50, color, life:.65+Math.random()*.3, max:1, size:3+Math.random()*5, text:i === 0 ? text : '' });
+  }
+  if (particles.length > 260) particles.splice(0, particles.length - 260);
+}
+function floatText(x,y,text,color='#fff9c2') {
+  particles.push({x,y,vx:0,vy:-50,color,life:1.1,max:1.1,size:20,text});
+}
+const game = new GardenGame({ emit:onEvent });
+function onEvent(type, data = {}) {
+  if (type === 'shot') { recoil = .1; tone(320,.055,'triangle',.012,135); }
+  if (type === 'hit') { puff(data.x,data.y,'#e3f8a3',4); }
+  if (type === 'kill') {
+    puff(data.x,data.y,'#fff4a0',15); floatText(data.x,data.y-20,'+'+data.score);
+    tone(640,.1,'sine',.035,960);
+  }
+  if (type === 'letter') { tone(560+game.skills[data.index].typed*180,.12); }
+  if (type === 'wrong') {
+    toast(data.expected ? '没关系，接着敲 '+data.expected+' 就好 ✧' : '大招正在充能，先突突突！', 1600);
+    tone(270,.09,'sine',.025,350);
+    const card = document.querySelector('.skill-card.selected');
+    if(card){card.classList.remove('wrong');void card.offsetWidth;card.classList.add('wrong');}
+  }
+  if (type === 'typing') { toast('按技能卡里的顺序敲字母，慢慢来',1600); }
+  if (type === 'cooldown') { toast('还要 '+Math.ceil(game.skills[data.index].cd)+' 秒，先用豌豆突突突',1400); }
+  if (type === 'empty') { toast('僵尸还没到，不浪费你的大招～'); }
+  if (type === 'cast') {
+    const icons = ['🌈','❄️','🍉'];
+    const banner = $('#castBanner'); banner.textContent = icons[data.index]+' '+data.name+'！';
+    banner.classList.remove('show');void banner.offsetWidth;banner.classList.add('show');
+    clearTimeout(bannerTimer);bannerTimer=setTimeout(()=>banner.classList.remove('show'),1000);
+    if(data.index===0){tone(180,.55,'sawtooth',.035,1250);shake=.35;}
+    if(data.index===1){tone(1400,.6,'sine',.05,430);toast('冻住啦！6 秒内豌豆伤害翻倍 ❄',2400);}
+    if(data.index===2)tone(750,.5,'triangle',.05,110);
+  }
+  if (type === 'explosion') { puff(data.x,data.y,'#ffd98a',45,'BOOM!');tone(100,.35,'sawtooth',.08,30);shake=.55; }
+  if (type === 'breach') { shake=.3;tone(150,.15,'triangle',.06,95);toast('有个小捣蛋溜进来了，继续守住！'); }
+  if (type === 'wave') { toast(data.wave===1?'第 1 波！试试敲 A 放激光 🌈':'第 '+data.wave+' 波来啦！小院护盾恢复 2 格',2800); }
+  if (type === 'clear') { toast('这波守住啦！歇一口气，下一波马上来 ✦',2700);tone(660,.25,'sine',.04,880); }
+  if (type === 'boss') { toast('大个子来串门！用冰冻和西瓜招呼它！',3500); }
+  if (type === 'finish') { finishScreen(data.win); }
+}
+
+function updateHud(force=false) {
+  const values = JSON.stringify([game.health,game.wave,game.kills,game.score,game.status,game.spawned,game.typing,game.freeze>0,game.skills.map(s=>[s.code,s.typed,Math.ceil(s.cd*10)])]);
+  if(!force && values===lastHud)return;lastHud=values;
+  $('#score').textContent=game.score;
+  $('#waveTitle').textContent=['阳光小院','捣蛋小分队','大个子来串门'][game.wave-1];
+  $('#waveSubtitle').textContent=game.status==='ready'?'准备迎接第 1 波':'第 '+game.wave+' 波 · 已击退 '+game.kills+' 只';
+  $('.level-badge').textContent='0'+game.wave;
+  $('#hearts').innerHTML=Array.from({length:8},(_,i)=>'<span class="heart '+(i<game.health?'':'empty')+'" aria-hidden="true">♥</span>').join('');
+  $('#hearts').setAttribute('aria-label','护盾 '+game.health+' / 8');
+  $('#waveProgressText').textContent='第 '+game.wave+' / 3 波';
+  $('#waveFill').style.width=Math.min(100,(game.spawned-game.enemies.length)/game.quota*100)+'%';
+  $('#pauseButton').disabled=game.status!=='playing';
+  $('#difficulty').disabled=['playing','paused'].includes(game.status);
+  $('#fieldStatus').textContent=game.status==='ready'?'小院准备就绪':game.freeze>0?'全场冰冻中 · 伤害翻倍':game.waveBreak>0?'这波守住啦':'小院保卫战进行中';
+  $('#slowLabel').hidden=game.typing<0||game.status!=='playing';
+  $('#battlefield').classList.toggle('slow',game.typing>=0&&game.status==='playing');
+  $('#arsenalNote').textContent=game.typing>=0?'慢动作中 · 依次敲完提示字母':'敲出字母，立即释放';
+  document.querySelectorAll('.skill-card').forEach((card,index)=>{
+    const s=game.skills[index];card.classList.toggle('selected',game.typing===index);card.classList.toggle('cooling',s.cd>0);
+    card.setAttribute('aria-label',s.name+'，'+(s.cd>0?'充能中 '+Math.ceil(s.cd)+' 秒':'依次输入 '+s.code));
+    $('#skillKeys'+index).innerHTML=[...s.code].map((letter,i)=>'<kbd class="'+(i<s.typed?'typed':game.typing===index&&i===s.typed?'next':'')+'">'+letter+'</kbd>').join('');
+    $('#skillStatus'+index).textContent=s.cd>0?Math.ceil(s.cd)+' 秒充能':game.typing===index?'正在施法':'准备好啦';
+    $('#cooldown'+index).style.width=(1-s.cd/s.duration)*100+'%';
+  });
+  const expected=game.typing>=0?[game.skills[game.typing].code[game.skills[game.typing].typed]]:game.skills.filter(s=>s.cd<=0).map(s=>s.code[0]);
+  document.querySelectorAll('.touch-key').forEach(button=>button.classList.toggle('hint',expected.includes(button.dataset.key)));
+}
+
+function drawEmoji(text,x,y,size,angle=0) {
+  ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.font=size+'px "Apple Color Emoji","Segoe UI Emoji",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,0,0);ctx.restore();
+}
+function drawZombie(z,dead=false) {
+  const size=z.boss?145:z.tough?102:88;
+  const bob=game.freeze>0?0:Math.sin(game.time*7+z.phase)*3;
+  ctx.save();ctx.translate(z.x,z.y+bob);
+  if(dead){const elapsed=1-z.life/z.fullLife;ctx.globalAlpha=1-elapsed;ctx.rotate(elapsed*1.6);ctx.translate(elapsed*65,-Math.sin(elapsed*Math.PI)*65);ctx.scale(1-elapsed*.45,1-elapsed*.45);}
+  else {ctx.rotate(Math.sin(game.time*4+z.phase)*.045);}
+  ctx.fillStyle='#334c2529';ctx.beginPath();ctx.ellipse(0,size*.39,size*.3,8,0,0,Math.PI*2);ctx.fill();
+  if(z.hit>0)ctx.filter='brightness(1.5)';
+  else if(game.freeze>0)ctx.filter='hue-rotate(100deg) saturate(.7) brightness(1.1)';
+  else if(z.tough)ctx.filter='hue-rotate(30deg)';
+  if(sprite.complete&&sprite.naturalWidth)ctx.drawImage(sprite,-size/2,-size*.59,size,size);
+  else drawEmoji('🧟',0,0,size*.75);
+  ctx.filter='none';
+  if(z.boss)drawEmoji('👑',2,-size*.58,34);
+  if(z.tough&&!dead)drawEmoji('🧢',8,-size*.52,28);
+  if(!dead&&game.freeze>0){ctx.fillStyle='#c9f1ff30';ctx.strokeStyle='#dbfaffbb';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(-size*.34,-size*.46,size*.7,size*.86,10);ctx.fill();ctx.stroke();drawEmoji('❄️',size*.24,-size*.3,17);}
+  if(!dead&&(z.hp<z.maxHp||z.boss||z.tough)){
+    ctx.fillStyle='#314b4169';ctx.beginPath();ctx.roundRect(-size*.31,-size*.67,size*.62,5,3);ctx.fill();
+    ctx.fillStyle=z.boss?'#e8b061':'#d9f590';ctx.beginPath();ctx.roundRect(-size*.31,-size*.67,size*.62*Math.max(0,z.hp/z.maxHp),5,3);ctx.fill();
+  }
+  ctx.restore();
+}
+function drawHero() {
+  const target=game.target();const angle=Math.atan2(target.y-game.hero.y,target.x-game.hero.x);
+  ctx.save();ctx.translate(game.hero.x,game.hero.y);
+  ctx.fillStyle='#28452025';ctx.beginPath();ctx.ellipse(-7,38,38,11,0,0,Math.PI*2);ctx.fill();
+  drawEmoji('🌻',-11,0,85,Math.sin(game.time*3)*.04);
+  ctx.save();ctx.translate(21,7);ctx.rotate(angle);ctx.translate(recoil>0?-4:0,0);drawEmoji('🔫',0,0,48,Math.PI);ctx.restore();
+  ctx.font='bold 11px system-ui';ctx.fillStyle='#f8ffed';ctx.textAlign='center';ctx.shadowColor='#39522b';ctx.shadowBlur=4;ctx.fillText('豌豆小队长',-4,61);ctx.restore();
+  if(game.status==='playing'){
+    ctx.save();ctx.strokeStyle='#ffffdc99';ctx.lineWidth=2;ctx.setLineDash([4,7]);
+    ctx.beginPath();ctx.moveTo(game.hero.x+37,game.hero.y);ctx.lineTo(target.x,target.y);ctx.globalAlpha=.17;ctx.stroke();ctx.restore();
+    ctx.save();ctx.translate(target.x,target.y);ctx.strokeStyle='#ffffe9d9';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,13,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(-20,0);ctx.lineTo(-8,0);ctx.moveTo(8,0);ctx.lineTo(20,0);ctx.moveTo(0,-20);ctx.lineTo(0,-8);ctx.moveTo(0,8);ctx.lineTo(0,20);ctx.stroke();ctx.restore();
+  }
+}
+function drawEffects() {
+  for(const e of game.effects){
+    const progress=1-e.life/e.fullLife;
+    if(e.kind==='laser'){
+      ctx.save();ctx.translate(game.hero.x,game.hero.y);ctx.rotate(e.angle);ctx.globalAlpha=Math.min(1,e.life*3);ctx.lineCap='round';
+      ['#d4a6ff99','#b1eeffbb','#fff59fcc','#ffffffff'].forEach((color,i)=>{ctx.strokeStyle=color;ctx.lineWidth=[110,72,38,13][i];ctx.shadowBlur=20;ctx.shadowColor=color;ctx.beginPath();ctx.moveTo(30,0);ctx.lineTo(1150,0);ctx.stroke();});ctx.restore();
+    }
+    if(e.kind==='freeze'){
+      ctx.save();ctx.strokeStyle='#ddfaff';ctx.lineWidth=7*(1-progress);ctx.globalAlpha=1-progress;ctx.beginPath();ctx.arc(500,270,progress*650,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#c5f0ff';ctx.globalAlpha=(1-progress)*.16;ctx.fillRect(0,0,1000,530);ctx.restore();
+    }
+    if(e.kind==='melon'){
+      ctx.save();ctx.strokeStyle='#ffeaa1';ctx.fillStyle='#fff2b032';ctx.lineWidth=3;ctx.setLineDash([7,8]);ctx.beginPath();ctx.ellipse(e.x,e.y,160,55,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();
+      drawEmoji('🍉',e.x,e.y-(1-progress)*520,65+progress*65,progress*3);
+    }
+    if(e.kind==='explosion'){
+      ctx.save();ctx.globalAlpha=(1-progress)*.7;ctx.fillStyle='#fff7a9';ctx.strokeStyle='#ffb15f';ctx.lineWidth=15*(1-progress);ctx.beginPath();ctx.arc(e.x,e.y,25+progress*230,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();
+      if(progress<.4)drawEmoji('💥',e.x,e.y,160+progress*150);
+    }
+  }
+}
+function render(dt) {
+  ctx.clearRect(0,0,1000,530);ctx.save();
+  if(shake>0&&!reducedMotion)ctx.translate((Math.random()-.5)*shake*12,(Math.random()-.5)*shake*8);
+  // The dashed line marks where enemies can damage the garden.
+  if(game.status==='playing') {ctx.save();ctx.setLineDash([8,10]);ctx.strokeStyle='#fffad352';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(119,84);ctx.lineTo(119,465);ctx.stroke();ctx.restore();}
+  if(game.freeze>0){ctx.fillStyle='#b4e9ff24';ctx.fillRect(0,0,1000,530);}
+  drawHero();
+  [...game.enemies].sort((a,b)=>a.y-b.y).forEach(z=>drawZombie(z));
+  game.dead.forEach(z=>drawZombie(z,true));
+  for(const b of game.bullets){
+    ctx.save();ctx.strokeStyle='#e6fa7ab0';ctx.lineWidth=5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(b.x-b.vx*.018,b.y-b.vy*.018);ctx.lineTo(b.x,b.y);ctx.stroke();
+    ctx.fillStyle='#e5ff77';ctx.shadowColor='#f0ffaa';ctx.shadowBlur=8;ctx.beginPath();ctx.arc(b.x,b.y,6,0,Math.PI*2);ctx.fill();ctx.fillStyle='#faffd6';ctx.beginPath();ctx.arc(b.x-1,b.y-2,2,0,Math.PI*2);ctx.fill();ctx.restore();
+  }
+  drawEffects();
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];if(game.status!=='paused'){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;if(!p.text)p.vy+=190*dt;}
+    if(p.life<=0){particles.splice(i,1);continue;}
+    ctx.save();ctx.globalAlpha=Math.min(1,p.life/p.max*1.8);ctx.fillStyle=p.color;
+    if(p.text){ctx.font='900 '+p.size+'px system-ui';ctx.textAlign='center';ctx.shadowColor='#46612766';ctx.shadowBlur=5;ctx.fillText(p.text,p.x,p.y);}
+    else{ctx.beginPath();ctx.arc(p.x,p.y,p.size*Math.min(1,p.life*3),0,Math.PI*2);ctx.fill();}ctx.restore();
+  }
+  ctx.restore();recoil=Math.max(0,recoil-dt);shake=Math.max(0,shake-dt);
+}
+function frame(time) {
+  const dt=lastTime?Math.min((time-lastTime)/1000,.05):0;lastTime=time;
+  game.update(dt);render(dt);hudClock+=dt;if(hudClock>.07){updateHud();hudClock=0;}
+  window.requestAnimationFrame(frame);
+}
+function begin() {
+  if($('#gameDialog').open)closeDialog(false);
+  particles.length=0;game.adaptive=$('#difficulty').value==='adaptive';
+  $('#startScreen').hidden=true;game.start();canvas.focus({preventScroll:true});updateHud(true);
+}
+function showDialog(html,resume=game.status==='playing') {
+  dialogResume=resume;
+  if(game.status==='playing')game.pause();
+  $('#dialogContent').innerHTML=html;
+  if(!$('#gameDialog').open)$('#gameDialog').showModal();
+  updateHud(true);
+}
+function closeDialog(resume=true) {
+  $('#gameDialog').close();
+  if(resume&&dialogResume)game.resume();
+  if(resume&&['won','lost'].includes(game.status)){$('#startScreen').hidden=false;game.status='ready';}
+  dialogResume=false;updateHud(true);canvas.focus({preventScroll:true});
+}
+function pauseScreen() {
+  if(game.status!=='playing')return;
+  showDialog('<div class="dialog-icon">☁️</div><h2>小院暂停营业</h2><p>僵尸们也在休息，准备好再继续。</p><button class="primary-button" id="resumeButton">继续突突突 →</button><button class="secondary-button" id="restartButton">重新开始这一局</button>',true);
+  $('#resumeButton').onclick=()=>closeDialog();$('#restartButton').onclick=begin;
+}
+function finishScreen(win) {
+  best=Math.max(best,game.score);try{localStorage.setItem('gulu-shooter-best',String(best));}catch{}
+  $('#bestScore').textContent=best;
+  showDialog('<div class="dialog-icon">'+(win?'🏆':'🌻')+'</div><h2>'+(win?'小院守住啦！':'这一局也很勇敢！')+'</h2><p>'+(win?'你和豌豆小队赶跑了全部捣蛋鬼！':'小院暂时被借去开派对啦。<br>试试自动射击，再用大招招呼它们！')+'</p><div class="result-grid"><div><strong>'+game.score+'</strong><span>本局得分</span></div><div><strong>'+game.kills+'</strong><span>击退僵尸</span></div><div><strong>'+game.casts+'</strong><span>释放大招</span></div></div><p>你敲对了 '+game.correct+' 个字母，魔法越来越熟练啦！</p><button class="primary-button" id="againButton">再来一局 →</button>',false);
+  $('#againButton').onclick=begin;
+  if(win){tone(520,.3,'sine',.04,1040);for(let i=0;i<7;i++)puff(180+Math.random()*650,140+Math.random()*230,'#ffef92',20,'✦');}
+}
+function help() {
+  const resume=game.status==='playing'||dialogResume;
+  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>按住空格也能连续射击。开启「自动瞄准射击」，可以腾出双手打字。</div></div><div class="help-row"><span>⌨</span><div><strong>敲对技能卡上的字母放大招</strong><br>第一波 A 激光、S 冰冻、D 西瓜。激光和西瓜会朝准星释放。</div></div><div class="help-row"><span>✧</span><div><strong>第二波起，试试字母组合</strong><br>依次敲完提示即可；输入时进入慢动作，按错不清零、不扣分。</div></div><p>不想增加难度？开局前选「固定 A · S · D」。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
+}
+for(const row of ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM']){
+  const line=document.createElement('div');line.className='key-row';
+  for(const letter of row){const button=document.createElement('button');button.className='touch-key';button.textContent=letter;button.dataset.key=letter;button.setAttribute('aria-label','输入字母 '+letter);button.onclick=()=>{game.input(letter);updateHud(true);button.classList.add('pressed');setTimeout(()=>button.classList.remove('pressed'),130);};line.append(button);}
+  $('#touchKeyboard').append(line);
+}
+function pointerAim(event) {
+  const rect=canvas.getBoundingClientRect();game.setAim((event.clientX-rect.left)/rect.width*1000,(event.clientY-rect.top)/rect.height*530);
+}
+canvas.addEventListener('pointermove',pointerAim);
+canvas.addEventListener('pointerdown',event=>{
+  if(event.button!==0||game.status!=='playing')return;
+  event.preventDefault();pointerAim(event);game.shooting=true;canvas.focus({preventScroll:true});canvas.setPointerCapture(event.pointerId);
+});
+function stopShooting(){game.shooting=false;}
+canvas.addEventListener('pointerup',stopShooting);canvas.addEventListener('pointercancel',stopShooting);canvas.addEventListener('lostpointercapture',stopShooting);window.addEventListener('pointerup',stopShooting);
+window.addEventListener('blur',()=>{stopShooting();if(game.status==='playing')pauseScreen();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&game.status==='playing')pauseScreen();});
+document.addEventListener('keydown',event=>{
+  if(event.ctrlKey||event.metaKey||event.altKey||event.isComposing||$('#gameDialog').open)return;
+  if(['INPUT','TEXTAREA','SELECT'].includes(event.target.tagName))return;
+  if(event.key==='Escape'){event.preventDefault();pauseScreen();return;}
+  if(event.key==='Enter'&&game.status==='ready'&&event.target.tagName!=='BUTTON'){event.preventDefault();begin();return;}
+  if(event.key===' '&&game.status==='playing'&&event.target.tagName!=='BUTTON'){event.preventDefault();game.shooting=true;return;}
+  if(event.repeat)return;
+  if(/^[a-z]$/i.test(event.key)&&game.status==='playing'){event.preventDefault();game.input(event.key);updateHud(true);}
+  if(event.key==='Backspace'&&game.status==='playing'){event.preventDefault();game.backspace();updateHud(true);}
+});
+document.addEventListener('keyup',event=>{if(event.key===' ')game.shooting=false;});
+$('#startButton').onclick=begin;$('#pauseButton').onclick=pauseScreen;$('#helpButton').onclick=help;
+$('#soundButton').onclick=()=>{soundOn=!soundOn;$('#soundButton').setAttribute('aria-pressed',String(soundOn));$('#soundButton').setAttribute('aria-label',soundOn?'关闭音效':'开启音效');tone(700,.12);};
+$('#autoButton').onclick=()=>{game.auto=!game.auto;$('#autoButton').setAttribute('aria-pressed',String(game.auto));$('#aimHint').textContent=game.auto?'✦ 自动瞄准中 · 双手专心放大招':'⌖ 鼠标瞄准 · 按住左键连续射击';if(game.status==='playing')canvas.focus({preventScroll:true});};
+$('#keyboardButton').onclick=()=>{const expanded=$('#touchKeyboard').hidden;$('#touchKeyboard').hidden=!expanded;$('#keyboardButton').setAttribute('aria-expanded',String(expanded));};
+$('#difficulty').onchange=()=>{$('#progressHint').textContent=$('#difficulty').value==='fixed'?'三波都用固定字母 A / S / D，先玩个痛快！':'第 1 波：A / S / D → 第 2 波：双字母 → 第 3 波：三字母';};
+document.querySelectorAll('.skill-card').forEach((button,index)=>button.onclick=()=>{if(game.status!=='playing'){toast('先开始保卫小院吧！');return;}game.select(index);if(window.matchMedia('(pointer: coarse)').matches){$('#touchKeyboard').hidden=false;$('#keyboardButton').setAttribute('aria-expanded','true');}updateHud(true);});
+$('#closeDialog').onclick=()=>closeDialog();$('#gameDialog').addEventListener('cancel',event=>{event.preventDefault();closeDialog();});
+if(window.matchMedia('(pointer: coarse)').matches){$('#touchKeyboard').hidden=false;$('#keyboardButton').setAttribute('aria-expanded','true');}
+updateHud(true);window.requestAnimationFrame(frame);
