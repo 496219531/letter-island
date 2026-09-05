@@ -38,6 +38,9 @@ function floatText(x,y,text,color='#fff9c2') {
 }
 const game = new GardenGame({ emit:onEvent });
 function onEvent(type, data = {}) {
+  if (type === 'upgrade') { upgradeScreen(); }
+  if (type === 'critical') { floatText(data.x,data.y-28,'暴击！','#ffdd8a'); }
+  if (type === 'heal') { puff(data.x,data.y,'#b9ffa0',8,'+'); }
   if (type === 'shot') { recoil = .1; tone(320,.055,'triangle',.012,135); }
   if (type === 'hit') { puff(data.x,data.y,'#e3f8a3',4); }
   if (type === 'kill') {
@@ -60,30 +63,34 @@ function onEvent(type, data = {}) {
     banner.classList.remove('show');void banner.offsetWidth;banner.classList.add('show');
     clearTimeout(bannerTimer);bannerTimer=setTimeout(()=>banner.classList.remove('show'),1000);
     if(data.index===0){tone(180,.55,'sawtooth',.035,1250);shake=.35;}
-    if(data.index===1){tone(1400,.6,'sine',.05,430);toast('冻住啦！6 秒内豌豆伤害翻倍 ❄',2400);}
+    if(data.index===1){tone(1400,.6,'sine',.05,430);toast('冻住啦！'+(6+1.5*game.stack('permafrost'))+' 秒内豌豆伤害提升 ❄',2400);}
     if(data.index===2)tone(750,.5,'triangle',.05,110);
   }
   if (type === 'explosion') { puff(data.x,data.y,'#ffd98a',45,'BOOM!');tone(100,.35,'sawtooth',.08,30);shake=.55; }
   if (type === 'breach') { shake=.3;tone(150,.15,'triangle',.06,95);toast('有个小捣蛋溜进来了，继续守住！'); }
-  if (type === 'wave') { toast(data.wave===1?'第 1 波！试试敲 A 放激光 🌈':'第 '+data.wave+' 波来啦！小院护盾恢复 2 格',2800); }
+  if (type === 'wave') { toast(data.wave===1?'第 1 波！试试敲 A 放激光 🌈':'第 '+data.wave+' 波来啦！强化生效，僵尸也变强了！',2800); }
   if (type === 'clear') { toast('这波守住啦！歇一口气，下一波马上来 ✦',2700);tone(660,.25,'sine',.04,880); }
   if (type === 'boss') { toast('大个子来串门！用冰冻和西瓜招呼它！',3500); }
   if (type === 'finish') { finishScreen(data.win); }
 }
 
 function updateHud(force=false) {
-  const values = JSON.stringify([game.health,game.wave,game.kills,game.score,game.status,game.spawned,game.typing,game.freeze>0,game.skills.map(s=>[s.code,s.typed,Math.ceil(s.cd*10)])]);
+  const values = JSON.stringify([game.health,game.maxHealth,game.stacks,game.wave,game.kills,game.score,game.status,game.spawned,game.typing,game.freeze>0,game.skills.map(s=>[s.code,s.typed,Math.ceil(s.cd*10)])]);
   if(!force && values===lastHud)return;lastHud=values;
   $('#score').textContent=game.score;
-  $('#waveTitle').textContent=['阳光小院','捣蛋小分队','大个子来串门'][game.wave-1];
+  $('#upgradeCount').textContent=Object.values(game.stacks).reduce((a,b)=>a+b,0);
+  $('#runDifficulty').textContent='第 '+game.wave+' 波 · '+game.quota+' 只来袭 · 敌人生命 ×'+Math.pow(1.19,game.wave-1).toFixed(1);
+  const owned=GARDEN_CARDS.filter(c=>game.stack(c.id));
+  $('#runBuild').textContent=owned.length?owned.slice(-4).map(c=>c.icon+' ×'+game.stack(c.id)).join('  '):'击退整波，选择一张强化卡';
+  $('#waveTitle').textContent=game.wave%5===0?'首领来袭':game.wave>=4?'无尽捣蛋军团':'阳光小院';
   $('#waveSubtitle').textContent=game.status==='ready'?'准备迎接第 1 波':'第 '+game.wave+' 波 · 已击退 '+game.kills+' 只';
-  $('.level-badge').textContent='0'+game.wave;
-  $('#hearts').innerHTML=Array.from({length:8},(_,i)=>'<span class="heart '+(i<game.health?'':'empty')+'" aria-hidden="true">♥</span>').join('');
-  $('#hearts').setAttribute('aria-label','护盾 '+game.health+' / 8');
-  $('#waveProgressText').textContent='第 '+game.wave+' / 3 波';
+  $('.level-badge').textContent=String(game.wave).padStart(2,'0');
+  $('#hearts').innerHTML=Array.from({length:Math.min(12,game.maxHealth)},(_,i)=>'<span class="heart '+(i<game.health?'':'empty')+'" aria-hidden="true">♥</span>').join('')+'<small class="health-number">'+game.health+'/'+game.maxHealth+'</small>';
+  $('#hearts').setAttribute('aria-label','护盾 '+game.health+' / '+game.maxHealth);
+  $('#waveProgressText').textContent='第 '+game.wave+' 波 · ∞';
   $('#waveFill').style.width=Math.min(100,(game.spawned-game.enemies.length)/game.quota*100)+'%';
   $('#pauseButton').disabled=game.status!=='playing';
-  $('#difficulty').disabled=['playing','paused'].includes(game.status);
+  $('#difficulty').disabled=['playing','paused','upgrade'].includes(game.status);
   $('#fieldStatus').textContent=game.status==='ready'?'小院准备就绪':game.freeze>0?'全场冰冻中 · 伤害翻倍':game.waveBreak>0?'这波守住啦':'小院保卫战进行中';
   $('#slowLabel').hidden=game.typing<0||game.status!=='playing';
   $('#battlefield').classList.toggle('slow',game.typing>=0&&game.status==='playing');
@@ -103,7 +110,7 @@ function drawEmoji(text,x,y,size,angle=0) {
   ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.font=size+'px "Apple Color Emoji","Segoe UI Emoji",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,0,0);ctx.restore();
 }
 function drawZombie(z,dead=false) {
-  const size=z.boss?145:z.tough?102:88;
+  const size=z.boss?145:z.type==='mini'?55:z.tough?102:88;
   const bob=game.freeze>0?0:Math.sin(game.time*7+z.phase)*3;
   ctx.save();ctx.translate(z.x,z.y+bob);
   if(dead){const elapsed=1-z.life/z.fullLife;ctx.globalAlpha=1-elapsed;ctx.rotate(elapsed*1.6);ctx.translate(elapsed*65,-Math.sin(elapsed*Math.PI)*65);ctx.scale(1-elapsed*.45,1-elapsed*.45);}
@@ -111,12 +118,16 @@ function drawZombie(z,dead=false) {
   ctx.fillStyle='#334c2529';ctx.beginPath();ctx.ellipse(0,size*.39,size*.3,8,0,0,Math.PI*2);ctx.fill();
   if(z.hit>0)ctx.filter='brightness(1.5)';
   else if(game.freeze>0)ctx.filter='hue-rotate(100deg) saturate(.7) brightness(1.1)';
-  else if(z.tough)ctx.filter='hue-rotate(30deg)';
+  else ctx.filter={armor:'saturate(.45)',runner:'hue-rotate(300deg)',shield:'hue-rotate(60deg)',healer:'hue-rotate(330deg)',splitter:'hue-rotate(120deg)',bomber:'hue-rotate(240deg)',boss:'hue-rotate(310deg) saturate(1.5)',mini:'hue-rotate(110deg)'}[z.type]||'none';
   if(sprite.complete&&sprite.naturalWidth)ctx.drawImage(sprite,-size/2,-size*.59,size,size);
   else drawEmoji('🧟',0,0,size*.75);
   ctx.filter='none';
-  if(z.boss)drawEmoji('👑',2,-size*.58,34);
-  if(z.tough&&!dead)drawEmoji('🧢',8,-size*.52,28);
+  if(!dead){
+    const spec=ZOMBIE_TYPES[z.type];if(spec?.icon)drawEmoji(spec.icon,8,-size*.59,z.boss?34:25);
+    if(z.type!=='walker'&&z.type!=='mini'){ctx.font='bold 10px system-ui';ctx.textAlign='center';ctx.fillStyle='#fff';ctx.strokeStyle='#344d3acc';ctx.lineWidth=3;ctx.strokeText(spec.name,0,size*.56);ctx.fillText(spec.name,0,size*.56);}
+    if(z.shield>0){ctx.strokeStyle='#dcddff';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,-4,size*.48,Math.PI*.5,Math.PI*1.5);ctx.stroke();}
+    if(z.poisonTime>0)drawEmoji('☠️',-size*.35,0,17);
+  }
   if(!dead&&game.freeze>0){ctx.fillStyle='#c9f1ff30';ctx.strokeStyle='#dbfaffbb';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(-size*.34,-size*.46,size*.7,size*.86,10);ctx.fill();ctx.stroke();drawEmoji('❄️',size*.24,-size*.3,17);}
   if(!dead&&(z.hp<z.maxHp||z.boss||z.tough)){
     ctx.fillStyle='#314b4169';ctx.beginPath();ctx.roundRect(-size*.31,-size*.67,size*.62,5,3);ctx.fill();
@@ -142,7 +153,7 @@ function drawEffects() {
     const progress=1-e.life/e.fullLife;
     if(e.kind==='laser'){
       ctx.save();ctx.translate(game.hero.x,game.hero.y);ctx.rotate(e.angle);ctx.globalAlpha=Math.min(1,e.life*3);ctx.lineCap='round';
-      ['#d4a6ff99','#b1eeffbb','#fff59fcc','#ffffffff'].forEach((color,i)=>{ctx.strokeStyle=color;ctx.lineWidth=[110,72,38,13][i];ctx.shadowBlur=20;ctx.shadowColor=color;ctx.beginPath();ctx.moveTo(30,0);ctx.lineTo(1150,0);ctx.stroke();});ctx.restore();
+      ['#d4a6ff99','#b1eeffbb','#fff59fcc','#ffffffff'].forEach((color,i)=>{ctx.strokeStyle=color;ctx.lineWidth=[110,72,38,13][i]*((e.width||85)/85);ctx.shadowBlur=20;ctx.shadowColor=color;ctx.beginPath();ctx.moveTo(30,0);ctx.lineTo(1150,0);ctx.stroke();});ctx.restore();
     }
     if(e.kind==='freeze'){
       ctx.save();ctx.strokeStyle='#ddfaff';ctx.lineWidth=7*(1-progress);ctx.globalAlpha=1-progress;ctx.beginPath();ctx.arc(500,270,progress*650,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#c5f0ff';ctx.globalAlpha=(1-progress)*.16;ctx.fillRect(0,0,1000,530);ctx.restore();
@@ -191,6 +202,7 @@ function begin() {
   $('#startScreen').hidden=true;game.start();canvas.focus({preventScroll:true});updateHud(true);
 }
 function showDialog(html,resume=game.status==='playing') {
+  $('#closeDialog').hidden=game.status==='upgrade';
   dialogResume=resume;
   if(game.status==='playing')game.pause();
   $('#dialogContent').innerHTML=html;
@@ -198,6 +210,7 @@ function showDialog(html,resume=game.status==='playing') {
   updateHud(true);
 }
 function closeDialog(resume=true) {
+  if(game.status==='upgrade')return;
   $('#gameDialog').close();
   if(resume&&dialogResume)game.resume();
   if(resume&&['won','lost'].includes(game.status)){$('#startScreen').hidden=false;game.status='ready';}
@@ -211,13 +224,32 @@ function pauseScreen() {
 function finishScreen(win) {
   best=Math.max(best,game.score);try{localStorage.setItem('gulu-shooter-best',String(best));}catch{}
   $('#bestScore').textContent=best;
-  showDialog('<div class="dialog-icon">'+(win?'🏆':'🌻')+'</div><h2>'+(win?'小院守住啦！':'这一局也很勇敢！')+'</h2><p>'+(win?'你和豌豆小队赶跑了全部捣蛋鬼！':'小院暂时被借去开派对啦。<br>试试自动射击，再用大招招呼它们！')+'</p><div class="result-grid"><div><strong>'+game.score+'</strong><span>本局得分</span></div><div><strong>'+game.kills+'</strong><span>击退僵尸</span></div><div><strong>'+game.casts+'</strong><span>释放大招</span></div></div><p>你敲对了 '+game.correct+' 个字母，魔法越来越熟练啦！</p><button class="primary-button" id="againButton">再来一局 →</button>',false);
+  showDialog('<div class="dialog-icon">'+(win?'🏆':'🌻')+'</div><h2>'+(win?'小院守住啦！':'这一局也很勇敢！')+'</h2><p>'+(win?'你和豌豆小队赶跑了全部捣蛋鬼！':'你守到了第 '+game.wave+' 波！<br>下次试试另一套强化组合，挑战更远。')+'</p><div class="result-grid"><div><strong>'+game.score+'</strong><span>本局得分</span></div><div><strong>'+game.kills+'</strong><span>击退僵尸</span></div><div><strong>'+game.casts+'</strong><span>释放大招</span></div></div><p>你敲对了 '+game.correct+' 个字母，魔法越来越熟练啦！</p><button class="primary-button" id="againButton">再来一局 →</button>',false);
   $('#againButton').onclick=begin;
   if(win){tone(520,.3,'sine',.04,1040);for(let i=0;i<7;i++)puff(180+Math.random()*650,140+Math.random()*230,'#ffef92',20,'✦');}
 }
+
+function upgradeScreen(){
+  const nextWave=game.wave+1;
+  const forecast=nextWave%5===0?'👑 下一波：巨型首领，会不断召唤跑跑僵尸':nextWave===2?'⚡ 下一波解锁：闪电跑跑、铁桶卫士':nextWave===3?'🛡️ 下一波解锁：盾牌兵、分裂软糖':nextWave===4?'💚 下一波解锁：治疗僵尸、爆破客':'下一波：更多敌人，更高生命，更快进攻';
+  showDialog('<div class="upgrade-eyebrow">WAVE '+game.wave+' CLEAR</div><h2>守住了！选一张，变更强</h2><p>所有强化整局有效，同名卡牌可以叠加。</p><div class="upgrade-options">'+game.offers.map((c,i)=>'<button class="upgrade-card cat-'+c.category+'" data-upgrade="'+c.id+'"><span class="upgrade-category">'+c.category+' <kbd>'+(i+1)+'</kbd></span><span class="upgrade-art">'+c.icon+'</span><strong>'+c.name+'</strong><span class="upgrade-description">'+c.description+'</span><span class="upgrade-stack">'+(game.stack(c.id)?'叠加强化：'+game.stack(c.id)+' → '+(game.stack(c.id)+1)+' 层':'新强化 · 获得第 1 层')+'</span><span class="choose-label">选择并迎战第 '+nextWave+' 波 →</span></button>').join('')+'</div><div class="next-wave-info">'+forecast+'</div><p class="upgrade-recovery">小院恢复 '+(1+game.stack('repair'))+' 护盾 · 大招充能推进 3 秒 · 选卡时战场暂停</p>',false);
+  $('#gameDialog').classList.add('upgrade-dialog');
+  document.querySelectorAll('[data-upgrade]').forEach(b=>b.onclick=()=>pickUpgrade(b.dataset.upgrade));
+}
+function pickUpgrade(id){
+  if(!game.chooseCard(id))return;
+  $('#gameDialog').close();$('#gameDialog').classList.remove('upgrade-dialog');$('#closeDialog').hidden=false;dialogResume=false;
+  tone(660,.25,'sine',.04,1100);updateHud(true);canvas.focus({preventScroll:true});
+}
+function showBuild(){
+  if(game.status==='upgrade')return;
+  const owned=GARDEN_CARDS.filter(c=>game.stack(c.id));
+  showDialog('<div class="dialog-icon">🎒</div><h2>我的强化组合</h2><p>第 '+game.wave+' 波 · '+Object.values(game.stacks).reduce((a,b)=>a+b,0)+' 张卡牌 · '+owned.length+' 种强化</p><div class="owned-cards">'+(owned.length?owned.map(c=>'<div class="owned-card"><span>'+c.icon+'</span><div><strong>'+c.name+' <b>×'+game.stack(c.id)+'</b></strong><small>'+c.description+'</small></div></div>').join(''):'<p>打完第一波，就能三选一获得强化。<br>本局共可遇到 24 种卡牌，试试不同组合！</p>')+'</div>',game.status==='playing');
+}
+
 function help() {
   const resume=game.status==='playing'||dialogResume;
-  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>按住空格也能连续射击。开启「自动瞄准射击」，可以腾出双手打字。</div></div><div class="help-row"><span>⌨</span><div><strong>敲对技能卡上的字母放大招</strong><br>第一波 A 激光、S 冰冻、D 西瓜。激光和西瓜会朝准星释放。</div></div><div class="help-row"><span>✧</span><div><strong>第二波起，试试字母组合</strong><br>依次敲完提示即可；输入时进入慢动作，按错不清零、不扣分。</div></div><p>不想增加难度？开局前选「固定 A · S · D」。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
+  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>按住空格也能连续射击。开启「自动瞄准射击」，可以腾出双手打字。</div></div><div class="help-row"><span>⌨</span><div><strong>敲对技能卡上的字母放大招</strong><br>第一波 A 激光、S 冰冻、D 西瓜。激光和西瓜会朝准星释放。</div></div><div class="help-row"><span>✧</span><div><strong>每一波结束，三选一叠加强化</strong><br>24 种强化可重复获得，整局有效。敌人每波变强，每 5 波有首领！打字时依然有慢动作。</div></div><p>不想增加难度？开局前选「固定 A · S · D」。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
 }
 for(const row of ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM']){
   const line=document.createElement('div');line.className='key-row';
@@ -237,6 +269,7 @@ canvas.addEventListener('pointerup',stopShooting);canvas.addEventListener('point
 window.addEventListener('blur',()=>{stopShooting();if(game.status==='playing')pauseScreen();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&game.status==='playing')pauseScreen();});
 document.addEventListener('keydown',event=>{
+  if(game.status==='upgrade'&&['1','2','3'].includes(event.key)&&!event.repeat&&!event.ctrlKey&&!event.metaKey&&!event.altKey){event.preventDefault();pickUpgrade(game.offers[Number(event.key)-1]?.id);return;}
   if(event.ctrlKey||event.metaKey||event.altKey||event.isComposing||$('#gameDialog').open)return;
   if(['INPUT','TEXTAREA','SELECT'].includes(event.target.tagName))return;
   if(event.key==='Escape'){event.preventDefault();pauseScreen();return;}
@@ -247,11 +280,11 @@ document.addEventListener('keydown',event=>{
   if(event.key==='Backspace'&&game.status==='playing'){event.preventDefault();game.backspace();updateHud(true);}
 });
 document.addEventListener('keyup',event=>{if(event.key===' ')game.shooting=false;});
-$('#startButton').onclick=begin;$('#pauseButton').onclick=pauseScreen;$('#helpButton').onclick=help;
+$('#buildButton').onclick=showBuild;$('#startButton').onclick=begin;$('#pauseButton').onclick=pauseScreen;$('#helpButton').onclick=help;
 $('#soundButton').onclick=()=>{soundOn=!soundOn;$('#soundButton').setAttribute('aria-pressed',String(soundOn));$('#soundButton').setAttribute('aria-label',soundOn?'关闭音效':'开启音效');tone(700,.12);};
 $('#autoButton').onclick=()=>{game.auto=!game.auto;$('#autoButton').setAttribute('aria-pressed',String(game.auto));$('#aimHint').textContent=game.auto?'✦ 自动瞄准中 · 双手专心放大招':'⌖ 鼠标瞄准 · 按住左键连续射击';if(game.status==='playing')canvas.focus({preventScroll:true});};
 $('#keyboardButton').onclick=()=>{const expanded=$('#touchKeyboard').hidden;$('#touchKeyboard').hidden=!expanded;$('#keyboardButton').setAttribute('aria-expanded',String(expanded));};
-$('#difficulty').onchange=()=>{$('#progressHint').textContent=$('#difficulty').value==='fixed'?'三波都用固定字母 A / S / D，先玩个痛快！':'第 1 波：A / S / D → 第 2 波：双字母 → 第 3 波：三字母';};
+$('#difficulty').onchange=()=>{$('#progressHint').textContent=$('#difficulty').value==='fixed'?'所有波次都用固定字母 A / S / D，敌人仍会逐渐变强。':'第 1 波：A / S / D → 第 2 波：双字母 → 第 3 波起：三字母';};
 document.querySelectorAll('.skill-card').forEach((button,index)=>button.onclick=()=>{if(game.status!=='playing'){toast('先开始保卫小院吧！');return;}game.select(index);if(window.matchMedia('(pointer: coarse)').matches){$('#touchKeyboard').hidden=false;$('#keyboardButton').setAttribute('aria-expanded','true');}updateHud(true);});
 $('#closeDialog').onclick=()=>closeDialog();$('#gameDialog').addEventListener('cancel',event=>{event.preventDefault();closeDialog();});
 if(window.matchMedia('(pointer: coarse)').matches){$('#touchKeyboard').hidden=false;$('#keyboardButton').setAttribute('aria-expanded','true');}
