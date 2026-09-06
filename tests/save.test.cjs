@@ -28,3 +28,9 @@ test('typing settings round trip and older saves retain compatible defaults',()=
  delete save.state.maxSpellLength;delete save.state.magicSlow;assert.ok(restore(loaded,save));assert.equal(loaded.maxSpellLength,60);assert.equal(loaded.magicSlow,false);
  for(const values of [{maxSpellLength:0},{maxSpellLength:61},{maxSpellLength:1.5},{magicSlow:'true'}]){const bad=JSON.parse(JSON.stringify(save));Object.assign(bad.state,values);assert.equal(validate(bad),false);}
 });
+test('sunflower damage and rescue countdown survive saves; old saves grow a matching defense',()=>{
+ const g=new GardenGame();g.start();g.damageDefense(.25,110);const s=encode(g),loaded=new GardenGame();assert.ok(restore(loaded,s));assert.deepEqual(loaded.flowerHealth,g.flowerHealth);
+ g.health=0;g.update(.05);const critical=encode(g);assert.ok(critical);assert.ok(restore(loaded,critical));assert.equal(loaded.health,0);assert.equal(loaded.breachElapsed,.05);
+ delete s.state.flowerHealth;delete s.state.breachElapsed;assert.ok(restore(loaded,s));assert.equal(loaded.health,7.75);assert.equal(loaded.flowerHealth.length,8);
+ loaded.status='upgrade';loaded.offers=[CARDS.find(c=>c.id==='fortify')];loaded.chooseCard('fortify');assert.equal(loaded.maxHealth,10);assert.equal(loaded.health,10);assert.ok(loaded.flowerHealth.every(h=>h===1.25));
+});

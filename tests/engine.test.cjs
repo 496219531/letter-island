@@ -54,7 +54,7 @@ test('special enemies armor, shields, healer, splitters, bombers and bosses work
  const shield=g.spawn(800,240,'shield');g.damage(shield,24);assert.equal(shield.hp,shield.maxHp);assert.ok(shield.shield<shield.maxHp*.65);
  const healer=g.spawn(820,210,'healer');healer.ability=0;g.update(.016);assert.ok(armored.hp>armored.maxHp-12);
  const splitter=g.spawn(750,300,'splitter');const spawned=g.spawned;g.damage(splitter,10000,'laser');assert.equal(g.enemies.filter(z=>z.type==='mini').length,2);assert.equal(g.spawned,spawned);
- const bomber=g.spawn(260,400,'bomber');const hp=g.health;g.update(.016);assert.equal(g.health,hp-2);
+ const bomber=g.spawn(194,400,'bomber');const hp=g.health;g.update(.016);assert.equal(g.health,hp-2);
  g.wave=5;g.spawned=g.quota-1;const boss=g.spawn();assert.equal(boss.type,'boss');boss.ability=0;g.update(.016);assert.ok(g.enemies.some(z=>z.type==='runner'));
 });
 test('enemy health, speed and population scale across waves',()=>{
@@ -117,4 +117,12 @@ test('optional slow motion needs partial input and immediately stops when switch
  a.input('a');assert.equal(a.typingSlow,true);const ax=a.enemies[0].gait,bx=b.enemies[0].gait;
  advance(a,.5);advance(b,.5);assert.ok(Math.abs((a.enemies[0].gait-ax)/(b.enemies[0].gait-bx)-.22)<.001);
  a.magicSlow=false;const x=a.enemies[0].gait,y=b.enemies[0].gait;advance(a,.5);advance(b,.5);assert.ok(Math.abs((a.enemies[0].gait-x)-(b.enemies[0].gait-y))<.001);
+});
+
+test('sunflowers are chewed over time; zero defense has rescue time and repair restores flowers',()=>{
+ const g=make();g.start();g.enemies=[];g.setFireStrength(0);const z=g.spawn(194,110,'walker');const initial=g.health;
+ advance(g,.3);assert.equal(g.health,initial);const x=z.x;advance(g,.4);assert.equal(g.health,initial-.25);assert.equal(g.flowerHealth[0],.75);assert.equal(z.x,x);assert.ok(z.hp>0);
+ g.freeze=2;const hp=g.health;advance(g,1);assert.equal(g.health,hp);
+ g.freeze=0;g.health=0;advance(g,1);assert.equal(g.status,'playing');assert.ok(g.breachElapsed>0);g.health=2;assert.equal(g.breachElapsed,0);assert.equal(g.health,2);assert.ok(g.flowerHealth.some(h=>h>0));
+ g.health=0;advance(g,2);assert.equal(g.status,'playing');g.pause();advance(g,4);assert.ok(Math.abs(g.breachElapsed-2)<.0001);g.resume();advance(g,1.2);assert.equal(g.status,'lost');
 });

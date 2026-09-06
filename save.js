@@ -1,10 +1,10 @@
 /* Versioned run snapshots. Only game data is serialized, never callbacks or UI. */
 (function(root){
   'use strict';
-  const FIELDS=['stacks','maxHealth','healKills','health','score','kills','casts','correct','wave','spawned','quota','spawnIn','waveBreak','shotIn','time','freeze','combo','typing','activeTime','serial','adaptive','auto','fireStrength','maxSpellLength','magicSlow','aim','hero','skills','enemies','effects'];
+  const FIELDS=['flowerHealth','breachElapsed','stacks','maxHealth','healKills','health','score','kills','casts','correct','wave','spawned','quota','spawnIn','waveBreak','shotIn','time','freeze','combo','typing','activeTime','serial','adaptive','auto','fireStrength','maxSpellLength','magicSlow','aim','hero','skills','enemies','effects'];
   const numeric=['maxHealth','healKills','health','score','kills','casts','correct','wave','spawned','quota','spawnIn','waveBreak','shotIn','time','freeze','combo','typing','activeTime','serial','fireStrength'];
   function encode(game){
-    if(!['playing','paused','upgrade'].includes(game.status)||game.health<=0)return null;
+    if(!['playing','paused','upgrade'].includes(game.status)||game.health<0)return null;
     const state={};for(const key of FIELDS)state[key]=game[key];
     state.status=game.status==='upgrade'?'upgrade':'paused';
     state.offers=game.offers.map(c=>c.id);
@@ -21,7 +21,9 @@
     if(!save||save.version!==1||!Number.isFinite(save.savedAt)||!save.state||!finiteTree(save.state))return false;
     const s=save.state,cardIds=new Set(root.GARDEN_CARDS.map(c=>c.id));
     if(!['paused','upgrade'].includes(s.status)||numeric.some(k=>typeof s[k]!=='number'))return false;
-    if(s.health<=0||s.maxHealth<s.health||s.wave<1||!Number.isInteger(s.wave)||s.fireStrength<0||s.fireStrength>1||s.typing< -1||s.typing>2||!Number.isInteger(s.typing))return false;
+    if(s.health<0||(s.health===0&&s.breachElapsed===undefined)||s.maxHealth<s.health||s.wave<1||!Number.isInteger(s.wave)||s.fireStrength<0||s.fireStrength>1||s.typing< -1||s.typing>2||!Number.isInteger(s.typing))return false;
+    if(s.breachElapsed!==undefined&&(!Number.isFinite(s.breachElapsed)||s.breachElapsed<0||s.breachElapsed>=3))return false;
+    if(s.flowerHealth!==undefined&&(!Array.isArray(s.flowerHealth)||s.flowerHealth.length!==8||s.flowerHealth.some(h=>!Number.isFinite(h)||h<0||h>s.maxHealth/8)||Math.abs(s.flowerHealth.reduce((a,b)=>a+b,0)-s.health)>.000001))return false;
     if(s.maxSpellLength!==undefined&&(!Number.isInteger(s.maxSpellLength)||s.maxSpellLength<1||s.maxSpellLength>60))return false;
     if(s.magicSlow!==undefined&&typeof s.magicSlow!=='boolean')return false;
     if(typeof s.adaptive!=='boolean'||typeof s.auto!=='boolean'||!s.stacks||Array.isArray(s.stacks))return false;
@@ -40,6 +42,7 @@
     if(!validate(save))return false;
     const s=JSON.parse(JSON.stringify(save.state));
     for(const key of FIELDS)game[key]=s[key];
+    game.flowerHealth=s.flowerHealth?[...s.flowerHealth]:Array(8).fill(0);game.health=s.health;game.breachElapsed=s.breachElapsed??0;
     game.maxSpellLength=s.maxSpellLength??60;game.magicSlow=s.magicSlow??false;
     game.bullets=s.bullets.map(b=>({...b,hitIds:new Set(b.hitIds)}));
     game.offers=s.offers.map(id=>root.GARDEN_CARDS.find(c=>c.id===id));

@@ -31,7 +31,7 @@
     }
     reset() {
       this.stacks = {}; this.offers = []; this.maxHealth = 8; this.healKills=0;
-      this.health = 8; this.score = 0; this.kills = 0; this.casts = 0; this.correct = 0;
+      this.flowerHealth=[];this.breachElapsed=0;this.health = 8; this.score = 0; this.kills = 0; this.casts = 0; this.correct = 0;
       this.wave = 1; this.spawned = 0; this.quota = 9; this.spawnIn = 2; this.waveBreak = 0;
       this.enemies = []; this.bullets = []; this.effects = []; this.dead = [];
       this.shooting = false; this.shotIn = 0; this.time = 0; this.freeze = 0; this.combo = 0;
@@ -41,6 +41,25 @@
         { name:'冰冻派对', code:'S', typed:0, cd:0, duration:12, uses:0, icon:'❄️' },
         { name:'西瓜轰轰', code:'D', typed:0, cd:0, duration:11, uses:0, icon:'🍉' }
       ];
+    }
+    get health(){return this.flowerHealth?.reduce((sum,h)=>sum+h,0)||0;}
+    set health(value){
+      const target=clamp(value,0,this.maxHealth),capacity=this.maxHealth/8;
+      if(!this.flowerHealth||this.flowerHealth.length!==8)this.flowerHealth=Array(8).fill(0);
+      let change=target-this.health;
+      const order=Array.from({length:8},(_,i)=>i).sort((a,b)=>this.flowerHealth[a]-this.flowerHealth[b]);
+      for(const i of order){
+        const amount=change>=0?Math.min(change,Math.max(0,capacity-this.flowerHealth[i])):-Math.min(-change,this.flowerHealth[i]);
+        this.flowerHealth[i]+=amount;change-=amount;
+      }
+      if(target>0)this.breachElapsed=0;
+    }
+    damageDefense(amount,y){
+      const order=Array.from({length:8},(_,i)=>i).sort((a,b)=>Math.abs(110+a*48-y)-Math.abs(110+b*48-y));
+      for(const i of order){const bite=Math.min(amount,this.flowerHealth[i]);if(bite<=0)continue;
+        this.flowerHealth[i]-=bite;amount-=bite;this.emit('nibble',{x:155,y:110+i*48,removed:this.flowerHealth[i]<=0});if(amount<=0)break;
+      }
+      this.combo=0;this.emit('breach',{health:this.health});
     }
     start() {
       this.reset(); this.status = 'playing';
@@ -69,7 +88,7 @@
       const z={id:++this.serial,type,x,y:y??[140,215,290,365,430][Math.floor(this.random()*5)],hp,maxHp:hp,
         speed:Math.min(155,(23+this.wave*2.3)*spec.speed),radius:type==='boss'?53:type==='mini'?20:31,
         boss:type==='boss',tough:type==='armor',hit:0,phase:this.random()*6.28,gait:this.random()*6.28,shield:type==='shield'?hp*.65:0,
-        poison:0,poisonTime:0,chill:0,ability:3,slowTime:0};
+        poison:0,poisonTime:0,chill:0,ability:3,slowTime:0,biteIn:.6,eating:false};
       this.enemies.push(z);if(count)this.spawned++;
       if(z.boss)this.emit('boss');return z;
     }
@@ -205,13 +224,17 @@
         if(this.freeze===0){
           const movementDt=worldDt*(z.slowTime>0?1-z.chill:1);
           const cadence=z.type==='runner'||z.type==='mini'?6.3:z.boss?2.25:3.35;
-          z.gait+=movementDt*cadence;
-          z.x-=z.speed*movementDt*(1+.38*Math.sin(z.gait));z.ability-=worldDt;
+          z.eating=z.x<=195&&this.health>0;
+          if(z.eating){
+            z.biteIn=(z.biteIn??.6)-worldDt;
+            if(z.biteIn<=0){z.biteIn=.3;this.damageDefense(z.boss?.75:.25,z.y);}
+          }else{z.gait+=movementDt*cadence;z.x-=z.speed*movementDt*(1+.38*Math.sin(z.gait));}
+          z.ability-=worldDt;
           if(z.type==='healer'&&z.ability<=0){z.ability=3;for(const other of this.enemies)if(other.hp>0&&other.id!==z.id&&Math.hypot(other.x-z.x,other.y-z.y)<190)other.hp=Math.min(other.maxHp,other.hp+other.maxHp*.1);this.emit('heal',{x:z.x,y:z.y});}
           if(z.boss&&z.ability<=0&&this.enemies.length<80){z.ability=9;this.spawn(z.x+40,clamp(z.y+45,100,455),'runner',false);}
-          if(z.type==='bomber'&&z.x<270){z.hp=0;this.health=Math.max(0,this.health-2);this.emit('explosion',{x:z.x,y:z.y});this.emit('breach',{health:this.health});continue;}
+          if(z.type==='bomber'&&z.x<=195){z.hp=0;this.damageDefense(2,z.y);this.emit('explosion',{x:z.x,y:z.y});this.emit('breach',{health:this.health});continue;}
         }
-        if(z.x<120){z.hp=0;this.health=Math.max(0,this.health-(z.boss?3:1));this.combo=0;this.emit('breach',{health:this.health});}
+        if(z.x<75)z.x=75;
       }
       for(const b of this.bullets){
         b.px=b.x;b.py=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
@@ -225,7 +248,7 @@
       this.enemies=this.enemies.filter(z=>z.hp>0);
       this.bullets=this.bullets.filter(b=>b.life>0&&b.x<1070&&b.y>-50&&b.y<600);
       this.dead.forEach(z=>z.life-=dt);this.dead=this.dead.filter(z=>z.life>0);
-      if(this.health<=0){this.finish(false);return;}
+      if(this.health<=0){this.breachElapsed+=worldDt;if(this.breachElapsed>=3){this.finish(false);return;}}else this.breachElapsed=0;
       if(this.spawned<this.quota){
         this.spawnIn-=worldDt;if(this.spawnIn<=0&&this.enemies.length<100){this.spawn();this.spawnIn=Math.max(.28,2.1*Math.pow(.88,this.wave-1));}
       } else if(this.enemies.length===0){

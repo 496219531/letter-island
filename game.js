@@ -147,6 +147,7 @@ updateTypingControls();
 function onEvent(type, data = {}) {
   if(['start','wave','upgrade','pause'].includes(type))persistRun();
   if (type === 'upgrade') { upgradeScreen(); }
+  if(type==='nibble')puff(data.x,data.y,'#ffd945',data.removed?18:6,data.removed?'':'咔嚓');
   if (type === 'critical') { floatText(data.x,data.y-28,'暴击！','#ffdd8a'); }
   if (type === 'heal') { puff(data.x,data.y,'#b9ffa0',8,'+'); }
   if (type === 'shot') { recoil = .1; tone(320,.055,'triangle',.012,135); }
@@ -175,7 +176,7 @@ function onEvent(type, data = {}) {
     if(data.index===2)tone(750,.5,'triangle',.05,110);
   }
   if (type === 'explosion') { puff(data.x,data.y,'#ffd98a',45,'BOOM!');tone(100,.35,'sawtooth',.08,30);shake=.55; }
-  if (type === 'breach') { shake=.3;tone(150,.15,'triangle',.06,95);toast('有个小捣蛋溜进来了，继续守住！'); }
+  if (type === 'breach') { shake=.3;tone(150,.15,'triangle',.06,95);toast(game.health<=0?'向日葵全倒了！3 秒内修复防线或清场！':'向日葵正在被啃食！快保护它们！'); }
   if (type === 'wave') { toast(data.wave===1?'第 1 波！试试敲 A 放激光 🌈':'第 '+data.wave+' 波来啦！强化生效，僵尸也变强了！',2800); }
   if (type === 'clear') { toast('这波守住啦！歇一口气，下一波马上来 ✦',2700);tone(660,.25,'sine',.04,880); }
   if (type === 'boss') { toast('大个子来串门！用冰冻和西瓜招呼它！',3500); }
@@ -195,7 +196,7 @@ function spellKeysMarkup(skill,active){
   return rows.join('');
 }
 function updateHud(force=false) {
-  const values = JSON.stringify([game.health,game.maxHealth,game.stacks,game.wave,game.kills,game.score,game.status,game.spawned,game.typing,game.freeze>0,game.magicSlow,game.maxSpellLength,game.skills.map(s=>[s.code,s.typed,Math.ceil(s.cd*10)])]);
+  const values = JSON.stringify([game.health,game.maxHealth,game.stacks,game.wave,game.kills,game.score,game.status,game.spawned,game.typing,game.freeze>0,Math.ceil((3-game.breachElapsed)*10),game.magicSlow,game.maxSpellLength,game.skills.map(s=>[s.code,s.typed,Math.ceil(s.cd*10)])]);
   if(!force && values===lastHud)return;lastHud=values;
   document.body.classList.toggle('in-run',game.status!=='ready');
   $('#score').textContent=game.score;
@@ -206,13 +207,13 @@ function updateHud(force=false) {
   $('#waveTitle').textContent=game.wave%5===0?'首领来袭':game.wave>=4?'无尽捣蛋军团':'阳光小院';
   $('#waveSubtitle').textContent=game.status==='ready'?'准备迎接第 1 波':'第 '+game.wave+' 波 · 已击退 '+game.kills+' 只';
   $('.level-badge').textContent=String(game.wave).padStart(2,'0');
-  $('#hearts').innerHTML=Array.from({length:Math.min(12,game.maxHealth)},(_,i)=>'<span class="heart '+(i<game.health?'':'empty')+'" aria-hidden="true">♥</span>').join('')+'<small class="health-number">'+game.health+'/'+game.maxHealth+'</small>';
-  $('#hearts').setAttribute('aria-label','护盾 '+game.health+' / '+game.maxHealth);
+  $('#hearts').innerHTML=Array.from({length:Math.min(12,game.maxHealth)},(_,i)=>'<span class="heart '+(i<game.health?'':'empty')+'" aria-hidden="true">♥</span>').join('')+'<small class="health-number">'+Number(game.health.toFixed(1))+'/'+game.maxHealth+'</small>';
+  $('#hearts').setAttribute('aria-label','向日葵防御 '+Number(game.health.toFixed(1))+' / '+game.maxHealth);
   $('#waveProgressText').textContent='第 '+game.wave+' 波 · ∞';
   $('#waveFill').style.width=Math.min(100,(game.spawned-game.enemies.length)/game.quota*100)+'%';
   $('#pauseButton').disabled=game.status!=='playing';
   $('#difficulty').disabled=['playing','paused','upgrade'].includes(game.status);
-  $('#fieldStatus').textContent=game.status==='ready'?'小院准备就绪':game.freeze>0?'全场冰冻中 · 伤害翻倍':game.waveBreak>0?'这波守住啦':'小院保卫战进行中';
+  $('#fieldStatus').textContent=game.status==='ready'?'小院准备就绪':game.status==='lost'?'向日葵防线已突破':game.health<=0?'防线告急 · '+Math.max(0,3-game.breachElapsed).toFixed(1)+' 秒':game.freeze>0?'全场冰冻中 · 伤害翻倍':game.waveBreak>0?'这波守住啦':'小院保卫战进行中';
   $('#arsenalNote').textContent=game.typing>=0?(game.typingSlow?'慢动作中 · ':'自动换行 · ')+'已完成 '+game.skills[game.typing].typed+' / '+game.skills[game.typing].code.length+' 字母':'回蓝速度 ×'+game.rechargeRate.toFixed(2);
   $('#progressHint').textContent=game.adaptive?'本波新提示 '+game.spellLength+' 个字母 · 只显示当前两行，自动跟随输入':'固定 A / S / D · 回蓝和僵尸强度仍随波次提升';
   document.querySelectorAll('.skill-card').forEach((card,index)=>{
@@ -279,7 +280,7 @@ function drawWalkingSprite(z,size,dead){
 function drawZombie(z,dead=false) {
   const size=z.boss?145:z.type==='mini'?55:z.tough?102:88;
   const gait=z.gait??z.phase,amplitude=reducedMotion?.3:1;
-  const bob=dead?0:(Math.cos(gait*2)*1.5+Math.sin(gait)*.8)*amplitude;
+  const bob=dead?0:z.eating&&game.freeze<=0?Math.sin(game.time*12)*2:(Math.cos(gait*2)*1.5+Math.sin(gait)*.8)*amplitude;
   // The shadow stays on the ground while feet alternately lift and drag.
   ctx.save();ctx.translate(z.x,z.y);
   ctx.fillStyle='#334c2529';ctx.beginPath();ctx.ellipse(0,size*.39,size*.3,8,0,0,Math.PI*2);ctx.fill();
@@ -321,6 +322,26 @@ function getCaptainCutout(){
   }
   pen.putImageData(pixels,0,0);captainCutout=layer;return layer;
 }
+function drawSunflowerDefense(){
+  for(let i=0;i<8;i++){
+    const x=155,y=110+i*48,full=game.maxHealth/8,hp=game.flowerHealth[i],ratio=hp/full;
+    ctx.save();ctx.translate(x,y);
+    ctx.fillStyle='#49371d66';ctx.beginPath();ctx.ellipse(0,18,17,6,0,0,Math.PI*2);ctx.fill();
+    if(hp>0){
+      const sway=reducedMotion?0:Math.sin(game.time*2+i)*.045;
+      ctx.rotate(sway+(1-ratio)*.22);ctx.strokeStyle=ratio<.4?'#8a823b':'#36792d';ctx.lineWidth=5;
+      ctx.beginPath();ctx.moveTo(0,15);ctx.lineTo(0,-4);ctx.stroke();
+      ctx.fillStyle='#65b93d';ctx.beginPath();ctx.ellipse(-7,8,9,4,-.5,0,Math.PI*2);ctx.fill();
+      const petals=Math.max(2,Math.ceil(ratio*10));
+      for(let p=0;p<petals;p++){const a=p/10*Math.PI*2;ctx.save();ctx.rotate(a);ctx.fillStyle=ratio<.4?'#cf9d3c':'#ffda42';ctx.beginPath();ctx.ellipse(0,-13,5,10,0,0,Math.PI*2);ctx.fill();ctx.restore();}
+      ctx.fillStyle='#80532e';ctx.beginPath();ctx.arc(0,0,10,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#fff5b9';ctx.beginPath();ctx.arc(-3,-2,1.4,0,Math.PI*2);ctx.arc(3,-2,1.4,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='#3d281b';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(0,1,4,0,Math.PI);ctx.stroke();
+      if(ratio<.999){ctx.fillStyle='#3b332a';ctx.fillRect(-15,23,30,3);ctx.fillStyle='#ffc955';ctx.fillRect(-15,23,30*ratio,3);}
+    }else{ctx.strokeStyle='#88754b';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(0,17);ctx.lineTo(2,10);ctx.stroke();}
+    ctx.restore();
+  }
+}
 function drawHero() {
   const target=game.target();const angle=Math.atan2(target.y-game.hero.y,target.x-game.hero.x);
   ctx.save();ctx.globalAlpha=1;ctx.filter='none';ctx.translate(game.hero.x,game.hero.y);
@@ -360,8 +381,7 @@ function drawEffects() {
 function render(dt) {
   ctx.clearRect(0,0,1000,530);ctx.save();
   if(shake>0&&!reducedMotion)ctx.translate((Math.random()-.5)*shake*12,(Math.random()-.5)*shake*8);
-  // The dashed line marks where enemies can damage the garden.
-  if(game.status==='playing') {ctx.save();ctx.setLineDash([8,10]);ctx.strokeStyle='#fffad352';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(119,84);ctx.lineTo(119,465);ctx.stroke();ctx.restore();}
+  drawSunflowerDefense();
   if(game.freeze>0){ctx.fillStyle='#b4e9ff24';ctx.fillRect(0,0,1000,530);}
   [...game.enemies].sort((a,b)=>a.y-b.y).forEach(z=>drawZombie(z));
   game.dead.forEach(z=>drawZombie(z,true));
@@ -425,7 +445,7 @@ function finishScreen(win) {
 function upgradeScreen(){
   const nextWave=game.wave+1;
   const forecast=nextWave%5===0?'👑 下一波：巨型首领，会不断召唤跑跑僵尸':nextWave===2?'⚡ 下一波解锁：闪电跑跑、铁桶卫士':nextWave===3?'🛡️ 下一波解锁：盾牌兵、分裂软糖':nextWave===4?'💚 下一波解锁：治疗僵尸、爆破客':'下一波：更多敌人，更高生命，更快进攻';
-  showDialog('<div class="upgrade-eyebrow">WAVE '+game.wave+' CLEAR</div><h2>守住了！选一张，变更强</h2><p>所有强化整局有效，同名卡牌可以叠加。</p><div class="upgrade-options">'+game.offers.map((c,i)=>'<button class="upgrade-card cat-'+c.category+'" data-upgrade="'+c.id+'"><span class="upgrade-category">'+c.category+' <kbd>'+(i+1)+'</kbd></span><span class="upgrade-art">'+c.icon+'</span><strong>'+c.name+'</strong><span class="upgrade-description">'+c.description+'</span><span class="upgrade-stack">'+(game.stack(c.id)?'叠加强化：'+game.stack(c.id)+' → '+(game.stack(c.id)+1)+' 层':'新强化 · 获得第 1 层')+'</span><span class="choose-label">选择并迎战第 '+nextWave+' 波 →</span></button>').join('')+'</div><div class="next-wave-info">'+forecast+'</div><p class="upgrade-recovery">小院恢复 '+(1+game.stack('repair'))+' 护盾 · 大招充能推进 3 秒 · 选卡时战场暂停</p>',false);
+  showDialog('<div class="upgrade-eyebrow">WAVE '+game.wave+' CLEAR</div><h2>守住了！选一张，变更强</h2><p>所有强化整局有效，同名卡牌可以叠加。</p><div class="upgrade-options">'+game.offers.map((c,i)=>'<button class="upgrade-card cat-'+c.category+'" data-upgrade="'+c.id+'"><span class="upgrade-category">'+c.category+' <kbd>'+(i+1)+'</kbd></span><span class="upgrade-art">'+c.icon+'</span><strong>'+c.name+'</strong><span class="upgrade-description">'+c.description+'</span><span class="upgrade-stack">'+(game.stack(c.id)?'叠加强化：'+game.stack(c.id)+' → '+(game.stack(c.id)+1)+' 层':'新强化 · 获得第 1 层')+'</span><span class="choose-label">选择并迎战第 '+nextWave+' 波 →</span></button>').join('')+'</div><div class="next-wave-info">'+forecast+'</div><p class="upgrade-recovery">向日葵修复 '+(1+game.stack('repair'))+' 护盾 · 大招充能推进 3 秒 · 选卡时战场暂停</p>',false);
   $('#gameDialog').classList.add('upgrade-dialog');
   document.querySelectorAll('[data-upgrade]').forEach(b=>b.onclick=()=>pickUpgrade(b.dataset.upgrade));
 }
@@ -442,7 +462,7 @@ function showBuild(){
 
 function help() {
   const resume=game.status==='playing'||dialogResume;
-  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>滑块可随时调低射速，调到 0 就完全关闭普通子弹。按住空格也能射击。开启「自动瞄准射击」，可以腾出双手打字。</div></div><div class="help-row"><span>⌨</span><div><strong>敲对技能卡上的字母放大招</strong><br>第一波 A 激光、S 冰冻、D 西瓜。激光和西瓜会朝准星释放。</div></div><div class="help-row"><span>✧</span><div><strong>每一波结束，三选一叠加强化</strong><br>敌人每波增多、变强，大招回蓝也更快。施法从 1～3 个字母逐步增加至多行，最多 60 个；逐行输入，不用回车。按错保留进度，每 5 波有首领！字母上限可用滑块控制，慢动作可自行开启或关闭。</div></div><p>不想增加难度？开局前选「固定 A · S · D」。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
+  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>滑块可随时调低射速，调到 0 就完全关闭普通子弹。按住空格也能射击。开启「自动瞄准射击」，可以腾出双手打字。</div></div><div class="help-row"><span>⌨</span><div><strong>敲对技能卡上的字母放大招</strong><br>第一波 A 激光、S 冰冻、D 西瓜。激光和西瓜会朝准星释放。</div></div><div class="help-row"><span>✧</span><div><strong>向日葵就是小院防线</strong><br>僵尸靠近后会停下啃食，花瓣逐渐掉落，吃完只剩残茎。全部倒下后有 3 秒抢救时间；恢复护盾、修理或加固都能修复向日葵。<br><strong>每一波结束，三选一叠加强化</strong><br>敌人每波增多、变强，大招回蓝也更快。施法从 1～3 个字母逐步增加至多行，最多 60 个；逐行输入，不用回车。按错保留进度，每 5 波有首领！字母上限可用滑块控制，慢动作可自行开启或关闭。</div></div><p>不想增加难度？开局前选「固定 A · S · D」。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
 }
 for(const row of ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM']){
   const line=document.createElement('div');line.className='key-row';
