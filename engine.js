@@ -34,7 +34,7 @@
       this.flowerHealth=[];this.breachElapsed=0;this.health = 8; this.score = 0; this.kills = 0; this.casts = 0; this.correct = 0;
       this.wave = 1; this.spawned = 0; this.quota = 9; this.spawnIn = 2; this.waveBreak = 0;
       this.enemies = []; this.bullets = []; this.effects = []; this.dead = [];
-      this.shooting = false; this.shotIn = 0; this.time = 0; this.freeze = 0; this.combo = 0;
+      this.shooting = false; this.shotIn = 0; this.shotKick=0; this.time = 0; this.freeze = 0; this.combo = 0;
       this.typing = -1; this.activeTime = 0;
       this.skills = [
         { name:'彩虹激光', code:'A', typed:0, cd:0, duration:8, uses:0, icon:'🌈' },
@@ -97,13 +97,18 @@
       this.fireStrength=clamp(n,0,1);this.shotIn=0;
       if(this.fireStrength===0)this.bullets=[];
     }
+    muzzle(){
+      const target=this.target(),angle=Math.atan2(target.y-this.hero.y,target.x-this.hero.x);
+      const tilt=clamp(angle*.15,-.10,.10),x=47.55,y=-22.02;
+      return {x:this.hero.x+(this.shotKick>0?-3:0)+x*Math.cos(tilt)-y*Math.sin(tilt),y:this.hero.y+x*Math.sin(tilt)+y*Math.cos(tilt),tilt};
+    }
     shoot() {
       if(this.fireStrength<=0)return;
-      const target=this.target(),angle=Math.atan2(target.y-this.hero.y,target.x-this.hero.x);
+      this.shotKick=.1;const target=this.target(),muzzle=this.muzzle(),angle=Math.atan2(target.y-muzzle.y,target.x-muzzle.x);
       const count=1+this.stack('multishot'),renderCount=Math.min(15,count);
       for(let i=0;i<renderCount;i++){
         const a=angle+(i-(renderCount-1)/2)*.06;
-        this.bullets.push({x:this.hero.x+30,y:this.hero.y,px:this.hero.x+30,py:this.hero.y,vx:Math.cos(a)*720,vy:Math.sin(a)*720,life:2.5,
+        this.bullets.push({x:muzzle.x,y:muzzle.y,px:muzzle.x,py:muzzle.y,vx:Math.cos(a)*720,vy:Math.sin(a)*720,life:2.5,
           damage:24*this.power*(count/renderCount),pierce:this.stack('pierce'),bounces:this.stack('ricochet'),hitIds:new Set()});
       }
       this.emit('shot',{angle});
@@ -210,7 +215,7 @@
         const s=this.skills[i];if(s.cd>0){s.cd=Math.max(0,s.cd-dt*this.rechargeRate);if(s.cd===0){s.code=this.nextCode(i);this.emit('ready',{index:i});}}
       }
       this.freeze=Math.max(0,this.freeze-worldDt);
-      this.shotIn-=dt;
+      this.shotKick=Math.max(0,(this.shotKick||0)-dt);this.shotIn-=dt;
       if(this.fireStrength>0&&(this.shooting||this.auto)&&this.shotIn<=0){this.shoot();this.shotIn=Math.max(.025,.15/(this.fireStrength*(1+.18*this.stack('rapid'))));}
       for(const e of this.effects){e.life-=dt;if(e.kind==='melon'&&e.life<=0&&!e.exploded){e.exploded=true;for(const z of [...this.enemies])if(Math.hypot(z.x-e.x,z.y-e.y)<e.radius+z.radius)this.damage(z,e.damage,'melon');this.effects.push({kind:'explosion',x:e.x,y:e.y,life:.7,fullLife:.7});this.emit('explosion',{x:e.x,y:e.y});}}
       this.effects=this.effects.filter(e=>e.life>0);

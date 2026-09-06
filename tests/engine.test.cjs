@@ -126,3 +126,10 @@ test('sunflowers are chewed over time; zero defense has rescue time and repair r
  g.freeze=0;g.health=0;advance(g,1);assert.equal(g.status,'playing');assert.ok(g.breachElapsed>0);g.health=2;assert.equal(g.breachElapsed,0);assert.equal(g.health,2);assert.ok(g.flowerHealth.some(h=>h>0));
  g.health=0;advance(g,2);assert.equal(g.status,'playing');g.pause();advance(g,4);assert.ok(Math.abs(g.breachElapsed-2)<.0001);g.resume();advance(g,1.2);assert.equal(g.status,'lost');
 });
+test('shots start at the illustrated muzzle and travel toward the crosshair',()=>{
+ const g=make();g.start();g.auto=false;
+ for(const [x,y] of [[800,110],[800,450],[200,280]]){
+  g.setAim(x,y);g.bullets=[];g.shoot();const b=g.bullets[0],m=g.muzzle();assert.equal(b.x,m.x);assert.equal(b.y,m.y);
+  assert.ok(Math.abs(b.vx*(y-m.y)-b.vy*(x-m.x))<.00001);
+ }
+});

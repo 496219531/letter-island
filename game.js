@@ -345,16 +345,16 @@ function drawSunflowerDefense(){
 function drawHero() {
   const target=game.target();const angle=Math.atan2(target.y-game.hero.y,target.x-game.hero.x);
   ctx.save();ctx.globalAlpha=1;ctx.filter='none';ctx.translate(game.hero.x,game.hero.y);
-  ctx.fillStyle='#28452040';ctx.beginPath();ctx.ellipse(-5,44,40,10,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#28452040';ctx.beginPath();ctx.ellipse(-5,39,31,8,0,0,Math.PI*2);ctx.fill();
   if(captainSprite.complete&&captainSprite.naturalWidth){
-    ctx.save();ctx.translate(recoil>0?-4:0,reducedMotion?0:Math.sin(game.time*3)*1.2);
+    ctx.save();ctx.translate(game.shotKick>0?-3:0,0);
     ctx.rotate(Math.max(-.10,Math.min(.10,angle*.15)));
-    ctx.drawImage(getCaptainCutout(),-89,-111,170,170);ctx.restore();
+    ctx.drawImage(getCaptainCutout(),-70,-84,134,134);ctx.restore();
   }else drawEmoji('🌱',-8,0,95);
-  ctx.font='bold 11px system-ui';ctx.fillStyle='#f8ffed';ctx.textAlign='center';ctx.shadowColor='#39522b';ctx.shadowBlur=4;ctx.fillText('豌豆队长',-4,64);ctx.restore();
+  ctx.font='bold 11px system-ui';ctx.fillStyle='#f8ffed';ctx.textAlign='center';ctx.shadowColor='#39522b';ctx.shadowBlur=4;ctx.fillText('豌豆队长',-4,56);ctx.restore();
   if(game.status==='playing'){
     ctx.save();ctx.strokeStyle='#ffffdc99';ctx.lineWidth=2;ctx.setLineDash([4,7]);
-    ctx.beginPath();ctx.moveTo(game.hero.x+37,game.hero.y);ctx.lineTo(target.x,target.y);ctx.globalAlpha=.17;ctx.stroke();ctx.restore();
+    ctx.beginPath();const muzzle=game.muzzle();ctx.moveTo(muzzle.x,muzzle.y);ctx.lineTo(target.x,target.y);ctx.globalAlpha=.17;ctx.stroke();ctx.restore();
     ctx.save();ctx.translate(target.x,target.y);ctx.strokeStyle='#ffffe9d9';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,13,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(-20,0);ctx.lineTo(-8,0);ctx.moveTo(8,0);ctx.lineTo(20,0);ctx.moveTo(0,-20);ctx.lineTo(0,-8);ctx.moveTo(0,8);ctx.lineTo(0,20);ctx.stroke();ctx.restore();
   }
 }
