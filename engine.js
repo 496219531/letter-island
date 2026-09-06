@@ -126,16 +126,18 @@
       if(id==='fortify'){this.maxHealth+=2;this.health+=2;}
       if(id==='repair')this.health=Math.min(this.maxHealth,this.health+2);
       this.health=Math.min(this.maxHealth,this.health+1+this.stack('repair'));
-      this.wave++;this.spawned=0;this.quota=9+(this.wave-1)*3;this.spawnIn=.7;this.waveBreak=0;this.offers=[];this.status='playing';
+      this.wave++;this.spawned=0;this.quota=9+(this.wave-1)*4+Math.floor((this.wave-1)/5)*3;this.spawnIn=.7;this.waveBreak=0;this.offers=[];this.status='playing';
       for(const s of this.skills)s.cd=Math.max(0,s.cd-3);
       this.emit('wave',{wave:this.wave});return true;
     }
+    get spellLength() { return this.adaptive?Math.min(60,this.wave<=4?this.wave:4+(this.wave-4)*2):1; }
+    get rechargeRate() { return (1+.16*(this.wave-1))*(1+.2*this.stack('recharge')); }
     nextCode(index) {
       const base=['A','S','D'][index];
       if(!this.adaptive || this.wave===1)return base;
-      const choices=['FJKL','AJKL','FJKL'][index];
+      const choices=this.wave<5?['FJKL','AJKL','FJKL'][index]:'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
       let code=base;
-      for(let i=1;i<Math.min(3,this.wave);i++)code+=choices[Math.floor(this.random()*choices.length)];
+      for(let i=1;i<this.spellLength;i++)code+=choices[Math.floor(this.random()*choices.length)];
       return code;
     }
     select(index) {
@@ -185,7 +187,7 @@
       const slow=this.typing>=0?.22:1;
       const worldDt=dt*slow;
       for(let i=0;i<this.skills.length;i++){
-        const s=this.skills[i];if(s.cd>0){s.cd=Math.max(0,s.cd-dt*(1+.2*this.stack('recharge')));if(s.cd===0){s.code=this.nextCode(i);this.emit('ready',{index:i});}}
+        const s=this.skills[i];if(s.cd>0){s.cd=Math.max(0,s.cd-dt*this.rechargeRate);if(s.cd===0){s.code=this.nextCode(i);this.emit('ready',{index:i});}}
       }
       this.freeze=Math.max(0,this.freeze-worldDt);
       this.shotIn-=dt;

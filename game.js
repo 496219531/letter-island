@@ -71,7 +71,7 @@ function onEvent(type, data = {}) {
     if(card){card.classList.remove('wrong');void card.offsetWidth;card.classList.add('wrong');}
   }
   if (type === 'typing') { toast('按技能卡里的顺序敲字母，慢慢来',1600); }
-  if (type === 'cooldown') { toast('还要 '+Math.ceil(game.skills[data.index].cd)+' 秒，先用豌豆突突突',1400); }
+  if (type === 'cooldown') { toast('还要 '+Math.ceil(game.skills[data.index].cd/game.rechargeRate)+' 秒，先用豌豆突突突',1400); }
   if (type === 'empty') { toast('僵尸还没到，不浪费你的大招～'); }
   if (type === 'cast') {
     const icons = ['🌈','❄️','🍉'];
@@ -90,6 +90,15 @@ function onEvent(type, data = {}) {
   if (type === 'finish') { finishScreen(data.win); }
 }
 
+function spellKeysMarkup(skill,active){
+  const rows=[];
+  for(let start=0;start<skill.code.length;start+=6){
+    rows.push('<span class="spell-row">'+[...skill.code.slice(start,start+6)].map((letter,offset)=>{
+      const i=start+offset;return '<kbd class="'+(i<skill.typed?'typed':active&&i===skill.typed?'next':'')+'">'+letter+'</kbd>';
+    }).join('')+'</span>');
+  }
+  return rows.join('');
+}
 function updateHud(force=false) {
   const values = JSON.stringify([game.health,game.maxHealth,game.stacks,game.wave,game.kills,game.score,game.status,game.spawned,game.typing,game.freeze>0,game.skills.map(s=>[s.code,s.typed,Math.ceil(s.cd*10)])]);
   if(!force && values===lastHud)return;lastHud=values;
@@ -110,12 +119,14 @@ function updateHud(force=false) {
   $('#fieldStatus').textContent=game.status==='ready'?'小院准备就绪':game.freeze>0?'全场冰冻中 · 伤害翻倍':game.waveBreak>0?'这波守住啦':'小院保卫战进行中';
   $('#slowLabel').hidden=game.typing<0||game.status!=='playing';
   $('#battlefield').classList.toggle('slow',game.typing>=0&&game.status==='playing');
-  $('#arsenalNote').textContent=game.typing>=0?'慢动作中 · 依次敲完提示字母':'敲出字母，立即释放';
+  $('#arsenalNote').textContent=game.typing>=0?'慢动作中 · 已完成 '+game.skills[game.typing].typed+' / '+game.skills[game.typing].code.length+' 字母':'回蓝速度 ×'+game.rechargeRate.toFixed(2);
+  $('#progressHint').textContent=game.adaptive?'本波新提示 '+game.spellLength+' 个字母 · 从左到右逐行输入，无需回车':'固定 A / S / D · 回蓝和僵尸强度仍随波次提升';
   document.querySelectorAll('.skill-card').forEach((card,index)=>{
     const s=game.skills[index];card.classList.toggle('selected',game.typing===index);card.classList.toggle('cooling',s.cd>0);
-    card.setAttribute('aria-label',s.name+'，'+(s.cd>0?'充能中 '+Math.ceil(s.cd)+' 秒':'依次输入 '+s.code));
-    $('#skillKeys'+index).innerHTML=[...s.code].map((letter,i)=>'<kbd class="'+(i<s.typed?'typed':game.typing===index&&i===s.typed?'next':'')+'">'+letter+'</kbd>').join('');
-    $('#skillStatus'+index).textContent=s.cd>0?Math.ceil(s.cd)+' 秒充能':game.typing===index?'正在施法':'准备好啦';
+    card.setAttribute('aria-label',s.name+'，'+(s.cd>0?'回蓝中 '+Math.ceil(s.cd/game.rechargeRate)+' 秒':'依次输入 '+s.code));
+    $('#skillKeys'+index).innerHTML=spellKeysMarkup(s,game.typing===index);
+    card.classList.toggle('long-spell',s.code.length>6);
+    $('#skillStatus'+index).textContent=s.cd>0?Math.ceil(s.cd/game.rechargeRate)+' 秒回蓝':game.typing===index?s.typed+' / '+s.code.length+' 字母':'准备好啦 · '+s.code.length+' 字母';
     $('#cooldown'+index).style.width=(1-s.cd/s.duration)*100+'%';
   });
   const expected=game.typing>=0?[game.skills[game.typing].code[game.skills[game.typing].typed]]:game.skills.filter(s=>s.cd<=0).map(s=>s.code[0]);
@@ -316,7 +327,7 @@ function showBuild(){
 
 function help() {
   const resume=game.status==='playing'||dialogResume;
-  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>滑块可随时调低射速，调到 0 就完全关闭普通子弹。按住空格也能射击。开启「自动瞄准射击」，可以腾出双手打字。</div></div><div class="help-row"><span>⌨</span><div><strong>敲对技能卡上的字母放大招</strong><br>第一波 A 激光、S 冰冻、D 西瓜。激光和西瓜会朝准星释放。</div></div><div class="help-row"><span>✧</span><div><strong>每一波结束，三选一叠加强化</strong><br>24 种强化可重复获得，整局有效。敌人每波变强，每 5 波有首领！打字时依然有慢动作。</div></div><p>不想增加难度？开局前选「固定 A · S · D」。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
+  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>滑块可随时调低射速，调到 0 就完全关闭普通子弹。按住空格也能射击。开启「自动瞄准射击」，可以腾出双手打字。</div></div><div class="help-row"><span>⌨</span><div><strong>敲对技能卡上的字母放大招</strong><br>第一波 A 激光、S 冰冻、D 西瓜。激光和西瓜会朝准星释放。</div></div><div class="help-row"><span>✧</span><div><strong>每一波结束，三选一叠加强化</strong><br>敌人每波增多、变强，大招回蓝也更快。施法从 1～3 个字母逐步增加至多行，最多 60 个；逐行输入，不用回车。按错保留进度，每 5 波有首领！</div></div><p>不想增加难度？开局前选「固定 A · S · D」。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
 }
 for(const row of ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM']){
   const line=document.createElement('div');line.className='key-row';
@@ -351,7 +362,7 @@ $('#buildButton').onclick=showBuild;$('#startButton').onclick=begin;$('#pauseBut
 $('#soundButton').onclick=()=>{soundOn=!soundOn;$('#soundButton').setAttribute('aria-pressed',String(soundOn));$('#soundButton').setAttribute('aria-label',soundOn?'关闭音效':'开启音效');tone(700,.12);};
 $('#autoButton').onclick=()=>{game.auto=!game.auto;$('#autoButton').setAttribute('aria-pressed',String(game.auto));updateFireControl();if(game.status==='playing')canvas.focus({preventScroll:true});};
 $('#keyboardButton').onclick=()=>{const expanded=$('#touchKeyboard').hidden;$('#touchKeyboard').hidden=!expanded;$('#keyboardButton').setAttribute('aria-expanded',String(expanded));};
-$('#difficulty').onchange=()=>{$('#progressHint').textContent=$('#difficulty').value==='fixed'?'所有波次都用固定字母 A / S / D，敌人仍会逐渐变强。':'第 1 波：A / S / D → 第 2 波：双字母 → 第 3 波起：三字母';};
+$('#difficulty').onchange=()=>{$('#progressHint').textContent=$('#difficulty').value==='fixed'?'所有波次都用固定字母 A / S / D，敌人仍会逐渐变强。':'前期 1～3 字母 → 中期 6～10 字母 → 后期多行长组合';};
 document.querySelectorAll('.skill-card').forEach((button,index)=>button.onclick=()=>{if(game.status!=='playing'){toast('先开始保卫小院吧！');return;}game.select(index);if(window.matchMedia('(pointer: coarse)').matches){$('#touchKeyboard').hidden=false;$('#keyboardButton').setAttribute('aria-expanded','true');}updateHud(true);});
 $('#closeDialog').onclick=()=>closeDialog();$('#gameDialog').addEventListener('cancel',event=>{event.preventDefault();closeDialog();});
 if(window.matchMedia('(pointer: coarse)').matches){$('#touchKeyboard').hidden=false;$('#keyboardButton').setAttribute('aria-expanded','true');}

@@ -81,3 +81,20 @@ test('100 percent preserves original rate and lower settings reduce it for both 
  for(const auto of [true,false]){const full=count(1,auto),low=count(.3,auto);assert.ok(full>=18&&full<=21);assert.ok(low>=5&&low<=7);assert.ok(low<full*.4);assert.equal(count(0,auto),0);}
  const g=make();g.setFireStrength(-1);assert.equal(g.fireStrength,0);g.setFireStrength(2);assert.equal(g.fireStrength,1);g.setFireStrength(NaN);assert.equal(g.fireStrength,1);
 });
+test('spell length and recharge rate grow through late waves while fixed mode remains one letter',()=>{
+ const g=make();g.start();for(const [wave,length] of [[1,1],[3,3],[5,6],[7,10],[10,16],[17,30],[32,60],[100,60]]){
+  g.wave=wave;assert.equal(g.spellLength,length);assert.equal(g.nextCode(0).length,length);
+ }
+ g.wave=10;assert.equal(g.rechargeRate,2.44);g.stacks.recharge=2;assert.ok(Math.abs(g.rechargeRate-3.416)<.0001);
+ g.adaptive=false;assert.equal(g.nextCode(0),'A');assert.equal(g.spellLength,1);
+});
+test('long spells keep progress across row boundaries, errors and pause and only cast after the final letter',()=>{
+ const g=make();g.start();g.wave=10;g.skills[0].code=g.nextCode(0);const code=g.skills[0].code;
+ for(const c of code.slice(0,7))g.input(c);assert.equal(g.skills[0].typed,7);assert.equal(g.casts,0);
+ g.input(code[7]==='Z'?'X':'Z');assert.equal(g.skills[0].typed,7);g.pause();g.input(code[7]);assert.equal(g.skills[0].typed,7);g.resume();
+ for(const c of code.slice(7))g.input(c);assert.equal(g.casts,1);assert.equal(g.skills[0].typed,0);
+});
+test('late wave cooldowns recover faster in real time and pause still stops recovery',()=>{
+ const a=make(),b=make();a.start();b.start();b.wave=10;a.skills[0].cd=8;b.skills[0].cd=8;advance(a,1);advance(b,1);
+ assert.ok(b.skills[0].cd<a.skills[0].cd-1);b.pause();const cd=b.skills[0].cd;advance(b,2);assert.equal(b.skills[0].cd,cd);
+});
