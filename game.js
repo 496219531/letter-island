@@ -5,27 +5,15 @@ const ctx = canvas.getContext('2d');
 const sprite = new Image(); sprite.src = 'assets/zombie.png';
 const captainSprite=new Image();captainSprite.src='assets/pea-captain-v1.png';
 const particles = [];
-const MAX_PARTICLES=260, MAX_VOICES=32;
-let activeVoices=0;
+const MAX_PARTICLES=260;
+const soundscape=new GardenAudio(()=>new (window.AudioContext||window.webkitAudioContext)());
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-let soundOn = true, audio = null, best = 0, lastTime = 0, lastHud = '', hudClock = 0;
+let soundOn = true, best = 0, lastTime = 0, lastHud = '', hudClock = 0;
 let toastTimer, bannerTimer, recoil = 0, shake = 0, dialogResume = false;
 try { best = Math.max(0, Number(localStorage.getItem('gulu-shooter-best')) || 0); } catch {}
 $('#bestScore').textContent = best;
 
-function tone(frequency, duration = .1, type = 'sine', volume = .035, end = frequency) {
-  if (!soundOn || activeVoices>=MAX_VOICES) return;
-  try {
-    audio ??= new (window.AudioContext || window.webkitAudioContext)();
-    if (audio.state === 'suspended') audio.resume();
-    const oscillator = audio.createOscillator(), gain = audio.createGain(), now = audio.currentTime;
-    oscillator.type = type; oscillator.frequency.setValueAtTime(frequency, now);
-    oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, end), now + duration);
-    gain.gain.setValueAtTime(volume, now); gain.gain.exponentialRampToValueAtTime(.0001, now + duration);
-    oscillator.onended=()=>{oscillator.disconnect();gain.disconnect();oscillator.onended=null;activeVoices--;};
-    oscillator.connect(gain); gain.connect(audio.destination); oscillator.start(now); activeVoices++; oscillator.stop(now + duration);
-  } catch { soundOn = false; $('#soundButton').setAttribute('aria-pressed', 'false'); }
-}
+function tone(...args){if(soundOn)soundscape.tone(...args);}
 function toast(text, time = 2200) {
   clearTimeout(toastTimer); $('#battleToast').textContent = text; $('#battleToast').classList.add('visible');
   toastTimer = setTimeout(() => $('#battleToast').classList.remove('visible'), time);
@@ -103,10 +91,10 @@ function saveMenu(){
   };
 }
 readSavedRun();
-window.addEventListener('pagehide',()=>persistRun());
+window.addEventListener('pagehide',()=>{persistRun();soundscape.stop();});
 window.addEventListener('storage',event=>{
   if(event.key===WRITER_KEY&&event.newValue!==writerId&&['playing','paused','upgrade'].includes(game.status)){
-    game.shooting=false;game.status='ready';dialogResume=false;
+    game.shooting=false;game.status='ready';soundscape.stop();dialogResume=false;
     if($('#gameDialog').open)$('#gameDialog').close();$('#gameDialog').classList.remove('upgrade-dialog');$('#closeDialog').hidden=false;
     $('#startScreen').hidden=false;readSavedRun();updateHud(true);toast('冒险已在另一个页面继续，本页已停止，避免覆盖存档。',4000);
   }else if(event.key===SAVE_KEY&&game.status==='ready')readSavedRun();
@@ -152,16 +140,19 @@ $('#englishLevel').onchange=()=>{game.englishLevel=Number($('#englishLevel').val
 $('#magicSlowButton').onclick=()=>{game.magicSlow=!game.magicSlow;saveTypingSettings();};
 updateTypingControls();
 function onEvent(type, data = {}) {
+  if(['start','pause','upgrade','finish'].includes(type))soundscape.stop();
+  if(type==='nibble')soundscape.play('nibble',data);
+  if(type==='critical')soundscape.play('critical',data);
   if(['start','wave','upgrade','pause'].includes(type))persistRun();
   if (type === 'upgrade') { upgradeScreen(); }
   if(type==='nibble')puff(data.x,data.y,'#ffd945',data.removed?18:6,data.removed?'':'咔嚓');
   if (type === 'critical') { floatText(data.x,data.y-28,'暴击！','#ffdd8a'); }
   if (type === 'heal') { puff(data.x,data.y,'#b9ffa0',8,'+'); }
-  if (type === 'shot') { recoil = .1; tone(320,.055,'triangle',.012,135); }
-  if (type === 'hit') { puff(data.x,data.y,'#e3f8a3',4); }
+  if (type === 'shot') { recoil = .1; soundscape.play('shot',{x:game.hero.x}); }
+  if (type === 'hit') { if(!['poison','thorns'].includes(data.kind))soundscape.play(data.surface||'flesh',data);puff(data.x,data.y,'#e3f8a3',4); }
   if (type === 'kill') {
     puff(data.x,data.y,'#fff4a0',15); floatText(data.x,data.y-20,'+'+data.score);
-    tone(640,.1,'sine',.035,960);
+    soundscape.play(data.boss?'boss':'kill',data);
   }
   if (type === 'letter') { tone(560+(game.skills[data.index].typed%8)*90,.12); }
   if (type === 'wrong') {
@@ -178,15 +169,15 @@ function onEvent(type, data = {}) {
     const banner = $('#castBanner'); banner.textContent = icons[data.index]+' '+data.name+'！';
     banner.classList.remove('show');void banner.offsetWidth;banner.classList.add('show');
     clearTimeout(bannerTimer);bannerTimer=setTimeout(()=>banner.classList.remove('show'),1000);
-    if(data.index===0){tone(180,.55,'sawtooth',.035,1250);shake=.35;}
-    if(data.index===1){tone(1400,.6,'sine',.05,430);toast('冻住啦！'+(6+1.5*game.stack('permafrost'))+' 秒内豌豆伤害提升 ❄',2400);}
-    if(data.index===2)tone(750,.5,'triangle',.05,110);
+    if(data.index===0){soundscape.play('laser',{x:game.hero.x});shake=.35;}
+    if(data.index===1){soundscape.play('freeze');toast('冻住啦！'+(6+1.5*game.stack('permafrost'))+' 秒内豌豆伤害提升 ❄',2400);}
+    if(data.index===2)soundscape.play('melon');
   }
-  if (type === 'explosion') { puff(data.x,data.y,'#ffd98a',45,'BOOM!');tone(100,.35,'sawtooth',.08,30);shake=.55; }
-  if (type === 'breach') { shake=.3;tone(150,.15,'triangle',.06,95);toast(game.health<=0?'向日葵全倒了！3 秒内修复防线或清场！':'向日葵正在被啃食！快保护它们！'); }
+  if (type === 'explosion') { puff(data.x,data.y,'#ffd98a',45,'BOOM!');soundscape.play('explosion',data);shake=.55; }
+  if (type === 'breach') { shake=.3;soundscape.play('warning');toast(game.health<=0?'向日葵全倒了！3 秒内修复防线或清场！':'向日葵正在被啃食！快保护它们！'); }
   if (type === 'wave') { toast(data.wave===1?'第 1 波！试试敲 A 放激光 🌈':'第 '+data.wave+' 波来啦！强化生效，僵尸也变强了！',2800); }
   if (type === 'clear') { toast('这波守住啦！歇一口气，下一波马上来 ✦',2700);tone(660,.25,'sine',.04,880); }
-  if (type === 'boss') { toast('大个子来串门！用冰冻和西瓜招呼它！',3500); }
+  if (type === 'boss') { soundscape.play('boss',{x:950});toast('大个子来串门！用冰冻和西瓜招呼它！',3500); }
   if (type === 'finish') { finishSavedRun();finishScreen(data.win); }
 }
 
@@ -416,7 +407,7 @@ function render(dt) {
 }
 function frame(time) {
   const dt=lastTime?Math.min((time-lastTime)/1000,.05):0;lastTime=time;
-  game.update(dt);render(dt);if(['playing','paused','upgrade'].includes(game.status)){saveClock+=dt;if(saveClock>=2){persistRun();saveClock=0;}}hudClock+=dt;if(hudClock>.07){updateHud();hudClock=0;}
+  game.update(dt);soundscape.update(dt,game);render(dt);if(['playing','paused','upgrade'].includes(game.status)){saveClock+=dt;if(saveClock>=2){persistRun();saveClock=0;}}hudClock+=dt;if(hudClock>.07){updateHud();hudClock=0;}
   window.requestAnimationFrame(frame);
 }
 function begin(force=false) {
@@ -510,7 +501,7 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('keyup',event=>{if(event.key===' ')game.shooting=false;});
 $('#saveButton').onclick=saveMenu;$('#continueButton').onclick=continueRun;$('#buildButton').onclick=showBuild;$('#startButton').onclick=begin;$('#pauseButton').onclick=pauseScreen;$('#helpButton').onclick=help;
-$('#soundButton').onclick=()=>{soundOn=!soundOn;$('#soundButton').setAttribute('aria-pressed',String(soundOn));$('#soundButton').setAttribute('aria-label',soundOn?'关闭音效':'开启音效');tone(700,.12);};
+$('#soundButton').onclick=()=>{soundOn=!soundOn;soundscape.setEnabled(soundOn);$('#soundButton').setAttribute('aria-pressed',String(soundOn));$('#soundButton').setAttribute('aria-label',soundOn?'关闭音效':'开启音效');tone(700,.12);};
 $('#autoButton').onclick=()=>{game.auto=!game.auto;$('#autoButton').setAttribute('aria-pressed',String(game.auto));updateFireControl();if(game.status==='playing')canvas.focus({preventScroll:true});};
 $('#keyboardButton').onclick=()=>{const expanded=$('#touchKeyboard').hidden;$('#touchKeyboard').hidden=!expanded;$('#keyboardButton').setAttribute('aria-expanded',String(expanded));};
 $('#difficulty').onchange=()=>{game.learningMode=['english','sentences'].includes($('#difficulty').value)?$('#difficulty').value:'letters';game.adaptive=$('#difficulty').value!=='fixed';updateTypingControls();updateHud(true);};

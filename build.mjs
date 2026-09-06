@@ -1,8 +1,8 @@
 import { mkdir, cp, readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
-for (const script of ['engine.js', 'save.js', 'game.js', 'adventure.js']) execFileSync(process.execPath, ['--check', script], { stdio: 'inherit' });
+for (const script of ['engine.js', 'save.js', 'sound.js', 'game.js', 'adventure.js']) execFileSync(process.execPath, ['--check', script], { stdio: 'inherit' });
 await mkdir('dist', { recursive: true });
-for (const file of ['index.html', 'styles.css', 'engine.js', 'save.js', 'game.js', 'adventure.html', 'adventure.css', 'adventure.js', 'assets']) {
+for (const file of ['index.html', 'styles.css', 'engine.js', 'save.js', 'sound.js', 'game.js', 'adventure.html', 'adventure.css', 'adventure.js', 'assets']) {
   await cp(file, `dist/${file}`, { recursive: true });
 }
 const html = await readFile('dist/index.html', 'utf8');

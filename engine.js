@@ -121,11 +121,12 @@
     }
     damage(z,amount,kind='pea') {
       if(z.hp<=0)return;
+      const surface=this.freeze>0?'iceHit':z.shield>0?'shield':z.type==='armor'?'metal':'flesh';
       if(kind==='pea'&&z.type==='armor')amount*=.5;
       if(z.shield>0){const blocked=Math.min(z.shield,amount);z.shield-=blocked;amount-=blocked;}
       z.hp-=amount;z.hit=.12;
       if(kind==='pea')z.x=Math.min(1070,z.x+3+4*this.stack('knockback'));
-      this.emit('hit',{x:z.x,y:z.y,kind});
+      this.emit('hit',{x:z.x,y:z.y,kind,surface});
       if(z.hp<=0){
         this.kills++;const score=z.boss?250:z.type==='walker'?10:25;this.score+=score;this.combo++;
         this.dead.push({...z,life:.7,fullLife:.7});this.emit('kill',{x:z.x,y:z.y,boss:z.boss,score});

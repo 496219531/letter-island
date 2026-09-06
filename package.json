@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node build.mjs",
     "dev": "python3 -m http.server 4173 --bind 127.0.0.1",
-    "test": "node tests/engine.test.cjs && node tests/save.test.cjs",
+    "test": "node tests/engine.test.cjs && node tests/save.test.cjs && node tests/sound.test.cjs",
     "test:memory": "node --expose-gc tests/memory.test.cjs"
   }
 }
