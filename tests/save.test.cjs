@@ -34,3 +34,8 @@ test('sunflower damage and rescue countdown survive saves; old saves grow a matc
  delete s.state.flowerHealth;delete s.state.breachElapsed;assert.ok(restore(loaded,s));assert.equal(loaded.health,7.75);assert.equal(loaded.flowerHealth.length,8);
  loaded.status='upgrade';loaded.offers=[CARDS.find(c=>c.id==='fortify')];loaded.chooseCard('fortify');assert.equal(loaded.maxHealth,10);assert.equal(loaded.health,10);assert.ok(loaded.flowerHealth.every(h=>h===1.25));
 });
+test('English run saves words, progress and level; old runs default to letters',()=>{
+ const g=new GardenGame();g.learningMode='english';g.englishLevel=3;g.start();g.input(g.skills[0].code[0]);const save=encode(g),loaded=new GardenGame();assert.ok(restore(loaded,save));assert.equal(loaded.learningMode,'english');assert.equal(loaded.englishLevel,3);assert.equal(loaded.skills[0].typed,1);assert.equal(loaded.skills[0].code,g.skills[0].code);
+ const bad=JSON.parse(JSON.stringify(save));bad.state.skills[0].code='FAKEWORD';assert.equal(validate(bad),false);
+ const old=new GardenGame();old.start();const legacy=encode(old);delete legacy.state.learningMode;delete legacy.state.englishLevel;assert.ok(restore(loaded,legacy));assert.equal(loaded.learningMode,'letters');
+});

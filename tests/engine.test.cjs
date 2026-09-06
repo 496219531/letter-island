@@ -133,3 +133,13 @@ test('shots start at the illustrated muzzle and travel toward the crosshair',()=
   assert.ok(Math.abs(b.vx*(y-m.y)-b.vy*(x-m.x))<.00001);
  }
 });
+test('English tiers generate real words with unique initials and preserve in-flight prompts',()=>{
+ const {ENGLISH_WORDS}=require('../engine.js');const g=make();g.learningMode='english';g.setMaxSpellLength(1);
+ for(let level=0;level<5;level++){
+  g.englishLevel=level;g.start();assert.equal(new Set(g.skills.map(s=>s.code[0])).size,3);
+  for(const skill of g.skills)assert.ok(ENGLISH_WORDS[level].some(e=>e.word===skill.code));
+  const word=g.skills[0].code;g.input(word[0]);assert.equal(g.casts,0);g.englishLevel=(level+1)%5;assert.equal(g.skills[0].code,word);
+  for(const c of word.slice(1))g.input(c);assert.equal(g.casts,1);advance(g,8.1);assert.ok(ENGLISH_WORDS[g.englishLevel].some(e=>e.word===g.skills[0].code));
+ }
+ g.learningMode='letters';g.start();assert.equal(g.skills[0].code,'A');
+});

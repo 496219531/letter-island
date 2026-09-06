@@ -23,9 +23,11 @@
     bomber:{name:'爆破客',icon:'💣',hp:1.15,speed:1.4},boss:{name:'巨型首领',icon:'👑',hp:12,speed:.55},
     mini:{name:'小软糖',icon:'',hp:.3,speed:1.65}
   };
+  // Game-specific learning tiers, not an exam or curriculum classification.
+  const ENGLISH_WORDS=["cat:猫 dog:狗 sun:太阳 moon:月亮 egg:鸡蛋 red:红色 blue:蓝色 pig:猪 cow:奶牛 duck:鸭子 fish:鱼 bird:鸟 ant:蚂蚁 bee:蜜蜂 apple:苹果 ball:球 book:书 cup:杯子 hat:帽子 hand:手 eye:眼睛 nose:鼻子 ear:耳朵 bus:公交车 toy:玩具", "water:水 milk:牛奶 bread:面包 rice:米饭 cake:蛋糕 juice:果汁 chair:椅子 table:桌子 door:门 room:房间 school:学校 teacher:老师 mother:妈妈 father:爸爸 sister:姐妹 brother:兄弟 green:绿色 yellow:黄色 happy:开心的 small:小的 big:大的 jump:跳 run:跑 sing:唱歌 swim:游泳", "garden:花园 flower:花 grass:草 forest:森林 river:河流 ocean:海洋 mountain:山 rabbit:兔子 monkey:猴子 elephant:大象 giraffe:长颈鹿 orange:橙子 banana:香蕉 potato:土豆 tomato:番茄 breakfast:早餐 dinner:晚餐 kitchen:厨房 bedroom:卧室 window:窗户 morning:早晨 evening:傍晚 family:家庭 friend:朋友 weather:天气", "adventure:冒险 protect:保护 repair:修理 collect:收集 explore:探索 discover:发现 practice:练习 remember:记住 question:问题 answer:答案 different:不同的 important:重要的 careful:小心的 brave:勇敢的 healthy:健康的 gentle:温柔的 curious:好奇的 rainbow:彩虹 sunshine:阳光 thunder:雷声 butterfly:蝴蝶 vegetable:蔬菜 library:图书馆 tomorrow:明天 together:一起", "challenge:挑战 courage:勇气 knowledge:知识 imagination:想象力 environment:环境 responsibility:责任 opportunity:机会 communicate:交流 understand:理解 encourage:鼓励 cooperate:合作 celebrate:庆祝 investigate:调查 experiment:实验 creative:有创造力的 independent:独立的 confident:自信的 patient:有耐心的 generous:慷慨的 grateful:感激的 discover:发现 improve:改善 develop:发展 solution:解决办法 achievement:成就"].map(tier=>tier.split(" ").map(item=>{const [word,meaning]=item.split(":");return {word:word.toUpperCase(),meaning};}));
   class GardenGame {
     constructor({ random = Math.random, emit = () => {} } = {}) {
-      this.random = random; this.emit = emit; this.status = 'ready'; this.adaptive = true; this.auto = false; this.fireStrength = .3; this.maxSpellLength = 60; this.magicSlow = false;
+      this.random = random; this.emit = emit; this.status = 'ready'; this.adaptive = true; this.auto = false; this.fireStrength = .3; this.maxSpellLength = 60; this.magicSlow = false;this.learningMode='letters';this.englishLevel=0;
       this.aim = { x: 690, y: 280 }; this.hero = { x: 100, y: 282 }; this.serial = 0;
       this.reset(); this.status = 'ready';
     }
@@ -63,6 +65,7 @@
     }
     start() {
       this.reset(); this.status = 'playing';
+      if(this.learningMode==='english')for(let i=0;i<3;i++)this.skills[i].code=this.nextCode(i);
       this.spawn(650, 210); this.spawn(790, 370); this.spawn(905, 140);
       this.emit('start'); this.emit('wave', { wave:1 });
     }
@@ -159,6 +162,13 @@
     get spellLength() { return this.adaptive?Math.min(this.maxSpellLength,this.wave<=4?this.wave:4+(this.wave-4)*2):1; }
     get rechargeRate() { return (1+.16*(this.wave-1))*(1+.2*this.stack('recharge')); }
     nextCode(index) {
+      if(this.learningMode==='english'){
+        const others=this.skills.filter((_,i)=>i!==index).map(s=>s.code[0]);
+        const tier=ENGLISH_WORDS[this.englishLevel]||ENGLISH_WORDS[0];
+        const pool=tier.filter(entry=>!others.includes(entry.word[0])&&entry.word!==this.skills[index].code);
+        const candidates=pool.length?pool:tier;
+        return candidates[Math.floor(this.random()*candidates.length)].word;
+      }
       const base=['A','S','D'][index];
       if(!this.adaptive || this.wave===1)return base;
       const choices=this.wave<5?['FJKL','AJKL','FJKL'][index]:'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -261,6 +271,6 @@
       }
     }
   }
-  root.GardenGame=GardenGame;root.GARDEN_CARDS=CARDS;root.ZOMBIE_TYPES=TYPES;
-  if(typeof module!=='undefined'&&module.exports)module.exports={GardenGame,CARDS,TYPES};
+  root.ENGLISH_WORDS=ENGLISH_WORDS;root.GardenGame=GardenGame;root.GARDEN_CARDS=CARDS;root.ZOMBIE_TYPES=TYPES;
+  if(typeof module!=='undefined'&&module.exports)module.exports={GardenGame,CARDS,TYPES,ENGLISH_WORDS};
 })(typeof globalThis!=='undefined'?globalThis:this);
