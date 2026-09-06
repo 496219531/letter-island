@@ -92,7 +92,10 @@ function onEvent(type, data = {}) {
 
 function spellKeysMarkup(skill,active){
   const rows=[];
-  for(let start=0;start<skill.code.length;start+=6){
+  const totalRows=Math.ceil(skill.code.length/6);
+  const currentRow=Math.min(totalRows-1,Math.floor(skill.typed/6));
+  const firstRow=Math.min(currentRow,Math.max(0,totalRows-2));
+  for(let start=firstRow*6;start<Math.min(skill.code.length,(firstRow+2)*6);start+=6){
     rows.push('<span class="spell-row">'+[...skill.code.slice(start,start+6)].map((letter,offset)=>{
       const i=start+offset;return '<kbd class="'+(i<skill.typed?'typed':active&&i===skill.typed?'next':'')+'">'+letter+'</kbd>';
     }).join('')+'</span>');
@@ -102,6 +105,7 @@ function spellKeysMarkup(skill,active){
 function updateHud(force=false) {
   const values = JSON.stringify([game.health,game.maxHealth,game.stacks,game.wave,game.kills,game.score,game.status,game.spawned,game.typing,game.freeze>0,game.skills.map(s=>[s.code,s.typed,Math.ceil(s.cd*10)])]);
   if(!force && values===lastHud)return;lastHud=values;
+  document.body.classList.toggle('in-run',game.status!=='ready');
   $('#score').textContent=game.score;
   $('#upgradeCount').textContent=Object.values(game.stacks).reduce((a,b)=>a+b,0);
   $('#runDifficulty').textContent='第 '+game.wave+' 波 · '+game.quota+' 只来袭 · 敌人生命 ×'+Math.pow(1.19,game.wave-1).toFixed(1);
@@ -119,14 +123,14 @@ function updateHud(force=false) {
   $('#fieldStatus').textContent=game.status==='ready'?'小院准备就绪':game.freeze>0?'全场冰冻中 · 伤害翻倍':game.waveBreak>0?'这波守住啦':'小院保卫战进行中';
   $('#slowLabel').hidden=game.typing<0||game.status!=='playing';
   $('#battlefield').classList.toggle('slow',game.typing>=0&&game.status==='playing');
-  $('#arsenalNote').textContent=game.typing>=0?'慢动作中 · 已完成 '+game.skills[game.typing].typed+' / '+game.skills[game.typing].code.length+' 字母':'回蓝速度 ×'+game.rechargeRate.toFixed(2);
-  $('#progressHint').textContent=game.adaptive?'本波新提示 '+game.spellLength+' 个字母 · 从左到右逐行输入，无需回车':'固定 A / S / D · 回蓝和僵尸强度仍随波次提升';
+  $('#arsenalNote').textContent=game.typing>=0?'自动换行 · 已完成 '+game.skills[game.typing].typed+' / '+game.skills[game.typing].code.length+' 字母':'回蓝速度 ×'+game.rechargeRate.toFixed(2);
+  $('#progressHint').textContent=game.adaptive?'本波新提示 '+game.spellLength+' 个字母 · 只显示当前两行，自动跟随输入':'固定 A / S / D · 回蓝和僵尸强度仍随波次提升';
   document.querySelectorAll('.skill-card').forEach((card,index)=>{
     const s=game.skills[index];card.classList.toggle('selected',game.typing===index);card.classList.toggle('cooling',s.cd>0);
     card.setAttribute('aria-label',s.name+'，'+(s.cd>0?'回蓝中 '+Math.ceil(s.cd/game.rechargeRate)+' 秒':'依次输入 '+s.code));
     $('#skillKeys'+index).innerHTML=spellKeysMarkup(s,game.typing===index);
     card.classList.toggle('long-spell',s.code.length>6);
-    $('#skillStatus'+index).textContent=s.cd>0?Math.ceil(s.cd/game.rechargeRate)+' 秒回蓝':game.typing===index?s.typed+' / '+s.code.length+' 字母':'准备好啦 · '+s.code.length+' 字母';
+    $('#skillStatus'+index).textContent=s.cd>0?Math.ceil(s.cd/game.rechargeRate)+' 秒回蓝':game.typing===index?'第 '+(Math.floor(s.typed/6)+1)+' / '+Math.ceil(s.code.length/6)+' 行 · '+s.typed+'/'+s.code.length:'准备好啦 · '+s.code.length+' 字母';
     $('#cooldown'+index).style.width=(1-s.cd/s.duration)*100+'%';
   });
   const expected=game.typing>=0?[game.skills[game.typing].code[game.skills[game.typing].typed]]:game.skills.filter(s=>s.cd<=0).map(s=>s.code[0]);
