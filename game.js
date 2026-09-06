@@ -37,6 +37,22 @@ function floatText(x,y,text,color='#fff9c2') {
   particles.push({x,y,vx:0,vy:-50,color,life:1.1,max:1.1,size:20,text});
 }
 const game = new GardenGame({ emit:onEvent });
+try {
+  const saved=localStorage.getItem('gulu-fire-strength');
+  if(saved!==null&&saved.trim()!==''&&Number.isFinite(Number(saved)))game.setFireStrength(Number(saved));
+} catch {}
+function updateFireControl(){
+  const percent=Math.round(game.fireStrength*100);
+  $('#fireStrength').value=percent;
+  $('#fireStrengthValue').textContent=percent===0?'已关闭':percent+'%';
+  $('#fireStrength').setAttribute('aria-valuetext',percent===0?'普通射击已关闭':percent===100?'100%，原版火力':percent+'% 射速');
+  $('#aimHint').textContent=percent===0?'✧ 普通射击已关闭 · 敲字母放大招':game.auto?'✦ 自动瞄准中 · 双手专心放大招':'⌖ 鼠标瞄准 · 按住左键连续射击';
+}
+$('#fireStrength').addEventListener('input',event=>{
+  game.setFireStrength(Number(event.target.value)/100);updateFireControl();
+  try{localStorage.setItem('gulu-fire-strength',String(game.fireStrength));}catch{}
+});
+updateFireControl();
 function onEvent(type, data = {}) {
   if (type === 'upgrade') { upgradeScreen(); }
   if (type === 'critical') { floatText(data.x,data.y-28,'暴击！','#ffdd8a'); }
@@ -300,7 +316,7 @@ function showBuild(){
 
 function help() {
   const resume=game.status==='playing'||dialogResume;
-  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>按住空格也能连续射击。开启「自动瞄准射击」，可以腾出双手打字。</div></div><div class="help-row"><span>⌨</span><div><strong>敲对技能卡上的字母放大招</strong><br>第一波 A 激光、S 冰冻、D 西瓜。激光和西瓜会朝准星释放。</div></div><div class="help-row"><span>✧</span><div><strong>每一波结束，三选一叠加强化</strong><br>24 种强化可重复获得，整局有效。敌人每波变强，每 5 波有首领！打字时依然有慢动作。</div></div><p>不想增加难度？开局前选「固定 A · S · D」。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
+  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>滑块可随时调低射速，调到 0 就完全关闭普通子弹。按住空格也能射击。开启「自动瞄准射击」，可以腾出双手打字。</div></div><div class="help-row"><span>⌨</span><div><strong>敲对技能卡上的字母放大招</strong><br>第一波 A 激光、S 冰冻、D 西瓜。激光和西瓜会朝准星释放。</div></div><div class="help-row"><span>✧</span><div><strong>每一波结束，三选一叠加强化</strong><br>24 种强化可重复获得，整局有效。敌人每波变强，每 5 波有首领！打字时依然有慢动作。</div></div><p>不想增加难度？开局前选「固定 A · S · D」。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
 }
 for(const row of ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM']){
   const line=document.createElement('div');line.className='key-row';
@@ -333,7 +349,7 @@ document.addEventListener('keydown',event=>{
 document.addEventListener('keyup',event=>{if(event.key===' ')game.shooting=false;});
 $('#buildButton').onclick=showBuild;$('#startButton').onclick=begin;$('#pauseButton').onclick=pauseScreen;$('#helpButton').onclick=help;
 $('#soundButton').onclick=()=>{soundOn=!soundOn;$('#soundButton').setAttribute('aria-pressed',String(soundOn));$('#soundButton').setAttribute('aria-label',soundOn?'关闭音效':'开启音效');tone(700,.12);};
-$('#autoButton').onclick=()=>{game.auto=!game.auto;$('#autoButton').setAttribute('aria-pressed',String(game.auto));$('#aimHint').textContent=game.auto?'✦ 自动瞄准中 · 双手专心放大招':'⌖ 鼠标瞄准 · 按住左键连续射击';if(game.status==='playing')canvas.focus({preventScroll:true});};
+$('#autoButton').onclick=()=>{game.auto=!game.auto;$('#autoButton').setAttribute('aria-pressed',String(game.auto));updateFireControl();if(game.status==='playing')canvas.focus({preventScroll:true});};
 $('#keyboardButton').onclick=()=>{const expanded=$('#touchKeyboard').hidden;$('#touchKeyboard').hidden=!expanded;$('#keyboardButton').setAttribute('aria-expanded',String(expanded));};
 $('#difficulty').onchange=()=>{$('#progressHint').textContent=$('#difficulty').value==='fixed'?'所有波次都用固定字母 A / S / D，敌人仍会逐渐变强。':'第 1 波：A / S / D → 第 2 波：双字母 → 第 3 波起：三字母';};
 document.querySelectorAll('.skill-card').forEach((button,index)=>button.onclick=()=>{if(game.status!=='playing'){toast('先开始保卫小院吧！');return;}game.select(index);if(window.matchMedia('(pointer: coarse)').matches){$('#touchKeyboard').hidden=false;$('#keyboardButton').setAttribute('aria-expanded','true');}updateHud(true);});

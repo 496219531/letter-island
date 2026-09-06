@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { GardenGame, CARDS, TYPES } = require('../engine.js');
-const make = () => new GardenGame({random:()=>.35});
+const make = () => {const g=new GardenGame({random:()=>.35});g.setFireStrength(1);return g;};
 const advance = (game, seconds) => { for(let i=0;i<seconds*60;i++)game.update(1/60); };
 const test = (name, fn) => { fn(); console.log('PASS',name); };
 test('ordinary shots collide with enemies and score kills',()=>{
@@ -69,4 +69,15 @@ test('walking phase follows movement, slow motion, ice and pause',()=>{
  a.pause();advance(a,1);assert.equal(a.enemies[0].gait,frozen);
  const g=make();g.start();g.enemies=[];const runner=g.spawn(900,200,'runner'),boss=g.spawn(900,400,'boss');
  const rp=runner.gait,bp=boss.gait;advance(g,1);assert.ok(runner.gait-rp>(boss.gait-bp)*2);
+});
+
+test('default fire is 30 percent and zero blocks manual and auto shots while skills still work',()=>{
+ const g=new GardenGame();assert.equal(g.fireStrength,.3);g.start();g.auto=true;g.shooting=true;g.shoot();assert.ok(g.bullets.length);
+ g.setFireStrength(0);assert.equal(g.bullets.length,0);g.shoot();advance(g,1);assert.equal(g.bullets.length,0);
+ g.input('s');assert.equal(g.casts,1);assert.ok(g.freeze>0);g.start();assert.equal(g.fireStrength,0);
+});
+test('100 percent preserves original rate and lower settings reduce it for both firing modes',()=>{
+ const count=(value,auto)=>{let shots=0;const g=new GardenGame({emit:t=>{if(t==='shot')shots++;}});g.setFireStrength(value);g.start();g.auto=auto;g.shooting=!auto;advance(g,3);return shots;};
+ for(const auto of [true,false]){const full=count(1,auto),low=count(.3,auto);assert.ok(full>=18&&full<=21);assert.ok(low>=5&&low<=7);assert.ok(low<full*.4);assert.equal(count(0,auto),0);}
+ const g=make();g.setFireStrength(-1);assert.equal(g.fireStrength,0);g.setFireStrength(2);assert.equal(g.fireStrength,1);g.setFireStrength(NaN);assert.equal(g.fireStrength,1);
 });

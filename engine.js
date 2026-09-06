@@ -25,7 +25,7 @@
   };
   class GardenGame {
     constructor({ random = Math.random, emit = () => {} } = {}) {
-      this.random = random; this.emit = emit; this.status = 'ready'; this.adaptive = true; this.auto = false;
+      this.random = random; this.emit = emit; this.status = 'ready'; this.adaptive = true; this.auto = false; this.fireStrength = .3;
       this.aim = { x: 690, y: 280 }; this.hero = { x: 100, y: 282 }; this.serial = 0;
       this.reset(); this.status = 'ready';
     }
@@ -73,7 +73,13 @@
       this.enemies.push(z);if(count)this.spawned++;
       if(z.boss)this.emit('boss');return z;
     }
+    setFireStrength(value) {
+      const n=Number(value);if(!Number.isFinite(n))return;
+      this.fireStrength=clamp(n,0,1);this.shotIn=0;
+      if(this.fireStrength===0)this.bullets=[];
+    }
     shoot() {
+      if(this.fireStrength<=0)return;
       const target=this.target(),angle=Math.atan2(target.y-this.hero.y,target.x-this.hero.x);
       const count=1+this.stack('multishot'),renderCount=Math.min(15,count);
       for(let i=0;i<renderCount;i++){
@@ -183,7 +189,7 @@
       }
       this.freeze=Math.max(0,this.freeze-worldDt);
       this.shotIn-=dt;
-      if((this.shooting||this.auto)&&this.shotIn<=0){this.shoot();this.shotIn=Math.max(.025,.15/(1+.18*this.stack('rapid')));}
+      if(this.fireStrength>0&&(this.shooting||this.auto)&&this.shotIn<=0){this.shoot();this.shotIn=Math.max(.025,.15/(this.fireStrength*(1+.18*this.stack('rapid'))));}
       for(const e of this.effects){e.life-=dt;if(e.kind==='melon'&&e.life<=0&&!e.exploded){e.exploded=true;for(const z of [...this.enemies])if(Math.hypot(z.x-e.x,z.y-e.y)<e.radius+z.radius)this.damage(z,e.damage,'melon');this.effects.push({kind:'explosion',x:e.x,y:e.y,life:.7,fullLife:.7});this.emit('explosion',{x:e.x,y:e.y});}}
       this.effects=this.effects.filter(e=>e.life>0);
       for(const z of [...this.enemies]){
