@@ -37,6 +37,74 @@ function floatText(x,y,text,color='#fff9c2') {
   particles.push({x,y,vx:0,vy:-50,color,life:1.1,max:1.1,size:20,text});
 }
 const game = new GardenGame({ emit:onEvent });
+const SAVE_KEY='gulu-run-v1', WRITER_KEY='gulu-run-writer-v1';
+const writerId=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
+let availableSave=null,saveClock=0,saveProblem='';
+function refreshSaveMenu(){
+  $('#continueButton').hidden=!availableSave;
+  $('#saveHint').hidden=!availableSave&&!saveProblem;
+  $('#saveHint').textContent=availableSave?'第 '+availableSave.state.wave+' 波 · '+Object.values(availableSave.state.stacks).reduce((a,b)=>a+b,0)+' 张强化 · '+availableSave.state.score+' 分 · 保存在当前浏览器':saveProblem;
+  $('#startButton').classList.toggle('new-run-button',!!availableSave);
+  $('#startButton').textContent=availableSave?'重新开始一局':'出发！保卫小院 →';
+}
+function readSavedRun(){
+  try{
+    const raw=localStorage.getItem(SAVE_KEY);
+    if(!raw){availableSave=null;saveProblem='';}
+    else if(raw.length<2000000){const record=JSON.parse(raw);if(GuluSave.validate(record.run)){availableSave=record.run;saveProblem='';}else{availableSave=null;saveProblem='存档无法读取，暂未覆盖。可重新开始一局。';}}
+    else{availableSave=null;saveProblem='存档无法读取，暂未覆盖。';}
+  }catch{availableSave=null;saveProblem='当前浏览器无法读取存档。';}
+  refreshSaveMenu();
+}
+function claimSave(){
+  try{localStorage.setItem(WRITER_KEY,writerId);return true;}
+  catch{saveProblem='浏览器未允许保存，当前进度无法自动存档。';toast(saveProblem,4000);return false;}
+}
+function persistRun(manual=false){
+  if(!['playing','paused','upgrade'].includes(game.status))return false;
+  try{
+    if(localStorage.getItem(WRITER_KEY)!==writerId){if(manual)toast('这局已在另一个页面继续，请在那里存档。');return false;}
+    const run=GuluSave.encode(game);if(!run)return false;
+    localStorage.setItem(SAVE_KEY,JSON.stringify({writer:writerId,run}));availableSave=run;saveProblem='';saveClock=0;
+    $('#saveButton').title='已自动保存 · 第 '+game.wave+' 波';refreshSaveMenu();
+    if(manual)toast('已保存！下次点「继续上次冒险」就能接着玩。',2500);
+    return true;
+  }catch{saveProblem='保存失败：浏览器存储不可用或空间不足。';$('#saveButton').title=saveProblem;if(manual)toast(saveProblem,4000);return false;}
+}
+function finishSavedRun(){
+  try{if(localStorage.getItem(WRITER_KEY)===writerId){localStorage.removeItem(SAVE_KEY);availableSave=null;saveProblem='';refreshSaveMenu();}}catch{}
+}
+function continueRun(){
+  readSavedRun();if(!availableSave)return;
+  if(!GuluSave.restore(game,availableSave)){toast('这份存档无法恢复，原存档暂未覆盖。');return;}
+  claimSave();particles.length=0;$('#startScreen').hidden=true;
+  $('#difficulty').value=game.adaptive?'adaptive':'fixed';$('#autoButton').setAttribute('aria-pressed',String(game.auto));updateFireControl();
+  if(game.status==='upgrade')upgradeScreen();else game.resume();
+  persistRun();updateHud(true);canvas.focus({preventScroll:true});toast('欢迎回来！继续守住第 '+game.wave+' 波。');
+}
+function saveMenu(){
+  if(game.status==='upgrade'){persistRun(true);return;}
+  if(!['playing','paused'].includes(game.status)){
+    readSavedRun();toast(availableSave?'已有第 '+availableSave.state.wave+' 波存档，点击「继续上次冒险」。':'开始冒险后会每 2 秒自动保存。');return;
+  }
+  showDialog('<div class="dialog-icon">💾</div><h2>把冒险装进口袋</h2><p>自动保存波次、卡牌、护盾、敌人位置和施法进度。<br>存档保存在当前浏览器，刷新或关闭后可继续。</p><button class="primary-button" id="saveAndContinue">保存并继续 →</button><button class="secondary-button" id="saveAndExit">保存并返回开始画面</button>',true);
+  $('#saveAndContinue').onclick=()=>{if(persistRun(true))closeDialog();};
+  $('#saveAndExit').onclick=()=>{
+    if(!persistRun()) {toast(saveProblem||'未能保存，请稍后重试。');return;}
+    $('#gameDialog').close();dialogResume=false;game.status='ready';game.shooting=false;
+    $('#startScreen').hidden=false;refreshSaveMenu();updateHud(true);
+  };
+}
+readSavedRun();
+window.addEventListener('pagehide',()=>persistRun());
+window.addEventListener('storage',event=>{
+  if(event.key===WRITER_KEY&&event.newValue!==writerId&&['playing','paused','upgrade'].includes(game.status)){
+    game.shooting=false;game.status='ready';dialogResume=false;
+    if($('#gameDialog').open)$('#gameDialog').close();$('#gameDialog').classList.remove('upgrade-dialog');$('#closeDialog').hidden=false;
+    $('#startScreen').hidden=false;readSavedRun();updateHud(true);toast('冒险已在另一个页面继续，本页已停止，避免覆盖存档。',4000);
+  }else if(event.key===SAVE_KEY&&game.status==='ready')readSavedRun();
+});
+
 try {
   const saved=localStorage.getItem('gulu-fire-strength');
   if(saved!==null&&saved.trim()!==''&&Number.isFinite(Number(saved)))game.setFireStrength(Number(saved));
@@ -54,6 +122,7 @@ $('#fireStrength').addEventListener('input',event=>{
 });
 updateFireControl();
 function onEvent(type, data = {}) {
+  if(['start','wave','upgrade','pause'].includes(type))persistRun();
   if (type === 'upgrade') { upgradeScreen(); }
   if (type === 'critical') { floatText(data.x,data.y-28,'暴击！','#ffdd8a'); }
   if (type === 'heal') { puff(data.x,data.y,'#b9ffa0',8,'+'); }
@@ -87,7 +156,7 @@ function onEvent(type, data = {}) {
   if (type === 'wave') { toast(data.wave===1?'第 1 波！试试敲 A 放激光 🌈':'第 '+data.wave+' 波来啦！强化生效，僵尸也变强了！',2800); }
   if (type === 'clear') { toast('这波守住啦！歇一口气，下一波马上来 ✦',2700);tone(660,.25,'sine',.04,880); }
   if (type === 'boss') { toast('大个子来串门！用冰冻和西瓜招呼它！',3500); }
-  if (type === 'finish') { finishScreen(data.win); }
+  if (type === 'finish') { finishSavedRun();finishScreen(data.win); }
 }
 
 function spellKeysMarkup(skill,active){
@@ -275,12 +344,16 @@ function render(dt) {
 }
 function frame(time) {
   const dt=lastTime?Math.min((time-lastTime)/1000,.05):0;lastTime=time;
-  game.update(dt);render(dt);hudClock+=dt;if(hudClock>.07){updateHud();hudClock=0;}
+  game.update(dt);render(dt);if(['playing','paused','upgrade'].includes(game.status)){saveClock+=dt;if(saveClock>=2){persistRun();saveClock=0;}}hudClock+=dt;if(hudClock>.07){updateHud();hudClock=0;}
   window.requestAnimationFrame(frame);
 }
-function begin() {
+function begin(force=false) {
+  if(force!==true&&(availableSave||saveProblem)){
+    showDialog('<div class="dialog-icon">🌱</div><h2>开始全新的冒险？</h2><p>新的一局会替换当前存档。<br>想保留进度，可以返回并继续上次冒险。</p><button class="primary-button" id="confirmNewRun">重新开始一局 →</button><button class="secondary-button" id="keepRun">保留存档，返回</button>',game.status==='playing'||dialogResume);
+    $('#confirmNewRun').onclick=()=>begin(true);$('#keepRun').onclick=()=>closeDialog();return;
+  }
   if($('#gameDialog').open)closeDialog(false);
-  particles.length=0;game.adaptive=$('#difficulty').value==='adaptive';
+  claimSave();particles.length=0;game.adaptive=$('#difficulty').value==='adaptive';
   $('#startScreen').hidden=true;game.start();canvas.focus({preventScroll:true});updateHud(true);
 }
 function showDialog(html,resume=game.status==='playing') {
@@ -355,14 +428,14 @@ document.addEventListener('keydown',event=>{
   if(event.ctrlKey||event.metaKey||event.altKey||event.isComposing||$('#gameDialog').open)return;
   if(['INPUT','TEXTAREA','SELECT'].includes(event.target.tagName))return;
   if(event.key==='Escape'){event.preventDefault();pauseScreen();return;}
-  if(event.key==='Enter'&&game.status==='ready'&&event.target.tagName!=='BUTTON'){event.preventDefault();begin();return;}
+  if(event.key==='Enter'&&game.status==='ready'&&event.target.tagName!=='BUTTON'){event.preventDefault();if(availableSave)continueRun();else begin();return;}
   if(event.key===' '&&game.status==='playing'&&event.target.tagName!=='BUTTON'){event.preventDefault();game.shooting=true;return;}
   if(event.repeat)return;
   if(/^[a-z]$/i.test(event.key)&&game.status==='playing'){event.preventDefault();game.input(event.key);updateHud(true);}
   if(event.key==='Backspace'&&game.status==='playing'){event.preventDefault();game.backspace();updateHud(true);}
 });
 document.addEventListener('keyup',event=>{if(event.key===' ')game.shooting=false;});
-$('#buildButton').onclick=showBuild;$('#startButton').onclick=begin;$('#pauseButton').onclick=pauseScreen;$('#helpButton').onclick=help;
+$('#saveButton').onclick=saveMenu;$('#continueButton').onclick=continueRun;$('#buildButton').onclick=showBuild;$('#startButton').onclick=begin;$('#pauseButton').onclick=pauseScreen;$('#helpButton').onclick=help;
 $('#soundButton').onclick=()=>{soundOn=!soundOn;$('#soundButton').setAttribute('aria-pressed',String(soundOn));$('#soundButton').setAttribute('aria-label',soundOn?'关闭音效':'开启音效');tone(700,.12);};
 $('#autoButton').onclick=()=>{game.auto=!game.auto;$('#autoButton').setAttribute('aria-pressed',String(game.auto));updateFireControl();if(game.status==='playing')canvas.focus({preventScroll:true});};
 $('#keyboardButton').onclick=()=>{const expanded=$('#touchKeyboard').hidden;$('#touchKeyboard').hidden=!expanded;$('#keyboardButton').setAttribute('aria-expanded',String(expanded));};
