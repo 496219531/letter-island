@@ -25,6 +25,9 @@
   };
   // Game-specific learning tiers, not an exam or curriculum classification.
   const ENGLISH_WORDS=["cat:猫 dog:狗 sun:太阳 moon:月亮 egg:鸡蛋 red:红色 blue:蓝色 pig:猪 cow:奶牛 duck:鸭子 fish:鱼 bird:鸟 ant:蚂蚁 bee:蜜蜂 apple:苹果 ball:球 book:书 cup:杯子 hat:帽子 hand:手 eye:眼睛 nose:鼻子 ear:耳朵 bus:公交车 toy:玩具", "water:水 milk:牛奶 bread:面包 rice:米饭 cake:蛋糕 juice:果汁 chair:椅子 table:桌子 door:门 room:房间 school:学校 teacher:老师 mother:妈妈 father:爸爸 sister:姐妹 brother:兄弟 green:绿色 yellow:黄色 happy:开心的 small:小的 big:大的 jump:跳 run:跑 sing:唱歌 swim:游泳", "garden:花园 flower:花 grass:草 forest:森林 river:河流 ocean:海洋 mountain:山 rabbit:兔子 monkey:猴子 elephant:大象 giraffe:长颈鹿 orange:橙子 banana:香蕉 potato:土豆 tomato:番茄 breakfast:早餐 dinner:晚餐 kitchen:厨房 bedroom:卧室 window:窗户 morning:早晨 evening:傍晚 family:家庭 friend:朋友 weather:天气", "adventure:冒险 protect:保护 repair:修理 collect:收集 explore:探索 discover:发现 practice:练习 remember:记住 question:问题 answer:答案 different:不同的 important:重要的 careful:小心的 brave:勇敢的 healthy:健康的 gentle:温柔的 curious:好奇的 rainbow:彩虹 sunshine:阳光 thunder:雷声 butterfly:蝴蝶 vegetable:蔬菜 library:图书馆 tomorrow:明天 together:一起", "challenge:挑战 courage:勇气 knowledge:知识 imagination:想象力 environment:环境 responsibility:责任 opportunity:机会 communicate:交流 understand:理解 encourage:鼓励 cooperate:合作 celebrate:庆祝 investigate:调查 experiment:实验 creative:有创造力的 independent:独立的 confident:自信的 patient:有耐心的 generous:慷慨的 grateful:感激的 discover:发现 improve:改善 develop:发展 solution:解决办法 achievement:成就"].map(tier=>tier.split(" ").map(item=>{const [word,meaning]=item.split(":");return {word:word.toUpperCase(),meaning};}));
+  const WORD_IPA={"cat": "kæt", "dog": "dɔɡ", "sun": "sʌn", "moon": "muːn", "egg": "eɡ", "red": "red", "blue": "bluː", "pig": "pɪɡ", "cow": "kaʊ", "duck": "dʌk", "fish": "fɪʃ", "bird": "bɝːd", "ant": "ænt", "bee": "biː", "apple": "ˈæpəl", "ball": "bɔːl", "book": "bʊk", "cup": "kʌp", "hat": "hæt", "hand": "hænd", "eye": "aɪ", "nose": "noʊz", "ear": "ɪr", "bus": "bʌs", "toy": "tɔɪ", "water": "ˈwɔːtər", "milk": "mɪlk", "bread": "bred", "rice": "raɪs", "cake": "keɪk", "juice": "dʒuːs", "chair": "tʃer", "table": "ˈteɪbəl", "door": "dɔːr", "room": "ruːm", "school": "skuːl", "teacher": "ˈtiːtʃər", "mother": "ˈmʌðər", "father": "ˈfɑːðər", "sister": "ˈsɪstər", "brother": "ˈbrʌðər", "green": "ɡriːn", "yellow": "ˈjeloʊ", "happy": "ˈhæpi", "small": "smɔːl", "big": "bɪɡ", "jump": "dʒʌmp", "run": "rʌn", "sing": "sɪŋ", "swim": "swɪm", "garden": "ˈɡɑːrdən", "flower": "ˈflaʊər", "grass": "ɡræs", "forest": "ˈfɔːrɪst", "river": "ˈrɪvər", "ocean": "ˈoʊʃən", "mountain": "ˈmaʊntən", "rabbit": "ˈræbɪt", "monkey": "ˈmʌŋki", "elephant": "ˈeləfənt", "giraffe": "dʒəˈræf", "orange": "ˈɔːrɪndʒ", "banana": "bəˈnænə", "potato": "pəˈteɪtoʊ", "tomato": "təˈmeɪtoʊ", "breakfast": "ˈbrekfəst", "dinner": "ˈdɪnər", "kitchen": "ˈkɪtʃən", "bedroom": "ˈbedruːm", "window": "ˈwɪndoʊ", "morning": "ˈmɔːrnɪŋ", "evening": "ˈiːvnɪŋ", "family": "ˈfæməli", "friend": "frend", "weather": "ˈweðər", "adventure": "ədˈventʃər", "protect": "prəˈtekt", "repair": "rɪˈper", "collect": "kəˈlekt", "explore": "ɪkˈsplɔːr", "discover": "dɪˈskʌvər", "practice": "ˈpræktɪs", "remember": "rɪˈmembər", "question": "ˈkwestʃən", "answer": "ˈænsər", "different": "ˈdɪfərənt", "important": "ɪmˈpɔːrtənt", "careful": "ˈkerfəl", "brave": "breɪv", "healthy": "ˈhelθi", "gentle": "ˈdʒentəl", "curious": "ˈkjʊriəs", "rainbow": "ˈreɪnboʊ", "sunshine": "ˈsʌnʃaɪn", "thunder": "ˈθʌndər", "butterfly": "ˈbʌtərflaɪ", "vegetable": "ˈvedʒtəbəl", "library": "ˈlaɪbreri", "tomorrow": "təˈmɑːroʊ", "together": "təˈɡeðər", "challenge": "ˈtʃælɪndʒ", "courage": "ˈkɝːɪdʒ", "knowledge": "ˈnɑːlɪdʒ", "imagination": "ɪˌmædʒəˈneɪʃən", "environment": "ɪnˈvaɪrənmənt", "responsibility": "rɪˌspɑːnsəˈbɪləti", "opportunity": "ˌɑːpərˈtuːnəti", "communicate": "kəˈmjuːnɪkeɪt", "understand": "ˌʌndərˈstænd", "encourage": "ɪnˈkɝːɪdʒ", "cooperate": "koʊˈɑːpəreɪt", "celebrate": "ˈseləbreɪt", "investigate": "ɪnˈvestɪɡeɪt", "experiment": "ɪkˈsperɪmənt", "creative": "kriˈeɪtɪv", "independent": "ˌɪndɪˈpendənt", "confident": "ˈkɑːnfɪdənt", "patient": "ˈpeɪʃənt", "generous": "ˈdʒenərəs", "grateful": "ˈɡreɪtfəl", "improve": "ɪmˈpruːv", "develop": "dɪˈveləp", "solution": "səˈluːʃən", "achievement": "əˈtʃiːvmənt"};
+  for(const tier of ENGLISH_WORDS)for(const entry of tier)entry.ipa=WORD_IPA[entry.word.toLowerCase()];
+  const ENGLISH_SENTENCES=[[["Hello", "你好"], ["Good morning", "早上好"], ["Thank you", "谢谢你"], ["See you", "再见"], ["I am happy", "我很开心"], ["My name is Sam", "我叫萨姆"], ["Nice to meet you", "很高兴认识你"], ["Please sit down", "请坐下"], ["Open the door", "打开门"], ["Come here", "到这里来"], ["You are kind", "你很友善"], ["We are friends", "我们是朋友"]], [["How are you", "你好吗"], ["I like apples", "我喜欢苹果"], ["This is my book", "这是我的书"], ["Please help me", "请帮帮我"], ["Can I have some water", "能给我一些水吗"], ["Where is my bag", "我的包在哪里"], ["Good night and sweet dreams", "晚安，祝你好梦"], ["Do you like milk", "你喜欢牛奶吗"], ["My favorite color is blue", "我最喜欢的颜色是蓝色"], ["Thank you for your help", "谢谢你的帮助"], ["See you tomorrow", "明天见"], ["Open your book please", "请打开你的书"]], [["What time is it", "现在几点了"], ["Could you say that again", "你能再说一遍吗"], ["I would like some juice", "我想要一些果汁"], ["How much is this", "这个多少钱"], ["Please speak slowly", "请说慢一点"], ["May I use the bathroom", "我可以用洗手间吗"], ["Do you want to play", "你想玩吗"], ["The weather is nice today", "今天天气很好"], ["Are you ready to go", "你准备好出发了吗"], ["We can take the bus", "我们可以坐公交车"], ["Turn left at the next street", "在下一条街左转"], ["See you after school", "放学后见"]], [["Could you show me the way", "你能给我指路吗"], ["I am looking for the library", "我正在找图书馆"], ["What would you like to eat", "你想吃什么"], ["Please tell me more about it", "请再多告诉我一些"], ["How long does it take", "这需要多长时间"], ["Do you have a smaller size", "你有小一点的尺码吗"], ["Thank you for inviting me", "谢谢你邀请我"], ["Would you like to join us", "你愿意加入我们吗"], ["My family enjoys cooking together", "我们家喜欢一起做饭"], ["Everyone needs a little help", "每个人都需要一点帮助"], ["Remember to bring your umbrella", "记得带上你的伞"], ["Take your time and try again", "慢慢来，再试一次"]], [["Could you explain what this means", "你能解释一下这是什么意思吗"], ["I would like to make a reservation", "我想预约"], ["Would you mind closing the window", "你介意关一下窗户吗"], ["Please let me know if you need help", "需要帮助时请告诉我"], ["How can I get to the nearest station", "我怎么去最近的车站"], ["Do you have any other suggestions", "你还有其他建议吗"], ["Thank you for being so patient", "谢谢你这么有耐心"], ["We should try to solve this together", "我们应该一起试着解决这件事"], ["It was a pleasure talking with you", "和你交谈很愉快"], ["Practice helps us become more confident", "练习帮助我们变得更自信"], ["Remember to take a break when you need one", "需要休息时记得休息一下"], ["Making mistakes is part of learning", "犯错是学习的一部分"]]].map(tier=>tier.map(([text,meaning])=>({text,meaning,word:text.toUpperCase()})));
   class GardenGame {
     constructor({ random = Math.random, emit = () => {} } = {}) {
       this.random = random; this.emit = emit; this.status = 'ready'; this.adaptive = true; this.auto = false; this.fireStrength = .3; this.maxSpellLength = 60; this.magicSlow = false;this.learningMode='letters';this.englishLevel=0;
@@ -65,7 +68,7 @@
     }
     start() {
       this.reset(); this.status = 'playing';
-      if(this.learningMode==='english')for(let i=0;i<3;i++)this.skills[i].code=this.nextCode(i);
+      if(this.learningMode!=='letters')for(let i=0;i<3;i++)this.skills[i].code=this.nextCode(i);
       this.spawn(650, 210); this.spawn(790, 370); this.spawn(905, 140);
       this.emit('start'); this.emit('wave', { wave:1 });
     }
@@ -162,9 +165,10 @@
     get spellLength() { return this.adaptive?Math.min(this.maxSpellLength,this.wave<=4?this.wave:4+(this.wave-4)*2):1; }
     get rechargeRate() { return (1+.16*(this.wave-1))*(1+.2*this.stack('recharge')); }
     nextCode(index) {
-      if(this.learningMode==='english'){
+      if(this.learningMode==='english'||this.learningMode==='sentences'){
         const others=this.skills.filter((_,i)=>i!==index).map(s=>s.code[0]);
-        const tier=ENGLISH_WORDS[this.englishLevel]||ENGLISH_WORDS[0];
+        const bank=this.learningMode==='sentences'?ENGLISH_SENTENCES:ENGLISH_WORDS;
+        const tier=bank[this.englishLevel]||bank[0];
         const pool=tier.filter(entry=>!others.includes(entry.word[0])&&entry.word!==this.skills[index].code);
         const candidates=pool.length?pool:tier;
         return candidates[Math.floor(this.random()*candidates.length)].word;
@@ -183,7 +187,7 @@
       this.emit('typing',{index});
     }
     input(key) {
-      if(this.status!=='playing'||!(/^[a-z]$/i).test(key))return false;
+      if(this.status!=='playing'||!((/^[a-z]$/i).test(key)||(key===' '&&this.learningMode==='sentences')))return false;
       key=key.toUpperCase();
       let index=this.typing;
       if(index<0)index=this.skills.findIndex(s=>s.cd<=0&&s.code[0]===key);
@@ -271,6 +275,6 @@
       }
     }
   }
-  root.ENGLISH_WORDS=ENGLISH_WORDS;root.GardenGame=GardenGame;root.GARDEN_CARDS=CARDS;root.ZOMBIE_TYPES=TYPES;
-  if(typeof module!=='undefined'&&module.exports)module.exports={GardenGame,CARDS,TYPES,ENGLISH_WORDS};
+  root.ENGLISH_SENTENCES=ENGLISH_SENTENCES;root.ENGLISH_WORDS=ENGLISH_WORDS;root.GardenGame=GardenGame;root.GARDEN_CARDS=CARDS;root.ZOMBIE_TYPES=TYPES;
+  if(typeof module!=='undefined'&&module.exports)module.exports={GardenGame,CARDS,TYPES,ENGLISH_WORDS,ENGLISH_SENTENCES};
 })(typeof globalThis!=='undefined'?globalThis:this);

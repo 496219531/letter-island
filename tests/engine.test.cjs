@@ -143,3 +143,19 @@ test('English tiers generate real words with unique initials and preserve in-fli
  }
  g.learningMode='letters';g.start();assert.equal(g.skills[0].code,'A');
 });
+test('every learning word includes Chinese and American IPA',()=>{
+ const {ENGLISH_WORDS}=require('../engine.js');for(const tier of ENGLISH_WORDS)for(const e of tier){assert.ok(e.meaning);assert.ok(e.ipa,e.word+' missing IPA');}
+});
+test('sentence tiers use complete phrases, require spaces, and only cast at completion',()=>{
+ const {ENGLISH_SENTENCES}=require('../engine.js');const g=make();g.learningMode='sentences';
+ for(let level=0;level<5;level++){
+  g.englishLevel=level;g.start();assert.equal(new Set(g.skills.map(s=>s.code[0])).size,3);
+  for(const skill of g.skills)assert.ok(ENGLISH_SENTENCES[level].some(e=>e.word===skill.code));
+  g.skills[0].code=ENGLISH_SENTENCES[level].find(e=>e.word.includes(' ')).word;const phrase=g.skills[0].code,space=phrase.indexOf(' ');
+  for(const c of phrase.slice(0,space))g.input(c.toLowerCase());g.input('z');assert.equal(g.skills[0].typed,space);assert.equal(g.casts,0);
+  g.input(' ');assert.equal(g.skills[0].typed,space+1);g.backspace();assert.equal(g.skills[0].typed,space);
+  g.pause();g.input(' ');assert.equal(g.skills[0].typed,space);g.resume();
+  for(const c of phrase.slice(space))g.input(c.toLowerCase());assert.equal(g.casts,1);assert.equal(g.shooting,false);
+ }
+ g.learningMode='letters';g.start();assert.equal(g.input(' '),false);
+});

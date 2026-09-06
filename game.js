@@ -85,7 +85,7 @@ function continueRun(){
   readSavedRun();if(!availableSave)return;
   if(!GuluSave.restore(game,availableSave)){toast('这份存档无法恢复，原存档暂未覆盖。');return;}
   claimSave();particles.length=0;$('#startScreen').hidden=true;
-  $('#difficulty').value=game.learningMode==='english'?'english':game.adaptive?'adaptive':'fixed';$('#autoButton').setAttribute('aria-pressed',String(game.auto));updateFireControl();updateTypingControls();
+  $('#difficulty').value=game.learningMode!=='letters'?game.learningMode:game.adaptive?'adaptive':'fixed';$('#autoButton').setAttribute('aria-pressed',String(game.auto));updateFireControl();updateTypingControls();
   if(game.status==='upgrade')upgradeScreen();else game.resume();
   persistRun();updateHud(true);canvas.focus({preventScroll:true});toast('欢迎回来！继续守住第 '+game.wave+' 波。');
 }
@@ -133,7 +133,10 @@ try {
   if(prefs){if(typeof prefs.maxSpellLength==='number')game.setMaxSpellLength(prefs.maxSpellLength);if(Number.isInteger(prefs.englishLevel)&&prefs.englishLevel>=0&&prefs.englishLevel<=4)game.englishLevel=prefs.englishLevel;if(typeof prefs.magicSlow==='boolean')game.magicSlow=prefs.magicSlow;}
 }catch{}
 function updateTypingControls(){
-  const english=$('#difficulty').value==='english';
+  const english=['english','sentences'].includes($('#difficulty').value);
+  if($('#sentenceSpace'))$('#sentenceSpace').hidden=$('#difficulty').value!=='sentences';
+  const labels=$('#difficulty').value==='sentences'?['幼儿 · 问候短句','一级 · 生活表达','二级 · 日常问答','三级 · 场景交流','四级 · 完整表达']:['幼儿 · 常见事物','一级 · 日常生活','二级 · 自然与家庭','三级 · 动作与表达','四级 · 进阶词汇'];
+  [...$('#englishLevel').options].forEach((o,i)=>o.textContent=labels[i]);
   $('#englishControl').hidden=!english;$('.spell-control').hidden=english;
   $('#englishLevel').value=String(game.englishLevel);
   $('#maxSpellLength').value=game.maxSpellLength;$('#maxSpellLengthValue').textContent=game.maxSpellLength;
@@ -160,9 +163,9 @@ function onEvent(type, data = {}) {
     puff(data.x,data.y,'#fff4a0',15); floatText(data.x,data.y-20,'+'+data.score);
     tone(640,.1,'sine',.035,960);
   }
-  if (type === 'letter') { tone(560+game.skills[data.index].typed*180,.12); }
+  if (type === 'letter') { tone(560+(game.skills[data.index].typed%8)*90,.12); }
   if (type === 'wrong') {
-    toast(data.expected ? '没关系，接着敲 '+data.expected+' 就好 ✧' : '大招正在充能，先突突突！', 1600);
+    toast(data.expected ? '没关系，接着敲 '+(data.expected===' '?'空格':data.expected)+' 就好 ✧' : '大招正在充能，先突突突！', 1600);
     tone(270,.09,'sine',.025,350);
     const card = document.querySelector('.skill-card.selected');
     if(card){card.classList.remove('wrong');void card.offsetWidth;card.classList.add('wrong');}
@@ -194,7 +197,7 @@ function spellKeysMarkup(skill,active){
   const firstRow=Math.min(currentRow,Math.max(0,totalRows-2));
   for(let start=firstRow*6;start<Math.min(skill.code.length,(firstRow+2)*6);start+=6){
     rows.push('<span class="spell-row">'+[...skill.code.slice(start,start+6)].map((letter,offset)=>{
-      const i=start+offset;return '<kbd class="'+(i<skill.typed?'typed':active&&i===skill.typed?'next':'')+'">'+letter+'</kbd>';
+      const i=start+offset;return '<kbd class="'+(i<skill.typed?'typed':active&&i===skill.typed?'next':'')+'">'+(letter===' '?'␣':letter)+'</kbd>';
     }).join('')+'</span>');
   }
   return rows.join('');
@@ -219,10 +222,17 @@ function updateHud(force=false) {
   $('#difficulty').disabled=['playing','paused','upgrade'].includes(game.status);
   $('#fieldStatus').textContent=game.status==='ready'?'小院准备就绪':game.status==='lost'?'向日葵防线已突破':game.health<=0?'防线告急 · '+Math.max(0,3-game.breachElapsed).toFixed(1)+' 秒':game.freeze>0?'全场冰冻中 · 伤害翻倍':game.waveBreak>0?'这波守住啦':'小院保卫战进行中';
   $('#arsenalNote').textContent=game.typing>=0?(game.typingSlow?'慢动作中 · ':'自动换行 · ')+'已完成 '+game.skills[game.typing].typed+' / '+game.skills[game.typing].code.length+' 字母':'回蓝速度 ×'+game.rechargeRate.toFixed(2);
-  $('#progressHint').textContent=game.learningMode==='english'?'输入完整单词放大招 · 中文帮助理解 · 可点选技能 · 游戏内分级，非考试等级':game.adaptive?'本波新提示 '+game.spellLength+' 个字母 · 只显示当前两行，自动跟随输入':'固定 A / S / D · 回蓝和僵尸强度仍随波次提升';
+  $('#progressHint').textContent=game.learningMode==='sentences'?'输入英文句子 · ␣ 代表空格 · 不区分大小写，无需标点 · 下组生效':game.learningMode==='english'?'输入完整单词放大招 · 中文帮助理解 · 可点选技能 · 游戏内分级，非考试等级':game.adaptive?'本波新提示 '+game.spellLength+' 个字母 · 只显示当前两行，自动跟随输入':'固定 A / S / D · 回蓝和僵尸强度仍随波次提升';
   document.querySelectorAll('.skill-card').forEach((card,index)=>{
-    const s=game.skills[index];const meaning=ENGLISH_WORDS.flat().find(entry=>entry.word===s.code)?.meaning;$('#wordMeaning'+index).hidden=game.learningMode!=='english';$('#wordMeaning'+index).textContent=game.learningMode==='english'?(meaning||''):'';card.classList.toggle('selected',game.typing===index);card.classList.toggle('cooling',s.cd>0);
-    card.setAttribute('aria-label',s.name+'，'+(s.cd>0?'回蓝中 '+Math.ceil(s.cd/game.rechargeRate)+' 秒':'依次输入 '+s.code));
+    const s=game.skills[index],sentence=game.learningMode==='sentences',learning=game.learningMode!=='letters';
+    const entry=(sentence?ENGLISH_SENTENCES:ENGLISH_WORDS).flat().find(entry=>entry.word===s.code);
+    card.classList.toggle('learning-card',learning);card.classList.toggle('sentence-card',sentence);
+    card.querySelector('.skill-info strong').textContent=sentence?(entry?.text||s.code):s.name;
+    $('#wordMeaning'+index).hidden=!learning;$('#wordMeaning'+index).textContent=learning?(entry?.meaning||''):'';
+    $('#wordIpa'+index).hidden=game.learningMode!=='english';$('#wordIpa'+index).textContent=entry?.ipa?'美 /'+entry.ipa+'/':'';
+    card.querySelector('.skill-info').title=learning?[entry?.text||s.code,entry?.meaning,entry?.ipa?'美 /'+entry.ipa+'/':''].filter(Boolean).join(' · '):s.name;
+    card.classList.toggle('selected',game.typing===index);card.classList.toggle('cooling',s.cd>0);
+    card.setAttribute('aria-label',s.name+'，'+(entry?.meaning?entry.meaning+'，':'')+(s.cd>0?'回蓝中 '+Math.ceil(s.cd/game.rechargeRate)+' 秒':'依次输入 '+s.code));
     $('#skillKeys'+index).innerHTML=spellKeysMarkup(s,game.typing===index);
     card.classList.toggle('long-spell',s.code.length>6);
     $('#skillStatus'+index).textContent=s.cd>0?Math.ceil(s.cd/game.rechargeRate)+' 秒回蓝':game.typing===index?'第 '+(Math.floor(s.typed/6)+1)+' / '+Math.ceil(s.code.length/6)+' 行 · '+s.typed+'/'+s.code.length:'准备好啦 · '+s.code.length+' 字母';
@@ -415,7 +425,7 @@ function begin(force=false) {
     $('#confirmNewRun').onclick=()=>begin(true);$('#keepRun').onclick=()=>closeDialog();return;
   }
   if($('#gameDialog').open)closeDialog(false);
-  claimSave();particles.length=0;game.learningMode=$('#difficulty').value==='english'?'english':'letters';game.adaptive=$('#difficulty').value!=='fixed';
+  claimSave();particles.length=0;game.learningMode=['english','sentences'].includes($('#difficulty').value)?$('#difficulty').value:'letters';game.adaptive=$('#difficulty').value!=='fixed';
   $('#startScreen').hidden=true;game.start();canvas.focus({preventScroll:true});updateHud(true);
 }
 function showDialog(html,resume=game.status==='playing') {
@@ -466,13 +476,14 @@ function showBuild(){
 
 function help() {
   const resume=game.status==='playing'||dialogResume;
-  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>滑块可随时调低射速，调到 0 就完全关闭普通子弹。按住空格也能射击。开启「自动瞄准射击」，可以腾出双手打字。</div></div><div class="help-row"><span>⌨</span><div><strong>敲对技能卡上的字母放大招</strong><br>字母模式第一波 A 激光、S 冰冻、D 西瓜。英语模式输入卡片上的完整单词；同屏单词首字母不同，也可先点技能卡再拼写。激光和西瓜会朝准星释放。</div></div><div class="help-row"><span>✧</span><div><strong>向日葵就是小院防线</strong><br>僵尸靠近后会停下啃食，花瓣逐渐掉落，吃完只剩残茎。全部倒下后有 3 秒抢救时间；恢复护盾、修理或加固都能修复向日葵。<br><strong>每一波结束，三选一叠加强化</strong><br>敌人每波增多、变强，大招回蓝也更快。施法从 1～3 个字母逐步增加至多行，最多 60 个；逐行输入，不用回车。按错保留进度，每 5 波有首领！字母上限可用滑块控制，慢动作可自行开启或关闭。</div></div><p>不想增加难度？开局前选「固定 A · S · D」。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
+  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>滑块可随时调低射速，调到 0 就完全关闭普通子弹。按住空格也能射击。开启「自动瞄准射击」，可以腾出双手打字。</div></div><div class="help-row"><span>⌨</span><div><strong>敲对技能卡上的字母放大招</strong><br>字母模式第一波 A 激光、S 冰冻、D 西瓜。英语模式输入卡片上的完整单词；同屏单词首字母不同，也可先点技能卡再拼写。单词下方显示中文与美式音标。日常英语句子模式显示英文及中文，请输入字母与空格，不区分大小写，无需输入标点。句子模式的空格键不会射击，鼠标和自动射击照常使用。激光和西瓜会朝准星释放。</div></div><div class="help-row"><span>✧</span><div><strong>向日葵就是小院防线</strong><br>僵尸靠近后会停下啃食，花瓣逐渐掉落，吃完只剩残茎。全部倒下后有 3 秒抢救时间；恢复护盾、修理或加固都能修复向日葵。<br><strong>每一波结束，三选一叠加强化</strong><br>敌人每波增多、变强，大招回蓝也更快。施法从 1～3 个字母逐步增加至多行，最多 60 个；逐行输入，不用回车。按错保留进度，每 5 波有首领！字母上限可用滑块控制，慢动作可自行开启或关闭。</div></div><p>不想增加难度？开局前选「固定 A · S · D」。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
 }
 for(const row of ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM']){
   const line=document.createElement('div');line.className='key-row';
   for(const letter of row){const button=document.createElement('button');button.className='touch-key';button.textContent=letter;button.dataset.key=letter;button.setAttribute('aria-label','输入字母 '+letter);button.onclick=()=>{game.input(letter);updateHud(true);button.classList.add('pressed');setTimeout(()=>button.classList.remove('pressed'),130);};line.append(button);}
   $('#touchKeyboard').append(line);
 }
+const spaceButton=document.createElement('button');spaceButton.id='sentenceSpace';spaceButton.className='touch-key sentence-space';spaceButton.dataset.key=' ';spaceButton.textContent='␣ 空格';spaceButton.hidden=true;spaceButton.onclick=()=>{game.input(' ');updateHud(true);};$('#touchKeyboard').append(spaceButton);updateTypingControls();
 function pointerAim(event) {
   const rect=canvas.getBoundingClientRect();game.setAim((event.clientX-rect.left)/rect.width*1000,(event.clientY-rect.top)/rect.height*530);
 }
@@ -491,6 +502,7 @@ document.addEventListener('keydown',event=>{
   if(['INPUT','TEXTAREA','SELECT'].includes(event.target.tagName))return;
   if(event.key==='Escape'){event.preventDefault();pauseScreen();return;}
   if(event.key==='Enter'&&game.status==='ready'&&event.target.tagName!=='BUTTON'){event.preventDefault();if(availableSave)continueRun();else begin();return;}
+  if(event.key===' '&&game.status==='playing'&&game.learningMode==='sentences'){event.preventDefault();if(!event.repeat){game.input(' ');updateHud(true);}return;}
   if(event.key===' '&&game.status==='playing'&&event.target.tagName!=='BUTTON'){event.preventDefault();game.shooting=true;return;}
   if(event.repeat)return;
   if(/^[a-z]$/i.test(event.key)&&game.status==='playing'){event.preventDefault();game.input(event.key);updateHud(true);}
@@ -501,7 +513,7 @@ $('#saveButton').onclick=saveMenu;$('#continueButton').onclick=continueRun;$('#b
 $('#soundButton').onclick=()=>{soundOn=!soundOn;$('#soundButton').setAttribute('aria-pressed',String(soundOn));$('#soundButton').setAttribute('aria-label',soundOn?'关闭音效':'开启音效');tone(700,.12);};
 $('#autoButton').onclick=()=>{game.auto=!game.auto;$('#autoButton').setAttribute('aria-pressed',String(game.auto));updateFireControl();if(game.status==='playing')canvas.focus({preventScroll:true});};
 $('#keyboardButton').onclick=()=>{const expanded=$('#touchKeyboard').hidden;$('#touchKeyboard').hidden=!expanded;$('#keyboardButton').setAttribute('aria-expanded',String(expanded));};
-$('#difficulty').onchange=()=>{game.learningMode=$('#difficulty').value==='english'?'english':'letters';game.adaptive=$('#difficulty').value!=='fixed';updateTypingControls();updateHud(true);};
+$('#difficulty').onchange=()=>{game.learningMode=['english','sentences'].includes($('#difficulty').value)?$('#difficulty').value:'letters';game.adaptive=$('#difficulty').value!=='fixed';updateTypingControls();updateHud(true);};
 document.querySelectorAll('.skill-card').forEach((button,index)=>button.onclick=()=>{if(game.status!=='playing'){toast('先开始保卫小院吧！');return;}game.select(index);if(window.matchMedia('(pointer: coarse)').matches){$('#touchKeyboard').hidden=false;$('#keyboardButton').setAttribute('aria-expanded','true');}updateHud(true);});
 $('#closeDialog').onclick=()=>closeDialog();$('#gameDialog').addEventListener('cancel',event=>{event.preventDefault();closeDialog();});
 if(window.matchMedia('(pointer: coarse)').matches){$('#touchKeyboard').hidden=false;$('#keyboardButton').setAttribute('aria-expanded','true');}

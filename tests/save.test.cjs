@@ -39,3 +39,7 @@ test('English run saves words, progress and level; old runs default to letters',
  const bad=JSON.parse(JSON.stringify(save));bad.state.skills[0].code='FAKEWORD';assert.equal(validate(bad),false);
  const old=new GardenGame();old.start();const legacy=encode(old);delete legacy.state.learningMode;delete legacy.state.englishLevel;assert.ok(restore(loaded,legacy));assert.equal(loaded.learningMode,'letters');
 });
+test('sentence saves retain spaces and partially typed progress',()=>{
+ const g=new GardenGame();g.learningMode='sentences';g.englishLevel=2;g.start();g.skills[0].code='WHAT TIME IS IT';for(const c of 'WHAT ')g.input(c);const save=encode(g),loaded=new GardenGame();assert.ok(restore(loaded,save));assert.equal(loaded.learningMode,'sentences');assert.equal(loaded.skills[0].typed,5);assert.equal(loaded.skills[0].code,'WHAT TIME IS IT');loaded.resume();for(const c of 'TIME IS IT')loaded.input(c);assert.equal(loaded.casts,1);
+ const bad=JSON.parse(JSON.stringify(save));bad.state.skills[0].code='FAKE SENTENCE';assert.equal(validate(bad),false);
+});
