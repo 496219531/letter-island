@@ -1,7 +1,7 @@
 /* Versioned run snapshots. Only game data is serialized, never callbacks or UI. */
 (function(root){
   'use strict';
-  const FIELDS=['stacks','maxHealth','healKills','health','score','kills','casts','correct','wave','spawned','quota','spawnIn','waveBreak','shotIn','time','freeze','combo','typing','activeTime','serial','adaptive','auto','fireStrength','aim','hero','skills','enemies','effects'];
+  const FIELDS=['stacks','maxHealth','healKills','health','score','kills','casts','correct','wave','spawned','quota','spawnIn','waveBreak','shotIn','time','freeze','combo','typing','activeTime','serial','adaptive','auto','fireStrength','maxSpellLength','magicSlow','aim','hero','skills','enemies','effects'];
   const numeric=['maxHealth','healKills','health','score','kills','casts','correct','wave','spawned','quota','spawnIn','waveBreak','shotIn','time','freeze','combo','typing','activeTime','serial','fireStrength'];
   function encode(game){
     if(!['playing','paused','upgrade'].includes(game.status)||game.health<=0)return null;
@@ -22,6 +22,8 @@
     const s=save.state,cardIds=new Set(root.GARDEN_CARDS.map(c=>c.id));
     if(!['paused','upgrade'].includes(s.status)||numeric.some(k=>typeof s[k]!=='number'))return false;
     if(s.health<=0||s.maxHealth<s.health||s.wave<1||!Number.isInteger(s.wave)||s.fireStrength<0||s.fireStrength>1||s.typing< -1||s.typing>2||!Number.isInteger(s.typing))return false;
+    if(s.maxSpellLength!==undefined&&(!Number.isInteger(s.maxSpellLength)||s.maxSpellLength<1||s.maxSpellLength>60))return false;
+    if(s.magicSlow!==undefined&&typeof s.magicSlow!=='boolean')return false;
     if(typeof s.adaptive!=='boolean'||typeof s.auto!=='boolean'||!s.stacks||Array.isArray(s.stacks))return false;
     if(Object.entries(s.stacks).some(([k,v])=>!cardIds.has(k)||!Number.isInteger(v)||v<1))return false;
     if(!s.aim||!s.hero||![s.aim.x,s.aim.y,s.hero.x,s.hero.y].every(Number.isFinite))return false;
@@ -38,6 +40,7 @@
     if(!validate(save))return false;
     const s=JSON.parse(JSON.stringify(save.state));
     for(const key of FIELDS)game[key]=s[key];
+    game.maxSpellLength=s.maxSpellLength??60;game.magicSlow=s.magicSlow??false;
     game.bullets=s.bullets.map(b=>({...b,hitIds:new Set(b.hitIds)}));
     game.offers=s.offers.map(id=>root.GARDEN_CARDS.find(c=>c.id===id));
     game.status=s.status;game.dead=[];game.shooting=false;

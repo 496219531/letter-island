@@ -78,7 +78,7 @@ function continueRun(){
   readSavedRun();if(!availableSave)return;
   if(!GuluSave.restore(game,availableSave)){toast('这份存档无法恢复，原存档暂未覆盖。');return;}
   claimSave();particles.length=0;$('#startScreen').hidden=true;
-  $('#difficulty').value=game.adaptive?'adaptive':'fixed';$('#autoButton').setAttribute('aria-pressed',String(game.auto));updateFireControl();
+  $('#difficulty').value=game.adaptive?'adaptive':'fixed';$('#autoButton').setAttribute('aria-pressed',String(game.auto));updateFireControl();updateTypingControls();
   if(game.status==='upgrade')upgradeScreen();else game.resume();
   persistRun();updateHud(true);canvas.focus({preventScroll:true});toast('欢迎回来！继续守住第 '+game.wave+' 波。');
 }
@@ -121,6 +121,22 @@ $('#fireStrength').addEventListener('input',event=>{
   try{localStorage.setItem('gulu-fire-strength',String(game.fireStrength));}catch{}
 });
 updateFireControl();
+try {
+  const prefs=JSON.parse(localStorage.getItem('gulu-typing-settings'));
+  if(prefs){if(typeof prefs.maxSpellLength==='number')game.setMaxSpellLength(prefs.maxSpellLength);if(typeof prefs.magicSlow==='boolean')game.magicSlow=prefs.magicSlow;}
+}catch{}
+function updateTypingControls(){
+  $('#maxSpellLength').value=game.maxSpellLength;$('#maxSpellLengthValue').textContent=game.maxSpellLength;
+  $('#maxSpellLength').setAttribute('aria-valuetext','最多 '+game.maxSpellLength+' 个字母，下一组提示生效');
+  $('#magicSlowButton').setAttribute('aria-checked',String(game.magicSlow));$('#magicSlowValue').textContent=game.magicSlow?'开':'关';
+}
+function saveTypingSettings(){
+  try{localStorage.setItem('gulu-typing-settings',JSON.stringify({maxSpellLength:game.maxSpellLength,magicSlow:game.magicSlow}));}catch{}
+  persistRun();updateTypingControls();updateHud(true);
+}
+$('#maxSpellLength').addEventListener('input',event=>{game.setMaxSpellLength(event.target.value);saveTypingSettings();});
+$('#magicSlowButton').onclick=()=>{game.magicSlow=!game.magicSlow;saveTypingSettings();};
+updateTypingControls();
 function onEvent(type, data = {}) {
   if(['start','wave','upgrade','pause'].includes(type))persistRun();
   if (type === 'upgrade') { upgradeScreen(); }
@@ -172,7 +188,7 @@ function spellKeysMarkup(skill,active){
   return rows.join('');
 }
 function updateHud(force=false) {
-  const values = JSON.stringify([game.health,game.maxHealth,game.stacks,game.wave,game.kills,game.score,game.status,game.spawned,game.typing,game.freeze>0,game.skills.map(s=>[s.code,s.typed,Math.ceil(s.cd*10)])]);
+  const values = JSON.stringify([game.health,game.maxHealth,game.stacks,game.wave,game.kills,game.score,game.status,game.spawned,game.typing,game.freeze>0,game.magicSlow,game.maxSpellLength,game.skills.map(s=>[s.code,s.typed,Math.ceil(s.cd*10)])]);
   if(!force && values===lastHud)return;lastHud=values;
   document.body.classList.toggle('in-run',game.status!=='ready');
   $('#score').textContent=game.score;
@@ -190,7 +206,7 @@ function updateHud(force=false) {
   $('#pauseButton').disabled=game.status!=='playing';
   $('#difficulty').disabled=['playing','paused','upgrade'].includes(game.status);
   $('#fieldStatus').textContent=game.status==='ready'?'小院准备就绪':game.freeze>0?'全场冰冻中 · 伤害翻倍':game.waveBreak>0?'这波守住啦':'小院保卫战进行中';
-  $('#arsenalNote').textContent=game.typing>=0?'自动换行 · 已完成 '+game.skills[game.typing].typed+' / '+game.skills[game.typing].code.length+' 字母':'回蓝速度 ×'+game.rechargeRate.toFixed(2);
+  $('#arsenalNote').textContent=game.typing>=0?(game.typingSlow?'慢动作中 · ':'自动换行 · ')+'已完成 '+game.skills[game.typing].typed+' / '+game.skills[game.typing].code.length+' 字母':'回蓝速度 ×'+game.rechargeRate.toFixed(2);
   $('#progressHint').textContent=game.adaptive?'本波新提示 '+game.spellLength+' 个字母 · 只显示当前两行，自动跟随输入':'固定 A / S / D · 回蓝和僵尸强度仍随波次提升';
   document.querySelectorAll('.skill-card').forEach((card,index)=>{
     const s=game.skills[index];card.classList.toggle('selected',game.typing===index);card.classList.toggle('cooling',s.cd>0);
@@ -404,7 +420,7 @@ function showBuild(){
 
 function help() {
   const resume=game.status==='playing'||dialogResume;
-  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>滑块可随时调低射速，调到 0 就完全关闭普通子弹。按住空格也能射击。开启「自动瞄准射击」，可以腾出双手打字。</div></div><div class="help-row"><span>⌨</span><div><strong>敲对技能卡上的字母放大招</strong><br>第一波 A 激光、S 冰冻、D 西瓜。激光和西瓜会朝准星释放。</div></div><div class="help-row"><span>✧</span><div><strong>每一波结束，三选一叠加强化</strong><br>敌人每波增多、变强，大招回蓝也更快。施法从 1～3 个字母逐步增加至多行，最多 60 个；逐行输入，不用回车。按错保留进度，每 5 波有首领！</div></div><p>不想增加难度？开局前选「固定 A · S · D」。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
+  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>滑块可随时调低射速，调到 0 就完全关闭普通子弹。按住空格也能射击。开启「自动瞄准射击」，可以腾出双手打字。</div></div><div class="help-row"><span>⌨</span><div><strong>敲对技能卡上的字母放大招</strong><br>第一波 A 激光、S 冰冻、D 西瓜。激光和西瓜会朝准星释放。</div></div><div class="help-row"><span>✧</span><div><strong>每一波结束，三选一叠加强化</strong><br>敌人每波增多、变强，大招回蓝也更快。施法从 1～3 个字母逐步增加至多行，最多 60 个；逐行输入，不用回车。按错保留进度，每 5 波有首领！字母上限可用滑块控制，慢动作可自行开启或关闭。</div></div><p>不想增加难度？开局前选「固定 A · S · D」。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
 }
 for(const row of ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM']){
   const line=document.createElement('div');line.className='key-row';

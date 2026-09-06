@@ -105,3 +105,16 @@ test('typing cannot slow spawning, freeze expiry, or enemy abilities',()=>{
  assert.deepEqual(a.enemies.map(z=>[z.x,z.gait,z.ability]),b.enemies.map(z=>[z.x,z.gait,z.ability]));
  a.select(2);const x=a.enemies[0].x;advance(a,1);assert.ok(a.enemies[0].x<x);
 });
+
+test('letter cap affects only future prompts, clamps bounds and survives restart',()=>{
+ const g=make();g.start();g.wave=30;g.skills[0].code=g.nextCode(0);g.input('a');const code=g.skills[0].code;
+ g.setMaxSpellLength(5);assert.equal(g.skills[0].code,code);assert.equal(g.skills[0].typed,1);assert.equal(g.nextCode(0).length,5);
+ g.setMaxSpellLength(0);assert.equal(g.nextCode(1),'S');g.setMaxSpellLength(99);assert.equal(g.maxSpellLength,60);g.setMaxSpellLength(NaN);assert.equal(g.maxSpellLength,60);
+ g.setMaxSpellLength(7);g.start();assert.equal(g.maxSpellLength,7);g.wave=20;g.adaptive=false;assert.equal(g.spellLength,1);
+});
+test('optional slow motion needs partial input and immediately stops when switched off',()=>{
+ const a=make(),b=make();a.start();b.start();assert.equal(a.magicSlow,false);a.magicSlow=true;a.skills[0].code='AFJ';a.select(0);assert.equal(a.typingSlow,false);
+ a.input('a');assert.equal(a.typingSlow,true);const ax=a.enemies[0].gait,bx=b.enemies[0].gait;
+ advance(a,.5);advance(b,.5);assert.ok(Math.abs((a.enemies[0].gait-ax)/(b.enemies[0].gait-bx)-.22)<.001);
+ a.magicSlow=false;const x=a.enemies[0].gait,y=b.enemies[0].gait;advance(a,.5);advance(b,.5);assert.ok(Math.abs((a.enemies[0].gait-x)-(b.enemies[0].gait-y))<.001);
+});

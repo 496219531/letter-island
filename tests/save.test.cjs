@@ -23,3 +23,8 @@ test('corrupt and incompatible saves are rejected without changing the current g
 test('finished or not-started games cannot replace an active save',()=>{
  const g=new GardenGame();assert.equal(encode(g),null);g.start();g.finish(false);assert.equal(encode(g),null);
 });
+test('typing settings round trip and older saves retain compatible defaults',()=>{
+ const g=new GardenGame();g.start();g.setMaxSpellLength(8);g.magicSlow=true;const save=encode(g);const loaded=new GardenGame();assert.ok(restore(loaded,save));assert.equal(loaded.maxSpellLength,8);assert.equal(loaded.magicSlow,true);
+ delete save.state.maxSpellLength;delete save.state.magicSlow;assert.ok(restore(loaded,save));assert.equal(loaded.maxSpellLength,60);assert.equal(loaded.magicSlow,false);
+ for(const values of [{maxSpellLength:0},{maxSpellLength:61},{maxSpellLength:1.5},{magicSlow:'true'}]){const bad=JSON.parse(JSON.stringify(save));Object.assign(bad.state,values);assert.equal(validate(bad),false);}
+});

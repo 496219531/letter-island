@@ -25,7 +25,7 @@
   };
   class GardenGame {
     constructor({ random = Math.random, emit = () => {} } = {}) {
-      this.random = random; this.emit = emit; this.status = 'ready'; this.adaptive = true; this.auto = false; this.fireStrength = .3;
+      this.random = random; this.emit = emit; this.status = 'ready'; this.adaptive = true; this.auto = false; this.fireStrength = .3; this.maxSpellLength = 60; this.magicSlow = false;
       this.aim = { x: 690, y: 280 }; this.hero = { x: 100, y: 282 }; this.serial = 0;
       this.reset(); this.status = 'ready';
     }
@@ -130,7 +130,9 @@
       for(const s of this.skills)s.cd=Math.max(0,s.cd-3);
       this.emit('wave',{wave:this.wave});return true;
     }
-    get spellLength() { return this.adaptive?Math.min(60,this.wave<=4?this.wave:4+(this.wave-4)*2):1; }
+    setMaxSpellLength(value) { const n=Number(value);if(Number.isFinite(n))this.maxSpellLength=clamp(Math.floor(n),1,60); }
+    get typingSlow() { return this.magicSlow&&this.typing>=0&&this.skills[this.typing].typed>0; }
+    get spellLength() { return this.adaptive?Math.min(this.maxSpellLength,this.wave<=4?this.wave:4+(this.wave-4)*2):1; }
     get rechargeRate() { return (1+.16*(this.wave-1))*(1+.2*this.stack('recharge')); }
     nextCode(index) {
       const base=['A','S','D'][index];
@@ -184,7 +186,7 @@
       const dt=clamp(rawDt,0,.05);
       if(this.status!=='playing')return;
       this.time+=dt;this.activeTime+=dt;
-      const worldDt=dt;
+      const worldDt=dt*(this.typingSlow?.22:1);
       for(let i=0;i<this.skills.length;i++){
         const s=this.skills[i];if(s.cd>0){s.cd=Math.max(0,s.cd-dt*this.rechargeRate);if(s.cd===0){s.code=this.nextCode(i);this.emit('ready',{index:i});}}
       }
