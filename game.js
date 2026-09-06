@@ -3,6 +3,7 @@ const $ = (selector) => document.querySelector(selector);
 const canvas = $('#gameCanvas');
 const ctx = canvas.getContext('2d');
 const sprite = new Image(); sprite.src = 'assets/zombie.png';
+const captainSprite=new Image();captainSprite.src='assets/pea-captain-v1.png';
 const particles = [];
 const MAX_PARTICLES=260, MAX_VOICES=32;
 let activeVoices=0;
@@ -306,15 +307,30 @@ function drawZombie(z,dead=false) {
   }
   ctx.restore();
 }
+// Build a reusable cutout once; never allocate a new sprite canvas per frame.
+let captainCutout=null;
+function getCaptainCutout(){
+  if(captainCutout)return captainCutout;
+  const layer=document.createElement('canvas');layer.width=512;layer.height=512;
+  const pen=layer.getContext('2d');pen.drawImage(captainSprite,0,0,512,512);
+  const pixels=pen.getImageData(0,0,512,512),data=pixels.data;
+  // This generated backdrop is neutral white/gray; the character is saturated green/brown.
+  for(let i=0;i<data.length;i+=4){
+    const lo=Math.min(data[i],data[i+1],data[i+2]),hi=Math.max(data[i],data[i+1],data[i+2]);
+    if(lo>175&&hi-lo<30)data[i+3]=0;
+  }
+  pen.putImageData(pixels,0,0);captainCutout=layer;return layer;
+}
 function drawHero() {
   const target=game.target();const angle=Math.atan2(target.y-game.hero.y,target.x-game.hero.x);
   ctx.save();ctx.globalAlpha=1;ctx.filter='none';ctx.translate(game.hero.x,game.hero.y);
-  ctx.fillStyle='#28452040';ctx.beginPath();ctx.ellipse(-7,38,38,11,0,0,Math.PI*2);ctx.fill();
-  ctx.shadowColor='#284a2e';ctx.shadowBlur=3;
-  drawEmoji('🌻',-11,0,100,Math.sin(game.time*3)*.04);
-  ctx.shadowBlur=0;
-  ctx.save();ctx.translate(21,7);ctx.rotate(angle);ctx.translate(recoil>0?-4:0,0);drawEmoji('🔫',0,0,55,Math.PI);ctx.restore();
-  ctx.font='bold 11px system-ui';ctx.fillStyle='#f8ffed';ctx.textAlign='center';ctx.shadowColor='#39522b';ctx.shadowBlur=4;ctx.fillText('豌豆小队长',-4,61);ctx.restore();
+  ctx.fillStyle='#28452040';ctx.beginPath();ctx.ellipse(-5,44,40,10,0,0,Math.PI*2);ctx.fill();
+  if(captainSprite.complete&&captainSprite.naturalWidth){
+    ctx.save();ctx.translate(recoil>0?-4:0,reducedMotion?0:Math.sin(game.time*3)*1.2);
+    ctx.rotate(Math.max(-.10,Math.min(.10,angle*.15)));
+    ctx.drawImage(getCaptainCutout(),-89,-111,170,170);ctx.restore();
+  }else drawEmoji('🌱',-8,0,95);
+  ctx.font='bold 11px system-ui';ctx.fillStyle='#f8ffed';ctx.textAlign='center';ctx.shadowColor='#39522b';ctx.shadowBlur=4;ctx.fillText('豌豆队长',-4,64);ctx.restore();
   if(game.status==='playing'){
     ctx.save();ctx.strokeStyle='#ffffdc99';ctx.lineWidth=2;ctx.setLineDash([4,7]);
     ctx.beginPath();ctx.moveTo(game.hero.x+37,game.hero.y);ctx.lineTo(target.x,target.y);ctx.globalAlpha=.17;ctx.stroke();ctx.restore();
