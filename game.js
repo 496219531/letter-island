@@ -4,6 +4,8 @@ const canvas = $('#gameCanvas');
 const ctx = canvas.getContext('2d');
 const sprite = new Image(); sprite.src = 'assets/zombie.png';
 const particles = [];
+const MAX_PARTICLES=260, MAX_VOICES=32;
+let activeVoices=0;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let soundOn = true, audio = null, best = 0, lastTime = 0, lastHud = '', hudClock = 0;
 let toastTimer, bannerTimer, recoil = 0, shake = 0, dialogResume = false;
@@ -11,7 +13,7 @@ try { best = Math.max(0, Number(localStorage.getItem('gulu-shooter-best')) || 0)
 $('#bestScore').textContent = best;
 
 function tone(frequency, duration = .1, type = 'sine', volume = .035, end = frequency) {
-  if (!soundOn) return;
+  if (!soundOn || activeVoices>=MAX_VOICES) return;
   try {
     audio ??= new (window.AudioContext || window.webkitAudioContext)();
     if (audio.state === 'suspended') audio.resume();
@@ -19,22 +21,26 @@ function tone(frequency, duration = .1, type = 'sine', volume = .035, end = freq
     oscillator.type = type; oscillator.frequency.setValueAtTime(frequency, now);
     oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, end), now + duration);
     gain.gain.setValueAtTime(volume, now); gain.gain.exponentialRampToValueAtTime(.0001, now + duration);
-    oscillator.connect(gain); gain.connect(audio.destination); oscillator.start(now); oscillator.stop(now + duration);
+    oscillator.onended=()=>{oscillator.disconnect();gain.disconnect();oscillator.onended=null;activeVoices--;};
+    oscillator.connect(gain); gain.connect(audio.destination); oscillator.start(now); activeVoices++; oscillator.stop(now + duration);
   } catch { soundOn = false; $('#soundButton').setAttribute('aria-pressed', 'false'); }
 }
 function toast(text, time = 2200) {
   clearTimeout(toastTimer); $('#battleToast').textContent = text; $('#battleToast').classList.add('visible');
   toastTimer = setTimeout(() => $('#battleToast').classList.remove('visible'), time);
 }
+function addParticle(particle) {
+  if(particles.length>=MAX_PARTICLES)particles.splice(0,particles.length-MAX_PARTICLES+1);
+  particles.push(particle);
+}
 function puff(x, y, color, count = 10, text = '') {
   for (let i = 0; i < count; i++) {
     const angle = Math.random() * Math.PI * 2, speed = 40 + Math.random() * 160;
-    particles.push({ x, y, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed-50, color, life:.65+Math.random()*.3, max:1, size:3+Math.random()*5, text:i === 0 ? text : '' });
+    addParticle({ x, y, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed-50, color, life:.65+Math.random()*.3, max:1, size:3+Math.random()*5, text:i === 0 ? text : '' });
   }
-  if (particles.length > 260) particles.splice(0, particles.length - 260);
 }
 function floatText(x,y,text,color='#fff9c2') {
-  particles.push({x,y,vx:0,vy:-50,color,life:1.1,max:1.1,size:20,text});
+  addParticle({x,y,vx:0,vy:-50,color,life:1.1,max:1.1,size:20,text});
 }
 const game = new GardenGame({ emit:onEvent });
 const SAVE_KEY='gulu-run-v1', WRITER_KEY='gulu-run-writer-v1';
