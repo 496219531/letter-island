@@ -142,32 +142,32 @@ function drawEmoji(text,x,y,size,angle=0) {
 }
 // Articulated rendering of the existing transparent sprite. All joints move
 // with each enemy's simulation clock, so pause, freeze and slow motion agree.
+// Separate the two original legs along their actual silhouettes, then animate
+// hip and knee joints. The old vertical image split cut across both legs.
 function drawWalkingSpriteMesh(pen,z,size){
-  const gait=z.gait??z.phase,amount=reducedMotion?.3:1;
-  const stride=Math.sin(gait),drag=Math.sin(gait+.85);
-  const pixels=sprite.naturalWidth,height=sprite.naturalHeight||pixels;
-  const rows=48;
-  for(let row=0;row<rows;row++){
-    const t=row/rows,h=1/rows;
-    const neck=Math.max(0,1-t/.53);
-    const shoulder=Math.sin(t*Math.PI);
-    const sway=(stride*1.7*neck+drag*1.15*shoulder)*amount;
-    const nod=Math.sin(gait+.5)*1.15*neck*amount;
-    if(t<.67){
-      pen.drawImage(sprite,0,t*height,pixels,Math.min(height-t*height,height*h+1),
-        -size/2+sway*size/88,-size*.59+t*size+nod*size/88,size,size*h+1);
-    }else{
-      // Two independently swinging legs, blended to the stationary hip joint.
-      const joint=Math.min(1,(t-.67)/.2);
-      for(let leg=0;leg<2;leg++){
-        const step=Math.sin(gait+leg*Math.PI);
-        const x=sway+(step*6.3*joint)*amount;
-        const lift=-Math.max(0,Math.cos(gait+leg*Math.PI))*3.8*joint*amount;
-        pen.drawImage(sprite,leg*pixels/2,t*height,pixels/2,Math.min(height-t*height,height*h+1),
-          -size/2+leg*size/2+x*size/88,-size*.59+t*size+lift*size/88,size/2+.4,size*h+1);
-      }
-    }
+  const phase=z.gait??z.phase,amount=reducedMotion?.45:1;
+  const rear=[[.57,.64],[.73,.64],[.78,.76],[.91,.85],[.92,1],[.60,1],[.58,.87],[.59,.78],[.55,.71]];
+  const front=[[.42,.64],[.59,.64],[.62,.72],[.55,.81],[.60,.88],[.64,1],[.22,1],[.22,.84],[.39,.79],[.40,.71]];
+  pen.save();pen.translate(-size/2,-size*.59);pen.scale(size,size);
+  function paintPart(polygon,from,to){
+    pen.save();pen.beginPath();polygon.forEach(([x,y],i)=>i?pen.lineTo(x,y):pen.moveTo(x,y));pen.closePath();pen.clip();
+    pen.beginPath();pen.rect(0,from,1,to-from);pen.clip();
+    pen.drawImage(sprite,0,0,1,1);pen.restore();
   }
+  function leg(polygon,hip,knee,step){
+    const swing=Math.sin(step)*.43*amount;
+    const bend=Math.max(0,Math.cos(step))*.48*amount;
+    pen.save();pen.translate(hip[0],hip[1]);pen.rotate(swing);pen.translate(-hip[0],-hip[1]);
+    paintPart(polygon,0,knee[1]+.018);
+    pen.translate(knee[0],knee[1]);pen.rotate(-bend);pen.translate(-knee[0],-knee[1]);
+    paintPart(polygon,knee[1]-.005,1);pen.restore();
+  }
+  leg(rear,[.66,.665],[.71,.80],phase+Math.PI);
+  leg(front,[.515,.665],[.48,.80],phase);
+  // Torso overlaps the hip joints while the head and reaching arms sway subtly.
+  pen.save();pen.translate(.58,.66);pen.rotate(Math.sin(phase-.3)*.025*amount);pen.translate(-.58,-.66);
+  const width=sprite.naturalWidth,height=sprite.naturalHeight||width;
+  pen.drawImage(sprite,0,0,width,height*.674,0,0,1,.674);pen.restore();pen.restore();
 }
 let walkAtlas = null;
 const WALK_FRAMES=32, WALK_CELL=128;
