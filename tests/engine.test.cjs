@@ -21,8 +21,8 @@ test('melon lands after a delay and hits only its blast radius',()=>{
 test('wrong letters preserve typed progress and health',()=>{
   const g=make();g.start();g.skills[0].code='AFJ';g.input('a');assert.equal(g.typing,0);g.input('x');assert.equal(g.skills[0].typed,1);assert.equal(g.health,8);g.input('f');g.input('j');assert.equal(g.casts,1);assert.equal(g.correct,3);
 });
-test('typing slows enemies and pause freezes all game timers',()=>{
-  const a=make(),b=make();a.start();b.start();a.skills[0].code='AF';a.input('a');const x=a.enemies[0].x;advance(a,1);advance(b,1);assert.ok(x-a.enemies[0].x < (x-b.enemies[0].x)*.45);a.pause();const before=JSON.stringify([a.enemies,a.skills,a.time]);advance(a,2);assert.equal(JSON.stringify([a.enemies,a.skills,a.time]),before);
+test('typing keeps enemies at full speed and pause freezes all game timers',()=>{
+  const a=make(),b=make();a.start();b.start();a.skills[0].code='AF';a.input('a');const x=a.enemies[0].x;advance(a,1);advance(b,1);assert.equal(a.enemies[0].x,b.enemies[0].x);a.pause();const before=JSON.stringify([a.enemies,a.skills,a.time]);advance(a,2);assert.equal(JSON.stringify([a.enemies,a.skills,a.time]),before);
 });
 test('a visible letter prompt stays fixed across waves until used and recharged',()=>{
   const g=make();g.start();g.wave=2;assert.equal(g.skills[0].code,'A');g.input('a');advance(g,8.1);assert.equal(g.skills[0].code.length,2);const code=g.skills[0].code;g.wave=3;assert.equal(g.skills[0].code,code);g.adaptive=false;assert.equal(g.nextCode(0),'A');
@@ -61,10 +61,10 @@ test('enemy health, speed and population scale across waves',()=>{
  const g=make();g.start();const early=g.spawn(900,200,'walker');g.wave=10;const late=g.spawn(900,200,'walker');assert.ok(late.hp>early.hp*4);assert.ok(late.speed>early.speed);assert.equal(CARDS.length,24);assert.equal(Object.keys(TYPES).length,9);
 });
 
-test('walking phase follows movement, slow motion, ice and pause',()=>{
+test('walking stays full speed while typing and stops for ice and pause',()=>{
  const a=make(),b=make();a.start();b.start();a.skills[0].code='AF';a.input('a');
  const phase=a.enemies[0].gait;advance(a,1);advance(b,1);
- assert.ok(Math.abs((a.enemies[0].gait-phase)/(b.enemies[0].gait-phase)-.22)<.001);
+ assert.ok(Math.abs((a.enemies[0].gait-phase)/(b.enemies[0].gait-phase)-1)<.001);
  a.freeze=3;const frozen=a.enemies[0].gait;advance(a,1);assert.equal(a.enemies[0].gait,frozen);
  a.pause();advance(a,1);assert.equal(a.enemies[0].gait,frozen);
  const g=make();g.start();g.enemies=[];const runner=g.spawn(900,200,'runner'),boss=g.spawn(900,400,'boss');
@@ -97,4 +97,11 @@ test('long spells keep progress across row boundaries, errors and pause and only
 test('late wave cooldowns recover faster in real time and pause still stops recovery',()=>{
  const a=make(),b=make();a.start();b.start();b.wave=10;a.skills[0].cd=8;b.skills[0].cd=8;advance(a,1);advance(b,1);
  assert.ok(b.skills[0].cd<a.skills[0].cd-1);b.pause();const cd=b.skills[0].cd;advance(b,2);assert.equal(b.skills[0].cd,cd);
+});
+
+test('typing cannot slow spawning, freeze expiry, or enemy abilities',()=>{
+ const a=make(),b=make();a.start();b.start();a.skills[0].code='AFJ';a.input('a');a.freeze=2;b.freeze=2;
+ advance(a,6);advance(b,6);assert.equal(a.freeze,0);assert.equal(a.spawned,b.spawned);assert.equal(a.spawnIn,b.spawnIn);
+ assert.deepEqual(a.enemies.map(z=>[z.x,z.gait,z.ability]),b.enemies.map(z=>[z.x,z.gait,z.ability]));
+ a.select(2);const x=a.enemies[0].x;advance(a,1);assert.ok(a.enemies[0].x<x);
 });

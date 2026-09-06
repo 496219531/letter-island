@@ -70,7 +70,7 @@ function onEvent(type, data = {}) {
     const card = document.querySelector('.skill-card.selected');
     if(card){card.classList.remove('wrong');void card.offsetWidth;card.classList.add('wrong');}
   }
-  if (type === 'typing') { toast('按技能卡里的顺序敲字母，慢慢来',1600); }
+  if (type === 'typing') { toast('按技能卡里的顺序敲字母，战斗会继续',1600); }
   if (type === 'cooldown') { toast('还要 '+Math.ceil(game.skills[data.index].cd/game.rechargeRate)+' 秒，先用豌豆突突突',1400); }
   if (type === 'empty') { toast('僵尸还没到，不浪费你的大招～'); }
   if (type === 'cast') {
@@ -121,8 +121,6 @@ function updateHud(force=false) {
   $('#pauseButton').disabled=game.status!=='playing';
   $('#difficulty').disabled=['playing','paused','upgrade'].includes(game.status);
   $('#fieldStatus').textContent=game.status==='ready'?'小院准备就绪':game.freeze>0?'全场冰冻中 · 伤害翻倍':game.waveBreak>0?'这波守住啦':'小院保卫战进行中';
-  $('#slowLabel').hidden=game.typing<0||game.status!=='playing';
-  $('#battlefield').classList.toggle('slow',game.typing>=0&&game.status==='playing');
   $('#arsenalNote').textContent=game.typing>=0?'自动换行 · 已完成 '+game.skills[game.typing].typed+' / '+game.skills[game.typing].code.length+' 字母':'回蓝速度 ×'+game.rechargeRate.toFixed(2);
   $('#progressHint').textContent=game.adaptive?'本波新提示 '+game.spellLength+' 个字母 · 只显示当前两行，自动跟随输入':'固定 A / S / D · 回蓝和僵尸强度仍随波次提升';
   document.querySelectorAll('.skill-card').forEach((card,index)=>{
@@ -141,7 +139,7 @@ function drawEmoji(text,x,y,size,angle=0) {
   ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.fillStyle='#ffffff';ctx.font=size+'px "Apple Color Emoji","Segoe UI Emoji",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,0,0);ctx.restore();
 }
 // Articulated rendering of the existing transparent sprite. All joints move
-// with each enemy's simulation clock, so pause, freeze and slow motion agree.
+// with each enemy's simulation clock, so pause and freeze agree.
 // Separate the two original legs along their actual silhouettes, then animate
 // hip and knee joints. The old vertical image split cut across both legs.
 function drawWalkingSpriteMesh(pen,z,size){

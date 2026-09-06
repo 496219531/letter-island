@@ -184,8 +184,7 @@
       const dt=clamp(rawDt,0,.05);
       if(this.status!=='playing')return;
       this.time+=dt;this.activeTime+=dt;
-      const slow=this.typing>=0?.22:1;
-      const worldDt=dt*slow;
+      const worldDt=dt;
       for(let i=0;i<this.skills.length;i++){
         const s=this.skills[i];if(s.cd>0){s.cd=Math.max(0,s.cd-dt*this.rechargeRate);if(s.cd===0){s.code=this.nextCode(i);this.emit('ready',{index:i});}}
       }
