@@ -68,7 +68,7 @@
       const hp=72*spec.hp*scale;
       const z={id:++this.serial,type,x,y:y??[140,215,290,365,430][Math.floor(this.random()*5)],hp,maxHp:hp,
         speed:Math.min(155,(23+this.wave*2.3)*spec.speed),radius:type==='boss'?53:type==='mini'?20:31,
-        boss:type==='boss',tough:type==='armor',hit:0,phase:this.random()*6.28,shield:type==='shield'?hp*.65:0,
+        boss:type==='boss',tough:type==='armor',hit:0,phase:this.random()*6.28,gait:this.random()*6.28,shield:type==='shield'?hp*.65:0,
         poison:0,poisonTime:0,chill:0,ability:3,slowTime:0};
       this.enemies.push(z);if(count)this.spawned++;
       if(z.boss)this.emit('boss');return z;
@@ -194,7 +194,10 @@
         if(this.stack('thorns')&&z.x<260)this.damage(z,25*this.stack('thorns')*worldDt,'thorns');
         if(z.hp<=0)continue;
         if(this.freeze===0){
-          z.x-=z.speed*worldDt*(z.slowTime>0?1-z.chill:1);z.ability-=worldDt;
+          const movementDt=worldDt*(z.slowTime>0?1-z.chill:1);
+          const cadence=z.type==='runner'||z.type==='mini'?6.3:z.boss?2.25:3.35;
+          z.gait+=movementDt*cadence;
+          z.x-=z.speed*movementDt*(1+.38*Math.sin(z.gait));z.ability-=worldDt;
           if(z.type==='healer'&&z.ability<=0){z.ability=3;for(const other of this.enemies)if(other.hp>0&&other.id!==z.id&&Math.hypot(other.x-z.x,other.y-z.y)<190)other.hp=Math.min(other.maxHp,other.hp+other.maxHp*.1);this.emit('heal',{x:z.x,y:z.y});}
           if(z.boss&&z.ability<=0&&this.enemies.length<80){z.ability=9;this.spawn(z.x+40,clamp(z.y+45,100,455),'runner',false);}
           if(z.type==='bomber'&&z.x<270){z.hp=0;this.health=Math.max(0,this.health-2);this.emit('explosion',{x:z.x,y:z.y});this.emit('breach',{health:this.health});continue;}

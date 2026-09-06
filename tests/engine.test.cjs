@@ -22,7 +22,7 @@ test('wrong letters preserve typed progress and health',()=>{
   const g=make();g.start();g.skills[0].code='AFJ';g.input('a');assert.equal(g.typing,0);g.input('x');assert.equal(g.skills[0].typed,1);assert.equal(g.health,8);g.input('f');g.input('j');assert.equal(g.casts,1);assert.equal(g.correct,3);
 });
 test('typing slows enemies and pause freezes all game timers',()=>{
-  const a=make(),b=make();a.start();b.start();a.skills[0].code='AF';a.input('a');const x=a.enemies[0].x;advance(a,1);advance(b,1);assert.ok(x-a.enemies[0].x < (x-b.enemies[0].x)*.3);a.pause();const before=JSON.stringify([a.enemies,a.skills,a.time]);advance(a,2);assert.equal(JSON.stringify([a.enemies,a.skills,a.time]),before);
+  const a=make(),b=make();a.start();b.start();a.skills[0].code='AF';a.input('a');const x=a.enemies[0].x;advance(a,1);advance(b,1);assert.ok(x-a.enemies[0].x < (x-b.enemies[0].x)*.45);a.pause();const before=JSON.stringify([a.enemies,a.skills,a.time]);advance(a,2);assert.equal(JSON.stringify([a.enemies,a.skills,a.time]),before);
 });
 test('a visible letter prompt stays fixed across waves until used and recharged',()=>{
   const g=make();g.start();g.wave=2;assert.equal(g.skills[0].code,'A');g.input('a');advance(g,8.1);assert.equal(g.skills[0].code.length,2);const code=g.skills[0].code;g.wave=3;assert.equal(g.skills[0].code,code);g.adaptive=false;assert.equal(g.nextCode(0),'A');
@@ -59,4 +59,14 @@ test('special enemies armor, shields, healer, splitters, bombers and bosses work
 });
 test('enemy health, speed and population scale across waves',()=>{
  const g=make();g.start();const early=g.spawn(900,200,'walker');g.wave=10;const late=g.spawn(900,200,'walker');assert.ok(late.hp>early.hp*4);assert.ok(late.speed>early.speed);assert.equal(CARDS.length,24);assert.equal(Object.keys(TYPES).length,9);
+});
+
+test('walking phase follows movement, slow motion, ice and pause',()=>{
+ const a=make(),b=make();a.start();b.start();a.skills[0].code='AF';a.input('a');
+ const phase=a.enemies[0].gait;advance(a,1);advance(b,1);
+ assert.ok(Math.abs((a.enemies[0].gait-phase)/(b.enemies[0].gait-phase)-.22)<.001);
+ a.freeze=3;const frozen=a.enemies[0].gait;advance(a,1);assert.equal(a.enemies[0].gait,frozen);
+ a.pause();advance(a,1);assert.equal(a.enemies[0].gait,frozen);
+ const g=make();g.start();g.enemies=[];const runner=g.spawn(900,200,'runner'),boss=g.spawn(900,400,'boss');
+ const rp=runner.gait,bp=boss.gait;advance(g,1);assert.ok(runner.gait-rp>(boss.gait-bp)*2);
 });

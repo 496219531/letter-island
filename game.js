@@ -109,17 +109,68 @@ function updateHud(force=false) {
 function drawEmoji(text,x,y,size,angle=0) {
   ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.font=size+'px "Apple Color Emoji","Segoe UI Emoji",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,0,0);ctx.restore();
 }
+// Articulated rendering of the existing transparent sprite. All joints move
+// with each enemy's simulation clock, so pause, freeze and slow motion agree.
+function drawWalkingSpriteMesh(pen,z,size){
+  const gait=z.gait??z.phase,amount=reducedMotion?.3:1;
+  const stride=Math.sin(gait),drag=Math.sin(gait+.85);
+  const pixels=sprite.naturalWidth,height=sprite.naturalHeight||pixels;
+  const rows=48;
+  for(let row=0;row<rows;row++){
+    const t=row/rows,h=1/rows;
+    const neck=Math.max(0,1-t/.53);
+    const shoulder=Math.sin(t*Math.PI);
+    const sway=(stride*1.7*neck+drag*1.15*shoulder)*amount;
+    const nod=Math.sin(gait+.5)*1.15*neck*amount;
+    if(t<.67){
+      pen.drawImage(sprite,0,t*height,pixels,Math.min(height-t*height,height*h+1),
+        -size/2+sway*size/88,-size*.59+t*size+nod*size/88,size,size*h+1);
+    }else{
+      // Two independently swinging legs, blended to the stationary hip joint.
+      const joint=Math.min(1,(t-.67)/.2);
+      for(let leg=0;leg<2;leg++){
+        const step=Math.sin(gait+leg*Math.PI);
+        const x=sway+(step*6.3*joint)*amount;
+        const lift=-Math.max(0,Math.cos(gait+leg*Math.PI))*3.8*joint*amount;
+        pen.drawImage(sprite,leg*pixels/2,t*height,pixels/2,Math.min(height-t*height,height*h+1),
+          -size/2+leg*size/2+x*size/88,-size*.59+t*size+lift*size/88,size/2+.4,size*h+1);
+      }
+    }
+  }
+}
+let walkAtlas = null;
+const WALK_FRAMES=32, WALK_CELL=128;
+function drawWalkingSprite(z,size,dead){
+  if(dead){ctx.drawImage(sprite,-size/2,-size*.59,size,size);return;}
+  if(!walkAtlas){
+    walkAtlas=document.createElement('canvas');walkAtlas.width=WALK_CELL*WALK_FRAMES;walkAtlas.height=WALK_CELL;
+    const pen=walkAtlas.getContext('2d');
+    for(let frame=0;frame<WALK_FRAMES;frame++){
+      pen.save();pen.translate(frame*WALK_CELL+64,76);
+      drawWalkingSpriteMesh(pen,{gait:frame/WALK_FRAMES*Math.PI*2},96);pen.restore();
+    }
+  }
+  const phase=((z.gait??z.phase)%(Math.PI*2)+Math.PI*2)%(Math.PI*2);
+  const frame=Math.floor(phase/(Math.PI*2)*WALK_FRAMES);
+  const scale=size/96;
+  ctx.drawImage(walkAtlas,frame*WALK_CELL,0,WALK_CELL,WALK_CELL,-64*scale,-76*scale,WALK_CELL*scale,WALK_CELL*scale);
+}
 function drawZombie(z,dead=false) {
   const size=z.boss?145:z.type==='mini'?55:z.tough?102:88;
-  const bob=game.freeze>0?0:Math.sin(game.time*7+z.phase)*3;
-  ctx.save();ctx.translate(z.x,z.y+bob);
-  if(dead){const elapsed=1-z.life/z.fullLife;ctx.globalAlpha=1-elapsed;ctx.rotate(elapsed*1.6);ctx.translate(elapsed*65,-Math.sin(elapsed*Math.PI)*65);ctx.scale(1-elapsed*.45,1-elapsed*.45);}
-  else {ctx.rotate(Math.sin(game.time*4+z.phase)*.045);}
+  const gait=z.gait??z.phase,amplitude=reducedMotion?.3:1;
+  const bob=dead?0:(Math.cos(gait*2)*1.5+Math.sin(gait)*.8)*amplitude;
+  // The shadow stays on the ground while feet alternately lift and drag.
+  ctx.save();ctx.translate(z.x,z.y);
   ctx.fillStyle='#334c2529';ctx.beginPath();ctx.ellipse(0,size*.39,size*.3,8,0,0,Math.PI*2);ctx.fill();
+  ctx.translate(0,bob*size/88);
+  if(dead){const elapsed=1-z.life/z.fullLife;ctx.globalAlpha=1-elapsed;ctx.rotate(elapsed*1.6);ctx.translate(elapsed*65,-Math.sin(elapsed*Math.PI)*65);ctx.scale(1-elapsed*.45,1-elapsed*.45);}
+  else {
+    ctx.translate(0,size*.28);ctx.rotate((-.035+Math.sin(gait-.35)*.055)*amplitude);ctx.translate(0,-size*.28);
+  }
   if(z.hit>0)ctx.filter='brightness(1.5)';
   else if(game.freeze>0)ctx.filter='hue-rotate(100deg) saturate(.7) brightness(1.1)';
   else ctx.filter={armor:'saturate(.45)',runner:'hue-rotate(300deg)',shield:'hue-rotate(60deg)',healer:'hue-rotate(330deg)',splitter:'hue-rotate(120deg)',bomber:'hue-rotate(240deg)',boss:'hue-rotate(310deg) saturate(1.5)',mini:'hue-rotate(110deg)'}[z.type]||'none';
-  if(sprite.complete&&sprite.naturalWidth)ctx.drawImage(sprite,-size/2,-size*.59,size,size);
+  if(sprite.complete&&sprite.naturalWidth)drawWalkingSprite(z,size,dead);
   else drawEmoji('🧟',0,0,size*.75);
   ctx.filter='none';
   if(!dead){
