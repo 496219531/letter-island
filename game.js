@@ -138,7 +138,7 @@ function updateHud(force=false) {
 }
 
 function drawEmoji(text,x,y,size,angle=0) {
-  ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.font=size+'px "Apple Color Emoji","Segoe UI Emoji",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,0,0);ctx.restore();
+  ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.fillStyle='#ffffff';ctx.font=size+'px "Apple Color Emoji","Segoe UI Emoji",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,0,0);ctx.restore();
 }
 // Articulated rendering of the existing transparent sprite. All joints move
 // with each enemy's simulation clock, so pause, freeze and slow motion agree.
@@ -219,10 +219,12 @@ function drawZombie(z,dead=false) {
 }
 function drawHero() {
   const target=game.target();const angle=Math.atan2(target.y-game.hero.y,target.x-game.hero.x);
-  ctx.save();ctx.translate(game.hero.x,game.hero.y);
-  ctx.fillStyle='#28452025';ctx.beginPath();ctx.ellipse(-7,38,38,11,0,0,Math.PI*2);ctx.fill();
-  drawEmoji('🌻',-11,0,85,Math.sin(game.time*3)*.04);
-  ctx.save();ctx.translate(21,7);ctx.rotate(angle);ctx.translate(recoil>0?-4:0,0);drawEmoji('🔫',0,0,48,Math.PI);ctx.restore();
+  ctx.save();ctx.globalAlpha=1;ctx.filter='none';ctx.translate(game.hero.x,game.hero.y);
+  ctx.fillStyle='#28452040';ctx.beginPath();ctx.ellipse(-7,38,38,11,0,0,Math.PI*2);ctx.fill();
+  ctx.shadowColor='#284a2e';ctx.shadowBlur=3;
+  drawEmoji('🌻',-11,0,100,Math.sin(game.time*3)*.04);
+  ctx.shadowBlur=0;
+  ctx.save();ctx.translate(21,7);ctx.rotate(angle);ctx.translate(recoil>0?-4:0,0);drawEmoji('🔫',0,0,55,Math.PI);ctx.restore();
   ctx.font='bold 11px system-ui';ctx.fillStyle='#f8ffed';ctx.textAlign='center';ctx.shadowColor='#39522b';ctx.shadowBlur=4;ctx.fillText('豌豆小队长',-4,61);ctx.restore();
   if(game.status==='playing'){
     ctx.save();ctx.strokeStyle='#ffffdc99';ctx.lineWidth=2;ctx.setLineDash([4,7]);
@@ -256,7 +258,6 @@ function render(dt) {
   // The dashed line marks where enemies can damage the garden.
   if(game.status==='playing') {ctx.save();ctx.setLineDash([8,10]);ctx.strokeStyle='#fffad352';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(119,84);ctx.lineTo(119,465);ctx.stroke();ctx.restore();}
   if(game.freeze>0){ctx.fillStyle='#b4e9ff24';ctx.fillRect(0,0,1000,530);}
-  drawHero();
   [...game.enemies].sort((a,b)=>a.y-b.y).forEach(z=>drawZombie(z));
   game.dead.forEach(z=>drawZombie(z,true));
   for(const b of game.bullets){
@@ -264,6 +265,7 @@ function render(dt) {
     ctx.fillStyle='#e5ff77';ctx.shadowColor='#f0ffaa';ctx.shadowBlur=8;ctx.beginPath();ctx.arc(b.x,b.y,6,0,Math.PI*2);ctx.fill();ctx.fillStyle='#faffd6';ctx.beginPath();ctx.arc(b.x-1,b.y-2,2,0,Math.PI*2);ctx.fill();ctx.restore();
   }
   drawEffects();
+  drawHero();
   for(let i=particles.length-1;i>=0;i--){
     const p=particles[i];if(game.status!=='paused'){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;if(!p.text)p.vy+=190*dt;}
     if(p.life<=0){particles.splice(i,1);continue;}
