@@ -159,3 +159,15 @@ test('sentence tiers use complete phrases, require spaces, and only cast at comp
  }
  g.learningMode='letters';g.start();assert.equal(g.input(' '),false);
 });
+test('speaking mode accepts only a complete recognized phrase and never accepts typing',()=>{
+ const {ENGLISH_SENTENCES}=require('../engine.js'),events=[],g=new GardenGame({random:()=>.35,emit:(type,data)=>events.push({type,data})});
+ g.learningMode='speaking';g.englishLevel=1;g.start();
+ for(const skill of g.skills)assert.ok(ENGLISH_SENTENCES[1].some(entry=>entry.word===skill.code));
+ const phrase=g.skills[0].code;assert.equal(g.input(phrase[0]),false);assert.equal(g.skills[0].typed,0);
+ assert.equal(g.speak(0,'totally different words'),false);assert.equal(g.casts,0);assert.equal(g.typing,0);
+ assert.equal(events.at(-1).type,'speech');assert.equal(events.at(-1).data.matched,false);
+ assert.equal(g.speak(0,'  '+phrase.toLowerCase()+'!  '),true);assert.equal(g.casts,1);assert.equal(g.typing,-1);
+ assert.equal(events.some(event=>event.type==='speech'&&event.data.matched),true);
+ assert.equal(g.speak(1,g.skills[1].code),true);assert.equal(g.casts,2);
+ assert.equal(g.speak(1,g.skills[1].code),false);
+});

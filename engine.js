@@ -166,9 +166,9 @@
     get spellLength() { return this.adaptive?Math.min(this.maxSpellLength,this.wave<=4?this.wave:4+(this.wave-4)*2):1; }
     get rechargeRate() { return (1+.16*(this.wave-1))*(1+.2*this.stack('recharge')); }
     nextCode(index) {
-      if(this.learningMode==='english'||this.learningMode==='sentences'){
+      if(['english','sentences','speaking'].includes(this.learningMode)){
         const others=this.skills.filter((_,i)=>i!==index).map(s=>s.code[0]);
-        const bank=this.learningMode==='sentences'?ENGLISH_SENTENCES:ENGLISH_WORDS;
+        const bank=['sentences','speaking'].includes(this.learningMode)?ENGLISH_SENTENCES:ENGLISH_WORDS;
         const tier=bank[this.englishLevel]||bank[0];
         const pool=tier.filter(entry=>!others.includes(entry.word[0])&&entry.word!==this.skills[index].code);
         const candidates=pool.length?pool:tier;
@@ -188,6 +188,7 @@
       this.emit('typing',{index});
     }
     input(key) {
+      if(this.learningMode==='speaking')return false;
       if(this.status!=='playing'||!((/^[a-z]$/i).test(key)||(key===' '&&this.learningMode==='sentences')))return false;
       key=key.toUpperCase();
       let index=this.typing;
@@ -203,6 +204,17 @@
         this.cast(index);
       }
       return true;
+    }
+    speak(index,transcript) {
+      if(this.status!=='playing'||this.learningMode!=='speaking'||!Number.isInteger(index)||index<0||index>2)return false;
+      const skill=this.skills[index];
+      if(skill.cd>0){this.emit('cooldown',{index});return false;}
+      const normalize=text=>String(text||'').toUpperCase().replace(/[^A-Z0-9' ]/g,' ').replace(/\s+/g,' ').trim();
+      const heard=normalize(transcript),expected=normalize(skill.code);
+      this.typing=index;this.emit('speech',{index,heard,expected,matched:heard===expected});
+      if(!heard||heard!==expected)return false;
+      if(!this.enemies.some(z=>z.hp>0)){this.typing=-1;this.emit('empty');return true;}
+      this.correct+=expected.replace(/ /g,'').length;this.cast(index);return true;
     }
     backspace() { if(this.typing>=0){const s=this.skills[this.typing];s.typed=Math.max(0,s.typed-1);} }
     cancelTyping(){if(this.typing>=0)this.skills[this.typing].typed=0;this.typing=-1;}

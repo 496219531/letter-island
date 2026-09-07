@@ -43,3 +43,8 @@ test('sentence saves retain spaces and partially typed progress',()=>{
  const g=new GardenGame();g.learningMode='sentences';g.englishLevel=2;g.start();g.skills[0].code='WHAT TIME IS IT';for(const c of 'WHAT ')g.input(c);const save=encode(g),loaded=new GardenGame();assert.ok(restore(loaded,save));assert.equal(loaded.learningMode,'sentences');assert.equal(loaded.skills[0].typed,5);assert.equal(loaded.skills[0].code,'WHAT TIME IS IT');loaded.resume();for(const c of 'TIME IS IT')loaded.input(c);assert.equal(loaded.casts,1);
  const bad=JSON.parse(JSON.stringify(save));bad.state.skills[0].code='FAKE SENTENCE';assert.equal(validate(bad),false);
 });
+test('speaking saves retain sentence prompts and reject non-library phrases',()=>{
+ const g=new GardenGame();g.learningMode='speaking';g.englishLevel=4;g.start();g.select(1);const save=encode(g),loaded=new GardenGame();
+ assert.ok(validate(save));assert.ok(restore(loaded,save));assert.equal(loaded.learningMode,'speaking');assert.equal(loaded.englishLevel,4);assert.equal(loaded.skills[1].code,g.skills[1].code);assert.equal(loaded.typing,1);
+ const bad=JSON.parse(JSON.stringify(save));bad.state.skills[0].code='SAY SOMETHING ELSE';assert.equal(validate(bad),false);
+});
