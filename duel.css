@@ -4,3 +4,6 @@
 @media(min-width:1000px){main{max-width:clamp(800px,calc(188.6dvh - 660px),1200px)}}
 
 .mode-row{display:grid;grid-template-columns:1fr}.mode-row>label{min-width:0}
+
+.waiting-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.waiting-actions button{flex:1;min-height:44px}.duel-app #leave,.duel-app #leaveWaiting{border:1px solid #e6ac84;color:#ffe0c8;min-height:40px}
+.duel-app .waiting-actions button{background:#294534;color:#fff1bd;border-color:#829664}.duel-app .waiting-actions button:hover:not(:disabled){background:#36563e}

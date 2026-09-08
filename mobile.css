@@ -89,3 +89,15 @@ body.mobile-game .iphone-skill-tabs button[data-skill][aria-pressed=true]{color:
 body.mobile-game #touchKeyboard .touch-key.hint[data-hint-skill]{position:relative;background:var(--skill-color);color:#14271f;border:2px solid var(--skill-color);box-shadow:0 0 0 1px var(--skill-color),0 2px 0 #071b13;outline:none;padding-bottom:9px;font-weight:900}
 body.mobile-game #touchKeyboard .touch-key.hint[data-hint-skill]::after{content:attr(data-skill-label);position:absolute;bottom:1px;left:0;right:0;text-align:center;font-size:8px;line-height:9px;font-weight:700;color:#14271f;pointer-events:none}
 body.mobile-game .skill-card[data-skill] .cooldown-track>span{background:var(--skill-color)}
+
+/* Duel controls remain reachable in the waiting dialog and phone battle. */
+.mobile-game.duel-app .room-tools{width:100%;justify-content:space-between}
+.mobile-game.duel-app .room-heading{position:sticky;top:0;z-index:20;background:#183423;padding:8px 0}
+.mobile-game.duel-app .room-tools button{min-height:44px;font-size:14px}
+.mobile-game.duel-app .waiting-actions{position:sticky;bottom:0;background:#1b3625;padding:8px 0}
+.mobile-game.duel-app .skills-heading{height:auto;min-height:28px;flex-wrap:wrap}
+.mobile-game.duel-app .skills-heading span{font-size:12px}
+.mobile-game.duel-app .duel-touch-keyboard{position:sticky;bottom:0;z-index:15;background:#183423;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+.mobile-game.duel-app .player-score{min-width:0;flex-wrap:wrap}
+.mobile-game.duel-app .player-score strong{overflow-wrap:anywhere}
+.mobile-game.duel-app .network-note{overflow-wrap:anywhere}

@@ -80,7 +80,14 @@ $('#copy').onclick=async()=>{
     let copied=false;try{copied=document.execCommand('copy');}catch{}input.remove();notice(copied?'邀请地址已复制':text);
   }
 };
-$('#leave').onclick=async()=>{if(state?.status==='playing'&&!confirm('离开房间将认输，确定离开吗？'))return;if(state?.status==='playing')await action({type:'surrender'});reset();};
+async function leaveRoom(){
+  if(state?.status==='playing'&&!confirm('退出房间将结束当前对局，确定退出吗？'))return;
+  try{if(session)await request(`/api/room/${session.code}/leave`,{method:'POST',body:'{}'});reset();notice('已退出房间，可以重新创建或加入');}
+  catch(e){if(e.status===401){reset();return;}notice('退出未成功，请重试：'+e.message);}
+}
+$('#leave').onclick=leaveRoom;
+$('#leaveWaiting').onclick=leaveRoom;
+$('#unready').onclick=()=>action({type:'unready'});
 $('#surrender').onclick=()=>{if(confirm('确定认输并结束这一局吗？'))action({type:'surrender'});};
 $('#auto').onchange=()=>{localAuto=$('#auto').checked;action({type:'auto',value:localAuto});};
 setInterval(()=>{if(session&&connected)action({type:'ping'});},2000);
@@ -116,6 +123,7 @@ function render() {
     $('#waitingDetail').textContent=finished?`${s.winner===null?s.reason:s.reason.startsWith('对方')?(s.winner===s.side?s.reason:s.reason.replace('对方','你的')):s.reason}。双方准备后可再来一局。`:'双方点击准备后自动开战。题目由房主设置，每个人独立作答。';
     $('#playerList').replaceChildren();
     s.players.forEach((p,i)=>{const row=document.createElement('p'),name=document.createElement('strong'),status=document.createElement('span');name.textContent=p?`${p.name}${i===s.side?'（我）':''}`:'等待朋友…';status.textContent=p?(p.connected?(p.ready?'已准备 ✓':'未准备'):'未连接'):'';row.append(name,status);$('#playerList').append(row);});
+    $('#unready').hidden=!me.ready;$('#unready').disabled=!connected;
     $('#ready').disabled=me.ready||!connected;$('#ready').textContent=me.ready?'已准备，等待朋友':finished?'再来一局 · 准备':'我准备好了';
   }
   if(!s.fields)return;
@@ -203,7 +211,7 @@ async function boot(){
   const code=new URLSearchParams(location.search).get('room');if(code)$('#roomCode').value=code.toUpperCase().slice(0,6);
   try{
     const info=await request('/api/lan');if(!Array.isArray(info.addresses))throw new Error();addresses=info.addresses;stages=info.stages||[];dialogueStages=info.dialogueStages||[];updateLevels();
-    const note=$('#networkNote');note.replaceChildren(document.createTextNode('另一台电脑打开：'));
+    const note=$('#networkNote');note.replaceChildren(document.createTextNode('手机或电脑打开：'));
     const url=addresses[0]||location.origin+'/duel.html';const a=document.createElement('a');a.href=url;a.textContent=url;note.append(a,document.createTextNode(' · 房主电脑保持运行。'));
     try{session=JSON.parse(sessionStorage.getItem(sessionKey));}catch{}
     if(session?.code&&session?.token){await request(`/api/room/${session.code}/state`);attach();}

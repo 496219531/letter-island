@@ -62,6 +62,11 @@ class DuelMatch {
     this.players[side]={name:String(name||'小院守卫').trim().slice(0,16)||'小院守卫',connected:false,offline:0,ready:false,sun:24,sent:0,dispatchCd:0};
     return side;
   }
+  leave(side) {
+    if(!this.players[side])return;
+    this.players[side]=null;this.status='waiting';this.games=null;this.winner=null;this.reason='';
+    this.players.forEach(p=>{if(p)p.ready=false;});
+  }
   connect(side,connected) {
     const p=this.players[side];if(!p)return;
     p.connected=connected;p.offline=0;
@@ -111,6 +116,7 @@ class DuelMatch {
   }
   command(side,action) {
     const p=this.players[side];if(!p||!p.connected)throw new Error('连接尚未恢复');
+    if(action.type==='unready') {if(['waiting','finished'].includes(this.status))p.ready=false;return;}
     if(action.type==='ready') {
       if(!['waiting','finished'].includes(this.status))return;
       p.ready=true;

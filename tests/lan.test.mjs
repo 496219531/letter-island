@@ -34,6 +34,22 @@ test('HTTP + two independent SSE clients: room lifecycle, commands, auth, reconn
   assert.equal((await post(`/api/room/${b.code}/action`,{type:'ping'},b.token)).status,200);
   await post(`/api/room/${b.code}/action`,{type:'surrender'},b.token);const done=await until(ca,s=>s.status==='finished');assert.equal(done.winner,0);
   await post(`/api/room/${a.code}/action`,{type:'ready'},a.token);await post(`/api/room/${b.code}/action`,{type:'ready'},b.token);await until(ca,s=>s.round===2&&s.status==='playing');
+  await post(`/api/room/${a.code}/action`,{type:'surrender'},a.token);
+  await post(`/api/room/${a.code}/action`,{type:'ready'},a.token);
+  await post(`/api/room/${a.code}/action`,{type:'unready'},a.token);
+  assert.equal(app.rooms.get(a.code).match.players[0].ready,false);
+  assert.equal((await post(`/api/room/${b.code}/leave`,{},b.token)).status,200);
+  assert.equal((await post(`/api/room/${b.code}/action`,{type:'ping'},b.token)).status,401);
+  assert.equal(app.rooms.get(a.code).match.status,'waiting');
+  const replacement=await post('/api/rooms',{name:'手机新玩家',mobile:true,code:a.code});
+  assert.equal(replacement.status,200);assert.equal(replacement.data.side,1);
+  assert.notEqual(replacement.data.token,b.token);
+  // Abandoned seats expire after the reconnect grace period.
+  app.rooms.get(a.code).lastSeen[1]=Date.now()-31000;
+  await new Promise(resolve=>setTimeout(resolve,250));
+  assert.equal(app.rooms.get(a.code).match.players[1],null);
+  assert.equal((await post(`/api/room/${a.code}/leave`,{},a.token)).status,200);
+  assert.equal(app.rooms.has(a.code),false);
   const cross=await fetch(base+'/api/rooms',{method:'POST',headers:{Origin:'http://elsewhere.invalid','Content-Type':'application/json'},body:'{}'});assert.equal(cross.status,403);
   for(const path of ['/lan-server.mjs','/duel.cjs','/.git/config','/package.json'])assert.equal((await fetch(base+path)).status,404);
   assert.equal((await fetch(base+'/duel.html')).status,200);assert.ok(Array.isArray((await (await fetch(base+'/api/lan')).json()).addresses));

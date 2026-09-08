@@ -25,6 +25,12 @@ export function createLanServer(tlsOptions=null) {
   const protocol=tlsOptions?'https':'http';
   const rooms=new Map();
   const speech=createSpeechBridge();
+  function release(room,side) {
+    const stream=room.streams[side];room.streams[side]=null;room.tokens[side]=null;
+    room.match.leave(side);stream?.end();
+    if(room.match.players.every(p=>!p))rooms.delete(room.code);
+    else broadcast(room);
+  }
   function broadcast(room) {
     room.streams.forEach((res,side)=>{
       if(!res||res.destroyed)return;
@@ -73,14 +79,15 @@ export function createLanServer(tlsOptions=null) {
           room={code,match:new DuelMatch({mode:data.mobile===true&&(!data.mode||data.mode==='letters')?'english':data.mode,level:data.level}),tokens:[],streams:[],lastSeen:[],lastActive:Date.now(),rates:[[],[]]};
           side=room.match.join(data.name);rooms.set(code,room);
         }
-        const token=randomBytes(24).toString('hex');room.tokens[side]=token;room.lastActive=Date.now();
+        const token=randomBytes(24).toString('hex');room.tokens[side]=token;room.lastSeen[side]=Date.now();room.lastActive=Date.now();
         json(res,200,{code:room.code,token,side});broadcast(room);return;
       }
       if(url.pathname.startsWith('/api/room/')) {
         const [, , ,code,operation]=url.pathname.split('/');const room=rooms.get(code);
         const token=operation==='events'?url.searchParams.get('token'):req.headers.authorization?.replace(/^Bearer /,'');
         const side=room?.tokens.findIndex(t=>t===token);
-        if(!room||side===undefined||side<0){json(res,401,{error:'房间已过期，请重新开房或加入'});return;}
+        if(!token||!room||side===undefined||side<0){json(res,401,{error:'房间已过期，请重新开房或加入'});return;}
+        if(operation==='leave'&&req.method==='POST'){release(room,side);json(res,200,{ok:true});return;}
         if(operation==='state'&&req.method==='GET'){json(res,200,{code:room.code,...room.match.snapshot(side)});return;}
         if(operation==='events'&&req.method==='GET') {
           const previous=room.streams[side];
@@ -115,6 +122,8 @@ export function createLanServer(tlsOptions=null) {
       broadcastIn=0;
       for(const [code,room] of rooms){
         room.streams.forEach((res,side)=>{if(res&&Date.now()-room.lastSeen[side]>6500){room.streams[side]=null;room.match.connect(side,false);res.destroy();}});
+        room.match.players.forEach((p,side)=>{if(p&&!p.connected&&Date.now()-room.lastSeen[side]>30000)release(room,side);});
+        if(!rooms.has(code))continue;
         if(room.streams.some(Boolean))room.lastActive=Date.now();
         if(Date.now()-room.lastActive>30*60*1000){rooms.delete(code);continue;}
         broadcast(room);
