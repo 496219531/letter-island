@@ -280,6 +280,9 @@ function onEvent(type, data = {}) {
   if (type === 'critical') { floatText(data.x,data.y-28,'暴击！','#ffdd8a'); }
   if (type === 'heal') { puff(data.x,data.y,'#b9ffa0',8,'+'); }
   if (type === 'shot') { recoil = .1; soundscape.play('shot',{x:game.hero.x}); }
+  if (type === 'hit'&&data.kind==='thorns'&&Math.random()<.06)floatText(data.x,data.y-32,'扎！','#c7ff87');
+  if (type === 'hit'&&data.kind==='splash')puff(data.x,data.y,'#ffc66b',5,'🍿');
+  if (type === 'hit'&&data.surface==='iceHit'&&game.stack('shatter'))puff(data.x,data.y,'#a9f4ff',3);
   if (type === 'hit') { if(!['poison','thorns'].includes(data.kind))soundscape.play(data.surface||'flesh',data);puff(data.x,data.y,'#e3f8a3',4); }
   if (type === 'kill') {
     puff(data.x,data.y,'#fff4a0',15); floatText(data.x,data.y-20,'+'+data.score);
@@ -476,6 +479,51 @@ function getCaptainCutout(){
   }
   pen.putImageData(pixels,0,0);captainCutout=layer;return layer;
 }
+// Visual upgrades are bounded even when card stacks grow indefinitely.
+function drawUpgradeScenery(){
+  const level=id=>Math.min(5,game.stack(id)),time=reducedMotion?0:game.time;
+  ctx.save();
+  if(level('fortify')){
+    ctx.strokeStyle='#b9d1dc';ctx.lineWidth=4+level('fortify');
+    for(const y of [112,440]){ctx.beginPath();ctx.moveTo(125,y);ctx.lineTo(195,y);ctx.stroke();}
+    for(let i=0;i<8;i++){const y=110+i*48;ctx.fillStyle='#587781';ctx.fillRect(133,y-16,12,35);ctx.fillStyle='#e0f2ed';ctx.fillRect(135,y-14,8,6);}
+  }
+  if(level('thorns'))for(let i=0;i<8;i++){
+    const x=216,y=110+i*48,k=1+level('thorns')*.09;
+    const biting=game.enemies.some(z=>z.hp>0&&z.x<260&&Math.abs(z.y-y)<28);
+    ctx.save();ctx.translate(x,y);ctx.scale(k,k);
+    ctx.fillStyle='#133c2a55';ctx.beginPath();ctx.ellipse(0,18,21,7,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=biting?'#b8ff69':'#448c43';ctx.lineCap='round';ctx.lineWidth=12;
+    ctx.beginPath();ctx.moveTo(0,14);ctx.lineTo(0,-19);ctx.moveTo(-1,1);ctx.lineTo(-15,1);ctx.lineTo(-15,-10);ctx.moveTo(1,-4);ctx.lineTo(14,-4);ctx.lineTo(14,-15);ctx.stroke();
+    ctx.strokeStyle='#e2f5b8';ctx.lineWidth=1.5;for(let j=0;j<4;j++){ctx.beginPath();ctx.moveTo(4,-15+j*8);ctx.lineTo(10,-18+j*8);ctx.moveTo(-5,-12+j*8);ctx.lineTo(-10,-15+j*8);ctx.stroke();}
+    if(biting){ctx.strokeStyle='#deff87';ctx.lineWidth=2;for(let j=0;j<3;j++){ctx.beginPath();ctx.moveTo(18,2+j*5);ctx.lineTo(27+Math.sin(time*12)*4,-3+j*5);ctx.stroke();}}
+    ctx.restore();
+  }
+  if(level('knockback')){
+    ctx.save();ctx.translate(82,170);ctx.strokeStyle='#b8a57e';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,58);ctx.stroke();ctx.rotate(time*(1+level('knockback')*.3));
+    for(let i=0;i<4;i++){ctx.rotate(Math.PI/2);ctx.fillStyle=i%2?'#ffe09d':'#bce8e2';ctx.fillRect(3,-5,25+level('knockback')*3,10);}ctx.restore();
+  }
+  if(level('barrier')){ctx.strokeStyle='#8be4ff';ctx.lineWidth=2+level('barrier');ctx.globalAlpha=.25+.1*Math.sin(time*2);ctx.beginPath();ctx.ellipse(game.hero.x,game.hero.y,74,95,0,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1;}
+  if(level('berserk')&&game.health<=game.maxHealth/2){ctx.fillStyle='#ff733644';ctx.beginPath();ctx.arc(game.hero.x,game.hero.y,76,0,Math.PI*2);ctx.fill();drawEmoji('🔥',game.hero.x,game.hero.y-82,35);}
+  for(let i=0;i<Math.min(3,level('multishot'));i++)drawEmoji('🌱',75+i*24,380,28+i*3);
+  // Each owned upgrade becomes a named garden installation, with visible stack size.
+  const owned=GARDEN_CARDS.filter(card=>game.stack(card.id));
+  owned.forEach((card,i)=>{
+    const x=285+(i%12)*57,y=38+Math.floor(i/12)*48,size=22+level(card.id)*2;
+    ctx.fillStyle='#183d2dbb';ctx.fillRect(x-24,y-22,49,44);drawEmoji(card.icon,x,y-1,size);
+    ctx.font='bold 8px system-ui';ctx.textAlign='center';ctx.fillStyle='#fff4cb';ctx.fillText(card.name,x,y+16);
+    ctx.font='bold 9px system-ui';ctx.textAlign='right';ctx.fillText('×'+game.stack(card.id),x+23,y-12);
+  });
+  if(level('poison'))for(const y of [150,300,440])drawEmoji('🍄',255,y,25+level('poison')*3);
+  if(level('frost'))for(const y of [190,350])drawEmoji('🧊',250,y,24+level('frost')*3);
+  if(level('repair'))drawEmoji('🛠️',100+Math.sin(time)*8,430,27+level('repair')*2);
+  if(level('leech'))drawEmoji('🧃',80,470,28+level('leech')*2);
+  if(level('recharge'))drawEmoji('🔋',115,215,27+level('recharge')*3);
+  if(level('magic'))drawEmoji('🔮',80,230,30+level('magic')*3);
+  if(level('crit'))drawEmoji('🍀',75,110,24+level('crit')*3);
+  if(game.freeze>0&&level('permafrost'))for(let i=0;i<6;i++)drawEmoji('❄️',300+i*110,100+Math.sin(time+i)*9,26);
+  ctx.restore();
+}
 function drawSunflowerDefense(){
   for(let i=0;i<8;i++){
     const x=155,y=110+i*48,full=game.maxHealth/8,hp=game.flowerHealth[i],ratio=hp/full;
@@ -503,7 +551,9 @@ function drawHero() {
   if(captainSprite.complete&&captainSprite.naturalWidth){
     ctx.save();ctx.translate(game.shotKick>0?-3:0,0);
     ctx.rotate(Math.max(-.10,Math.min(.10,angle*.15)));
-    ctx.drawImage(getCaptainCutout(),-70,-84,134,134);ctx.restore();
+    const growth=1+Math.min(5,game.stack('power'))*.035;ctx.scale(growth,growth);
+    ctx.drawImage(getCaptainCutout(),-70,-84,134,134);
+    if(game.stack('rapid'))drawEmoji('⚙️',-35,28,20+Math.min(5,game.stack('rapid'))*2,reducedMotion?0:game.time*5);ctx.restore();
   }else drawEmoji('🌱',-8,0,95);
   ctx.font='bold 11px system-ui';ctx.fillStyle='#f8ffed';ctx.textAlign='center';ctx.shadowColor='#39522b';ctx.shadowBlur=4;ctx.fillText('豌豆队长',-4,56);ctx.restore();
   if(game.status==='playing'){
@@ -523,8 +573,8 @@ function drawEffects() {
       ctx.save();ctx.strokeStyle='#ddfaff';ctx.lineWidth=7*(1-progress);ctx.globalAlpha=1-progress;ctx.beginPath();ctx.arc(500,270,progress*650,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#c5f0ff';ctx.globalAlpha=(1-progress)*.16;ctx.fillRect(0,0,1000,530);ctx.restore();
     }
     if(e.kind==='melon'){
-      ctx.save();ctx.strokeStyle='#ffeaa1';ctx.fillStyle='#fff2b032';ctx.lineWidth=3;ctx.setLineDash([7,8]);ctx.beginPath();ctx.ellipse(e.x,e.y,160,55,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();
-      drawEmoji('🍉',e.x,e.y-(1-progress)*520,65+progress*65,progress*3);
+      ctx.save();ctx.strokeStyle='#ffeaa1';ctx.fillStyle='#fff2b032';ctx.lineWidth=3;ctx.setLineDash([7,8]);ctx.beginPath();ctx.ellipse(e.x,e.y,Math.min(340,(e.radius||225)*.71),Math.min(115,(e.radius||225)*.245),0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();
+      drawEmoji('🍉',e.x,e.y-(1-progress)*520,(65+progress*65)*(1+Math.min(5,game.stack('blast'))*.15),progress*3);
     }
     if(e.kind==='explosion'){
       ctx.save();ctx.globalAlpha=(1-progress)*.7;ctx.fillStyle='#fff7a9';ctx.strokeStyle='#ffb15f';ctx.lineWidth=15*(1-progress);ctx.beginPath();ctx.arc(e.x,e.y,25+progress*230,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();
@@ -535,13 +585,15 @@ function drawEffects() {
 function render(dt) {
   ctx.clearRect(0,0,1000,530);ctx.save();
   if(shake>0&&!reducedMotion)ctx.translate((Math.random()-.5)*shake*12,(Math.random()-.5)*shake*8);
+  drawUpgradeScenery();
   drawSunflowerDefense();
   if(game.freeze>0){ctx.fillStyle='#b4e9ff24';ctx.fillRect(0,0,1000,530);}
   [...game.enemies].sort((a,b)=>a.y-b.y).forEach(z=>drawZombie(z));
   game.dead.forEach(z=>drawZombie(z,true));
   for(const b of game.bullets){
+    if(game.stack('pierce')){ctx.save();ctx.translate(b.x,b.y);ctx.rotate(Math.atan2(b.vy,b.vx));ctx.fillStyle='#eef7df';ctx.beginPath();ctx.moveTo(19,0);ctx.lineTo(1,-5);ctx.lineTo(1,5);ctx.fill();ctx.restore();}
     ctx.save();ctx.strokeStyle='#e6fa7ab0';ctx.lineWidth=5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(b.x-b.vx*.018,b.y-b.vy*.018);ctx.lineTo(b.x,b.y);ctx.stroke();
-    ctx.fillStyle='#e5ff77';ctx.shadowColor='#f0ffaa';ctx.shadowBlur=8;ctx.beginPath();ctx.arc(b.x,b.y,6,0,Math.PI*2);ctx.fill();ctx.fillStyle='#faffd6';ctx.beginPath();ctx.arc(b.x-1,b.y-2,2,0,Math.PI*2);ctx.fill();ctx.restore();
+    ctx.fillStyle=game.stack('poison')?'#be87f7':game.stack('frost')?'#a0ecff':'#e5ff77';ctx.shadowColor='#f0ffaa';ctx.shadowBlur=8;ctx.beginPath();ctx.arc(b.x,b.y,6+Math.min(5,game.stack('power'))*1.8,0,Math.PI*2);ctx.fill();ctx.fillStyle='#faffd6';ctx.beginPath();ctx.arc(b.x-1,b.y-2,2,0,Math.PI*2);ctx.fill();ctx.restore();
   }
   drawEffects();
   drawHero();
