@@ -23,6 +23,22 @@
   };
   document.addEventListener('DOMContentLoaded',()=>{
     document.body.classList.add('native-iphone');
+    // The web game has a desktop heading. In the app, its mode picker belongs
+    // with the one primary action on the home surface instead.
+    const startPanel=document.querySelector('.start-panel'),difficulty=document.querySelector('.difficulty-label'),duel=document.querySelector('.lan-entry');
+    if(startPanel&&difficulty){
+      const mode=document.createElement('section');mode.className='native-home-mode';
+      const label=document.createElement('strong');label.textContent='练习方式';
+      const start=startPanel.querySelector('#startButton');
+      mode.append(label,difficulty);start.before(mode);
+      if(duel){duel.textContent='⚔ 和朋友对战';start.after(duel);}
+    }
+    // The native shell always returns to the app home when the game is ready.
+    // Keep this independent of stale WebKit session state from an earlier run.
+    const home=document.getElementById('startScreen');
+    const syncHome=()=>{if(home&&(document.body.dataset.gameState||'ready')==='ready')home.hidden=false;};
+    new MutationObserver(syncHome).observe(document.body,{attributes:true,attributeFilter:['data-game-state']});
+    requestAnimationFrame(syncHome);
     document.querySelector('.arsenal').prepend(document.getElementById('battleToast'));
     const cards=[...document.querySelectorAll('.skill-card')];
     const tabs=document.createElement('div');tabs.className='iphone-skill-tabs';tabs.setAttribute('aria-label','选择大招');
