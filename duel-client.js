@@ -97,11 +97,20 @@ for(let i=0;i<3;i++){
   const button=document.createElement('button');button.className='skill';button.innerHTML='<div class="skill-top"><strong></strong><small></small></div><div class="dialogue-context" hidden></div><div class="skill-code"></div><div class="skill-meaning"></div><div class="skill-bar"></div>';
   button.onclick=()=>{action({type:'select',index:i});$('#myCanvas').focus({preventScroll:true});};$('#skills').append(button);skillCards.push(button);
 }
+let phoneSkill=0,phoneTabs=null;
+function showPhoneSkill(index){
+  phoneSkill=index;skillCards.forEach((card,i)=>card.classList.toggle('phone-visible',i===index));
+  if(phoneTabs)[...phoneTabs.children].forEach((button,i)=>button.setAttribute('aria-pressed',String(i===index)));
+}
 if(window.GuluMobile?.active){
+  document.body.classList.add('phone-duel');
+  phoneTabs=document.createElement('div');phoneTabs.className='duel-skill-tabs';phoneTabs.setAttribute('aria-label','选择大招');
+  ['🌈 激光','❄️ 冰冻','🍉 西瓜'].forEach((label,index)=>{const button=document.createElement('button');button.type='button';button.dataset.skill=index;button.textContent=label;button.onclick=()=>{showPhoneSkill(index);skillCards[index].click();};phoneTabs.append(button);skillCards[index].dataset.skill=index;});
+  $('#skills').before(phoneTabs);showPhoneSkill(0);
   const keyboard=document.createElement('div');keyboard.className='duel-touch-keyboard';keyboard.setAttribute('aria-label','对战触屏键盘');
   for(const keys of ['QWERTYUIOP'.split(''),'ASDFGHJKL'.split(''),'ZXCVBNM'.split(''),["'",'-','.',' ','Backspace','Escape']]){
     const row=document.createElement('div');row.className='touch-row';
-    for(const key of keys){const b=document.createElement('button');b.type='button';b.className='touch-key'+(key.length>1||key===' '?' wide':'');b.textContent=key===' '?'空格':key==='Backspace'?'退格':key==='Escape'?'取消':key;b.setAttribute('aria-label','输入 '+b.textContent);b.onclick=()=>{if(!connected||state?.status!=='playing'||state.paused)return;action(key==='Backspace'?{type:'backspace'}:key==='Escape'?{type:'cancel'}:{type:'key',key});};row.append(b);}
+    for(const key of keys){const b=document.createElement('button');b.type='button';b.className='touch-key'+(key.length>1||key===' '?' wide':'');b.textContent=key===' '?'空格':key==='Backspace'?'退格':key==='Escape'?'取消':key;b.setAttribute('aria-label','输入 '+b.textContent);b.dataset.key=key;b.onclick=()=>{if(!connected||state?.status!=='playing'||state.paused)return;action(key==='Backspace'?{type:'backspace'}:key==='Escape'?{type:'cancel'}:{type:'key',key});};row.append(b);}
     keyboard.append(row);
   }
   $('#skills').after(keyboard);
@@ -127,6 +136,14 @@ function render() {
     $('#ready').disabled=me.ready||!connected;$('#ready').textContent=me.ready?'已准备，等待朋友':finished?'再来一局 · 准备':'我准备好了';
   }
   if(!s.fields)return;
+  if(phoneTabs){
+    if(s.typing>=0&&s.typing!==phoneSkill)showPhoneSkill(s.typing);
+    const hints=GuluMobile.keySkillHints(s.skills,s.typing,s.config.mode);
+    document.querySelectorAll('.duel-touch-keyboard [data-key]').forEach(button=>{
+      const skill=hints[button.dataset.key];button.classList.toggle('hint',skill!==undefined);
+      if(skill!==undefined)button.dataset.hintSkill=skill;else delete button.dataset.hintSkill;
+    });
+  }
   const mine=s.fields[s.side],theirs=s.fields[1-s.side];
   $('#myName').textContent=me.name+'（我）';$('#theirName').textContent=other.name;
   $('#myHealth').textContent=`🌻 ${mine.health.toFixed(1)} / ${mine.maxHealth}`;$('#theirHealth').textContent=`🌻 ${theirs.health.toFixed(1)} / ${theirs.maxHealth}`;

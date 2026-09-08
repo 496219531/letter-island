@@ -101,3 +101,43 @@ body.mobile-game .skill-card[data-skill] .cooldown-track>span{background:var(--s
 .mobile-game.duel-app .player-score{min-width:0;flex-wrap:wrap}
 .mobile-game.duel-app .player-score strong{overflow-wrap:anywhere}
 .mobile-game.duel-app .network-note{overflow-wrap:anywhere}
+
+/* App-style duel: fixed battlefield, one skill pane, and bottom keyboard. */
+body.phone-duel[data-duel-state=playing]{height:100dvh;min-height:0;overflow:hidden!important;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);box-sizing:border-box}
+.phone-duel[data-duel-state=playing] .topbar{display:none}
+.phone-duel[data-duel-state=playing] main{flex:1;min-height:0;padding:3px 4px;height:100%;display:flex;flex-direction:column}
+.phone-duel[data-duel-state=playing] #room{flex:1;min-height:0;display:flex;flex-direction:column;gap:3px}
+.phone-duel[data-duel-state=playing] .room-heading{flex:none;min-height:36px;padding:0;gap:2px;position:static}
+.phone-duel[data-duel-state=playing] .room-heading>div:first-child{display:none}
+.phone-duel[data-duel-state=playing] .room-tools{width:100%;gap:4px;font-size:11px}
+.phone-duel[data-duel-state=playing] .room-tools button{height:34px;min-height:34px;font-size:12px;padding:3px 8px}
+.phone-duel[data-duel-state=playing] #battle{flex:1;min-height:0;display:flex;flex-direction:column;gap:3px;overflow:hidden}
+.phone-duel[data-duel-state=playing] .scoreboard{flex:none;height:34px;min-height:34px;padding:2px 6px}
+.phone-duel[data-duel-state=playing] .timer b{font-size:20px}
+.phone-duel[data-duel-state=playing] .timer>span{display:none}
+.phone-duel[data-duel-state=playing] .yard{flex:0 0 27dvh;min-height:115px;height:27dvh}
+.phone-duel[data-duel-state=playing] .yard-footer{min-height:22px;padding:1px 5px;font-size:10px}
+.phone-duel[data-duel-state=playing] .attack-panel{flex:none}
+.phone-duel[data-duel-state=playing] .dispatch{padding:3px 5px;display:flex;align-items:center;gap:5px}
+.phone-duel[data-duel-state=playing] .dispatch-title h2{display:none}
+.phone-duel[data-duel-state=playing] .dispatch-title strong{font-size:13px;white-space:nowrap}
+.phone-duel[data-duel-state=playing] .dispatch-title small{display:none}
+.phone-duel[data-duel-state=playing] #units{flex:1;margin:0;gap:3px}
+.phone-duel[data-duel-state=playing] #units button{min-height:34px;padding:2px;font-size:10px;gap:1px}
+.phone-duel .duel-skill-tabs{display:flex;gap:4px;flex:none}
+.phone-duel .duel-skill-tabs button{flex:1;min-width:0;height:36px;min-height:36px;padding:3px;font-size:12px;color:var(--skill-color);background:var(--skill-wash);border:1px solid var(--skill-color)}
+.phone-duel .duel-skill-tabs button[aria-pressed=true]{background:var(--skill-color);color:#152b24}
+.phone-duel[data-duel-state=playing] .skills-heading{display:none}
+.phone-duel[data-duel-state=playing] #skills{flex:1;min-height:0;display:block;overflow:hidden;padding:0}
+.phone-duel[data-duel-state=playing] #skills .skill{display:none;height:100%;min-height:0;padding:6px;overflow:auto;border-color:var(--skill-color);background:var(--skill-wash);gap:3px}
+.phone-duel[data-duel-state=playing] #skills .skill.phone-visible{display:flex}
+.phone-duel[data-duel-state=playing] .skill-top strong{font-size:12px}
+.phone-duel[data-duel-state=playing] .skill-code{font-size:18px;max-height:none;min-height:26px;flex-shrink:0}
+.phone-duel[data-duel-state=playing] .skill .skill-meaning{font-size:13px;line-height:1.3;flex-shrink:0}
+.phone-duel[data-duel-state=playing] .duel-touch-keyboard{position:static;flex:none;padding:2px 0 0}
+.phone-duel[data-duel-state=playing] .touch-row{margin-bottom:3px}
+.phone-duel[data-duel-state=playing] .touch-key{height:39px;min-height:39px;max-width:none;font-size:16px}
+.phone-duel .duel-touch-keyboard .hint{background:var(--skill-color);color:#14271f;border-color:var(--skill-color);font-weight:900}
+@media(max-height:650px){.phone-duel[data-duel-state=playing] .yard{flex-basis:24dvh;min-height:85px}.phone-duel[data-duel-state=playing] .touch-key{height:30px;min-height:30px}.phone-duel[data-duel-state=playing] .duel-skill-tabs button{height:30px;min-height:30px}}
+@media(orientation:landscape) and (max-height:500px){body.phone-duel[data-duel-state=playing]{overflow:auto!important;height:auto;min-height:100dvh}.phone-duel[data-duel-state=playing] main{height:auto;min-height:600px}.phone-duel[data-duel-state=playing] #skills{min-height:100px}}
+.phone-duel[data-duel-state=playing] #skills .skill.phone-visible{width:100%;max-width:none;box-sizing:border-box}
