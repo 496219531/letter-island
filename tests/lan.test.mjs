@@ -54,3 +54,19 @@ test('HTTP + two independent SSE clients: room lifecycle, commands, auth, reconn
   for(const path of ['/lan-server.mjs','/duel.cjs','/.git/config','/package.json'])assert.equal((await fetch(base+path)).status,404);
   assert.equal((await fetch(base+'/duel.html')).status,200);assert.ok(Array.isArray((await (await fetch(base+'/api/lan')).json()).addresses));
 });
+
+test('phones can create and join letter rooms and cast using touch-key commands',async t=>{
+  const app=createLanServer();await new Promise(r=>app.server.listen(0,'127.0.0.1',r));t.after(()=>app.stop());
+  const base=`http://127.0.0.1:${app.server.address().port}`;
+  async function post(path,data,token){const res=await fetch(base+path,{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(data)});assert.equal(res.status,200);return res.json();}
+  const a=await post('/api/rooms',{mobile:true,mode:'letters',level:0});
+  const b=await post('/api/rooms',{mobile:true,code:a.code});
+  const m=app.rooms.get(a.code).match;assert.equal(m.config.mode,'letters');
+  m.connect(0,true);m.connect(1,true);
+  for(const p of [a,b])await post(`/api/room/${p.code}/action`,{type:'ready'},p.token);
+  assert.equal(m.status,'playing');
+  m.send(1,'walker',false,290);
+  const word=m.games[0].skills[0].code;
+  for(const key of word)await post(`/api/room/${a.code}/action`,{type:'key',key},a.token);
+  assert.equal(m.games[0].casts,1);
+});

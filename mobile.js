@@ -37,6 +37,7 @@
   if(!phone)return;
   for(const id of ['difficulty','mode']){
     const select=document.getElementById(id);if(!select)continue;
+    if(id==='mode'&&document.body.classList.contains('duel-app'))continue;
     const mode=allowedMode(select.value,true);
     for(const option of [...select.options])if(['adaptive','letters'].includes(option.value))option.remove();
     select.value=mode;

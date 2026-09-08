@@ -71,12 +71,11 @@ export function createLanServer(tlsOptions=null) {
         if(data.code){
           room=rooms.get(String(data.code).trim().toUpperCase());
           if(!room){json(res,404,{error:'找不到房间，请检查房间码'});return;}
-          if(data.mobile===true&&room.match.config.mode==='letters'){json(res,400,{error:'手机版不使用纯字母模式，请房主创建英语单词或句子房间。'});return;}
           side=room.match.join(data.name);
         }else{
           if(rooms.size>=64){json(res,503,{error:'房间已满，请稍后再试'});return;}
           let code;do{code=randomBytes(3).toString('hex').toUpperCase();}while(rooms.has(code));
-          room={code,match:new DuelMatch({mode:data.mobile===true&&(!data.mode||data.mode==='letters')?'english':data.mode,level:data.level}),tokens:[],streams:[],lastSeen:[],lastActive:Date.now(),rates:[[],[]]};
+          room={code,match:new DuelMatch({mode:data.mode,level:data.level}),tokens:[],streams:[],lastSeen:[],lastActive:Date.now(),rates:[[],[]]};
           side=room.match.join(data.name);rooms.set(code,room);
         }
         const token=randomBytes(24).toString('hex');room.tokens[side]=token;room.lastSeen[side]=Date.now();room.lastActive=Date.now();
