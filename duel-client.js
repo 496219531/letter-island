@@ -56,11 +56,16 @@ function attach() {
 }
 async function enter(code) {
   $('#create').disabled=true;$('#join').disabled=true;
+  if(code){$('#inviteStatus').hidden=false;$('#inviteStatus').textContent=`正在加入房间 ${code}…`;}
   try {
     session=await request('/api/rooms',{method:'POST',body:JSON.stringify({mobile:Boolean(window.GuluMobile?.active),name:$('#playerName').value,code,mode:$('#mode').value,level:Number($('#level').value)})});
     try{sessionStorage.setItem(sessionKey,JSON.stringify(session));}catch{}
     attach();
-  }catch(e){notice(e.message||'无法连接，请先在房主电脑启动局域网服务');}
+  }catch(e){
+    const message=e.status===404?'这个房间已失效，请房主重新创建并分享新邀请链接。':e.message||'无法连接，请先在房主电脑启动局域网服务';
+    if(code){$('#inviteStatus').hidden=false;$('#inviteStatus').textContent=`房间 ${code}：${message}`;$('#join').textContent='重试加入';}
+    notice(message);
+  }
   finally{$('#create').disabled=false;$('#join').disabled=false;}
 }
 $('#create').onclick=()=>enter();
@@ -226,7 +231,10 @@ function drawBattle(canvas,s) {
 }
 async function boot(){
   const code=(new URLSearchParams(location.search).get('room')||'').trim().toUpperCase();
-  const invited=/^[A-F0-9]{6}$/.test(code);if(invited)$('#roomCode').value=code;
+  const invited=/^[A-F0-9]{6}$/.test(code);if(invited){
+    $('#roomCode').value=code;$('#roomCode').readOnly=true;$('#roomCode').setAttribute('aria-label','邀请链接中的房间号');
+    $('#inviteStatus').hidden=false;$('#inviteStatus').textContent=`邀请房间 ${code}，正在自动加入，无需输入房间号。`;
+  }
   try{
     const info=await request('/api/lan');if(!Array.isArray(info.addresses))throw new Error();addresses=info.addresses;stages=info.stages||[];dialogueStages=info.dialogueStages||[];updateLevels();
     const note=$('#networkNote');note.replaceChildren(document.createTextNode('手机或电脑打开：'));

@@ -12,6 +12,7 @@
       <div class="mode-row"><label>大招题目<select id="mode"><option value="letters">字母组合</option><option value="english">英语单词</option><option value="sentences">英语句子</option></select></label><label id="levelLabel" hidden><span id="levelTitle">词汇学段</span><select id="level"><option value="0">1 级 · 入门</option><option value="1">2 级 · 基础</option><option value="2">3 级 · 进阶</option><option value="3">4 级 · 提升</option><option value="4">5 级 · 挑战</option></select></label></div>
       <button id="create" class="primary">创建房间 →</button>
       <div class="divider">或加入朋友的房间</div>
+      <p id="inviteStatus" class="muted small" role="status" aria-live="polite" hidden></p>
       <form id="joinForm" class="join-row"><input id="roomCode" maxlength="6" pattern="[A-Fa-f0-9]{6}" required placeholder="6 位房间码" aria-label="房间码" autocomplete="off"><button id="join" type="submit">加入</button></form>
       <p class="muted small">加入时使用房主设置的题目模式与难度。<a href="vocabulary-guide.html" target="_blank" rel="noopener">词库与课标依据 ↗</a></p>
     </div>
