@@ -76,10 +76,10 @@
     return out;
   }
   class GardenAudio{
-    constructor(factory){this.factory=factory;this.context=null;this.enabled=true;this.volume=.6;this.voices=new Set();this.cache=new Map();this.last=new Map();this.duckUntil=0;this.nextGroan=Infinity;}
+    constructor(factory){this.factory=factory;this.context=null;this.enabled=true;this.volume=.6;this.recording=false;this.voices=new Set();this.cache=new Map();this.last=new Map();this.duckUntil=0;this.nextGroan=Infinity;}
     init(){
       if(!this.enabled)return false;
-      if(!this.context){const c=this.context=this.factory();this.master=c.createGain();this.master.gain.value=this.volume*.65;this.compressor=c.createDynamicsCompressor();
+      if(!this.context){const c=this.context=this.factory();this.master=c.createGain();this.master.gain.value=this.volume*.65*(this.recording?.15:1);this.compressor=c.createDynamicsCompressor();
         this.compressor.threshold.value=-12;this.compressor.ratio.value=3;
         if(this.compressor.knee)this.compressor.knee.value=18;if(this.compressor.attack)this.compressor.attack.value=.004;if(this.compressor.release)this.compressor.release.value=.12;
         this.master.connect(this.compressor);this.compressor.connect(c.destination);
@@ -116,7 +116,9 @@
         this.start(buffer,Math.min(.12,volume*2),0,'ui');
       }catch{this.setEnabled(false);}
     }
-    setVolume(value){const n=Number(value);if(!Number.isFinite(n))return;this.volume=Math.max(0,Math.min(1,n));if(this.master){const gain=this.master.gain;if(gain.setTargetAtTime)gain.setTargetAtTime(this.volume*.65,this.context.currentTime,.025);else gain.value=this.volume*.65;}if(this.volume===0)this.stop();}
+    applyVolume(){if(this.master){const gain=this.master.gain,target=this.volume*.65*(this.recording?.15:1);if(gain.setTargetAtTime)gain.setTargetAtTime(target,this.context.currentTime,.025);else gain.value=target;}}
+    setRecording(value){const next=Boolean(value);if(this.recording===next)return;this.recording=next;this.applyVolume();}
+    setVolume(value){const n=Number(value);if(!Number.isFinite(n))return;this.volume=Math.max(0,Math.min(1,n));this.applyVolume();if(this.volume===0)this.stop();}
     stop(){for(const voice of [...this.voices]){try{voice.source.stop();}catch{}voice.cleanup();}this.duckUntil=0;this.last.clear();}
     setEnabled(value){this.enabled=Boolean(value);if(!value)this.stop();}
     // Silence between actions is intentional; no recurring synthetic zombie groans.

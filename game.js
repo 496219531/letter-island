@@ -18,7 +18,7 @@ let listening=false,speechHeld=false,speechFeedback='',nativeSpeechReady=false,s
 const phoneSpeech=Boolean(window.GuluMobile?.active);
 const microphone=(phoneSpeech?GuluMobile.createSpeech:GuluPressToTalk.createPressToTalk)({
   authorize:async()=>{if(!speechAuthorized)throw new Error('请先点击启用语音权限');},
-  onState(phase){listening=phase==='recording';speechHeld=microphone.held;updateSpeechControl();},
+  onState(phase){listening=phase==='recording';speechHeld=microphone.held;soundscape.setRecording(speechHeld&&['preparing','recording'].includes(phase));updateSpeechControl();},
   onError(message,target,meta){if(target)rememberSpeechAttempt(target,'',message,meta);if(message.includes('权限')){speechAuthorized=false;permissionPhase='error';}speechFeedback=message;updateSpeechControl();toast(message,4500);},
   onResult(text,target,meta){
     if(game.status!=='playing'||game.learningMode!=='speaking'||game.typing!==target.index||game.skills[target.index].code!==target.code||game.skills[target.index].cd>0)return;
@@ -179,7 +179,7 @@ function saveMenu(){
   $('#saveAndExit').onclick=returnHome;
 }
 readSavedRun();
-window.addEventListener('pagehide',()=>{persistRun();soundscape.stop();});
+window.addEventListener('pagehide',()=>{persistRun();stopListening();soundscape.stop();});
 window.addEventListener('storage',event=>{
   if(event.key===WRITER_KEY&&event.newValue!==writerId&&['playing','paused','upgrade'].includes(game.status)){
     game.shooting=false;game.status='ready';soundscape.stop();dialogResume=false;

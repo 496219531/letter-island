@@ -21,3 +21,12 @@ fake.currentTime+=10;a.play('laser');a.play('shot');assert.equal(gains.at(-1).ga
 const g={status:'playing',freeze:0,enemies:[{hp:1,x:400}]};for(let i=0;i<20;i++)a.update(10,g);assert.equal(a.voices.size,0,'ambient growls should not restart');
 a.setVolume(0);a.play('shot');a.tone(800);assert.equal(a.voices.size,0);a.setVolume(.6);fake.currentTime+=10;a.play('kill');sources.at(-1).onended();assert.equal(a.voices.size,0);assert.equal(connections,2);
 console.log('PASS 45 sound variants: no clipping, smooth edges, reduced bass, per-event limits, voice cleanup, volume, spell mix and quiet idle.');
+
+// Recording gain is temporary and preserves volume changes and mute state.
+a.setVolume(.8);a.setRecording(true);assert.equal(a.volume,.8);assert.ok(Math.abs(a.master.gain.value-.8*.65*.15)<1e-9);
+a.setVolume(.4);assert.ok(Math.abs(a.master.gain.value-.4*.65*.15)<1e-9);
+a.setRecording(false);assert.equal(a.master.gain.value,.4*.65);
+a.setEnabled(false);a.setRecording(true);a.setRecording(false);assert.equal(a.enabled,false);
+a.setEnabled(true);a.setVolume(0);a.setRecording(true);a.setRecording(false);assert.equal(a.master.gain.value,0);
+const cold=new GardenAudio(()=>fake);cold.setRecording(true);cold.init();assert.equal(cold.master.gain.value,.6*.65*.15);cold.setRecording(false);assert.equal(cold.master.gain.value,.6*.65);
+console.log('PASS recording ducking, lazy initialization, volume changes and mute preservation');
