@@ -7,9 +7,42 @@ const captainSprite=new Image();captainSprite.src='assets/pea-captain-v1.png';
 const particles = [];
 const MAX_PARTICLES=260;
 const soundscape=new GardenAudio(()=>new (window.AudioContext||window.webkitAudioContext)());
+try{const volume=localStorage.getItem('gulu-sfx-volume-v2');if(volume!==null)soundscape.setVolume(Number(volume));}catch{}
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let soundOn = true, best = 0, lastTime = 0, lastHud = '', hudClock = 0;
 let toastTimer, bannerTimer, recoil = 0, shake = 0, dialogResume = false;
+const localSpeech=GuluSystemSpeech.createLocalSpeech(window.speechSynthesis,window.SpeechSynthesisUtterance);
+const reviewStore=GuluSpeechReview.repository(localStorage);
+const speechAttempts=new Map();
+let listening=false,speechHeld=false,speechFeedback='',nativeSpeechReady=false,speechAuthorized=false,permissionPhase='idle';
+const phoneSpeech=Boolean(window.GuluMobile?.active);
+const microphone=(phoneSpeech?GuluMobile.createSpeech:GuluPressToTalk.createPressToTalk)({
+  authorize:async()=>{if(!speechAuthorized)throw new Error('请先点击启用语音权限');},
+  onState(phase){listening=phase==='recording';speechHeld=microphone.held;updateSpeechControl();},
+  onError(message,target,meta){if(target)rememberSpeechAttempt(target,'',message,meta);if(message.includes('权限')){speechAuthorized=false;permissionPhase='error';}speechFeedback=message;updateSpeechControl();toast(message,4500);},
+  onResult(text,target,meta){
+    if(game.status!=='playing'||game.learningMode!=='speaking'||game.typing!==target.index||game.skills[target.index].code!==target.code||game.skills[target.index].cd>0)return;
+    rememberSpeechAttempt(target,text,'',meta);speechFeedback='听到：'+text;game.speak(target.index,text);updateHud(true);
+  }
+});
+const voicePermissions=GuluPressToTalk.createVoicePermissions({
+  requestMicrophone(){
+    if(!navigator.mediaDevices?.getUserMedia)throw new Error('当前地址不能申请录音权限。手机需使用受信任的 HTTPS 地址连接游戏；普通局域网 HTTP 可玩单词和句子模式。');
+    return navigator.mediaDevices.getUserMedia({audio:true});
+  },
+  async authorizeNative(){
+    if(phoneSpeech){if(!(window.SpeechRecognition||window.webkitSpeechRecognition))throw new Error('此手机浏览器不支持语音识别；请使用支持该功能的系统浏览器。');return;}
+    const response=await fetch('/api/speech/authorize',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    const result=await response.json();if(!response.ok||!result.ok)throw new Error(result.error||'系统识别授权尚未完成');
+  },
+  onState(phase){permissionPhase=phase;speechAuthorized=phase==='ready';updateSpeechControl();}
+});
+async function enableSpeech(){
+  speechFeedback='';
+  try{await voicePermissions.enable();nativeSpeechReady=true;speechFeedback=phoneSpeech?'麦克风已授权。按住朗读；手机语音服务可能需要联网。':'麦克风和系统识别已授权。选一句，按住麦克风录音。';}
+  catch(error){speechFeedback=error.name==='NotAllowedError'?'麦克风权限被拒绝。请在设备与浏览器的隐私设置中允许麦克风，再点重新申请。':error.message;}
+  updateSpeechControl();
+}
 try { best = Math.max(0, Number(localStorage.getItem('gulu-shooter-best')) || 0); } catch {}
 $('#bestScore').textContent = best;
 
@@ -32,6 +65,9 @@ function floatText(x,y,text,color='#fff9c2') {
   addParticle({x,y,vx:0,vy:-50,color,life:1.1,max:1.1,size:20,text});
 }
 const game = new GardenGame({ emit:onEvent });
+if(window.GuluMobile?.active){game.learningMode='english';game.auto=true;$('#autoButton').setAttribute('aria-pressed','true');}
+function lookupSentence(code){return game.customBank?.entries.find(e=>e.word===code)||findSentenceEntry(code);}
+function lookupWord(code){return game.customBank?.entries.find(e=>e.word===code)||findWordEntry(code);}
 const SAVE_KEY='gulu-run-v1', WRITER_KEY='gulu-run-writer-v1';
 const writerId=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
 let availableSave=null,saveClock=0,saveProblem='';
@@ -72,10 +108,66 @@ function finishSavedRun(){
 function continueRun(){
   readSavedRun();if(!availableSave)return;
   if(!GuluSave.restore(game,availableSave)){toast('这份存档无法恢复，原存档暂未覆盖。');return;}
-  claimSave();particles.length=0;$('#startScreen').hidden=true;
-  $('#difficulty').value=game.learningMode!=='letters'?game.learningMode:game.adaptive?'adaptive':'fixed';$('#autoButton').setAttribute('aria-pressed',String(game.auto));updateFireControl();updateTypingControls();
+  if(window.GuluMobile?.active&&game.learningMode==='letters'){game.learningMode='english';game.typing=-1;for(let i=0;i<3;i++){game.skills[i].code=game.nextCode(i);game.skills[i].typed=0;game.skills[i].repeatsDone=0;}}
+  claimSave();particles.length=0;$('#startScreen').hidden=true;$('#settingsPanel').open=false;
+  $('#difficulty').value=game.learningMode!=='letters'?game.learningMode:'adaptive';$('#autoButton').setAttribute('aria-pressed',String(game.auto));updateFireControl();updateTypingControls();
+  window.GuluLibraryUI?.restoreSelection(game.customBank);
   if(game.status==='upgrade')upgradeScreen();else game.resume();
   persistRun();updateHud(true);canvas.focus({preventScroll:true});toast('欢迎回来！继续守住第 '+game.wave+' 波。');
+}
+function returnHome(){
+  if(['playing','paused','upgrade'].includes(game.status)&&!persistRun()){toast(saveProblem||'未能保存，请稍后重试。');return;}
+  stopListening();game.shooting=false;game.status='ready';dialogResume=false;
+  $('#gameDialog').close();$('#gameDialog').classList.remove('upgrade-dialog');$('#closeDialog').hidden=false;
+  $('#settingsPanel').open=false;document.querySelector('#mobileSettingsDialog')?.close();
+  $('#startScreen').hidden=false;readSavedRun();updateTypingControls();updateHud(true);
+  $('#startButton').focus({preventScroll:true});
+}
+function rememberSpeechAttempt(target,text,error,meta={}){
+  const attempts=speechAttempts.get(target.code)||[];attempts.push({at:new Date().toISOString(),text,error,audioId:meta?.audioId||null});speechAttempts.set(target.code,attempts.slice(-10));
+  if(speechAttempts.size>30)speechAttempts.delete(speechAttempts.keys().next().value);
+}
+async function skipSpeechPrompt(){
+  syncMobileSpeechTarget();const index=game.typing,skill=game.skills[index];
+  if(game.status!=='playing'||game.learningMode!=='speaking'||!skill||skill.cd>0||microphone.phase!=='idle')return;
+  const code=skill.code,entry=lookupSentence(code),attempts=speechAttempts.get(code)||[];
+  game.pause();stopListening();
+  try{
+    if(window.GuluNative?.retainAudio)await GuluNative.retainAudio(attempts.map(a=>a.audioId).filter(Boolean));
+    if(game.status!=='paused'||skill.code!==code)throw new Error('游戏状态已改变，请回到当前句子后重试。');
+    reviewStore.add({id:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),at:new Date().toISOString(),code,text:entry?.text||code,meaning:entry?.meaning||'',scene:entry?.scene||game.customBank?.name||'',level:game.englishLevel,wave:game.wave,attempts});
+    game.resume();if(!game.skipSpeech(index)){speechFeedback='已记录到口语复盘；当前分组没有其他句子可换。';updateHud(true);return;}
+    speechAttempts.delete(code);speechFeedback='已跳过并存入「口语复盘」，请朗读新句子。';persistRun();updateHud(true);
+  }catch(error){if(game.status==='paused')game.resume();toast('未完成跳过：'+error.message,4500);updateHud(true);}
+}
+function openSpeechReview(){
+  const settingsDialog=document.querySelector('#mobileSettingsDialog');if(settingsDialog?.open)settingsDialog.querySelector('.mobile-settings-header button').click();
+  let records;try{records=reviewStore.list();}catch(e){toast(e.message);return;}
+  const resume=game.status==='playing';if(resume)game.pause();stopListening();
+  const dialog=document.createElement('dialog');dialog.className='speech-review-dialog';dialog.setAttribute('aria-label','口语复盘');
+  const heading=document.createElement('h2');heading.textContent='口语复盘';dialog.append(heading);
+  const note=document.createElement('p');note.textContent='这里标出识别文字与原句的差异，不是发音评分。先听示范，再回听录音；差异也可能来自漏读、环境噪声或识别服务。每句保留最近10次尝试，最多100条记录。记录保存在本机，卸载或清除数据会丢失。';dialog.append(note);
+  const close=document.createElement('button');close.textContent='完成';close.className='primary-button';close.onclick=()=>dialog.close();dialog.append(close);
+  if(!records.length){const empty=document.createElement('p');empty.textContent='还没有跳过的句子。口语练习卡住时，可以点“跳过并记录”。';dialog.append(empty);}
+  for(const record of records){
+    const card=document.createElement('section');card.className='review-record';
+    const text=document.createElement('h3');text.textContent=record.text;card.append(text);
+    const meaning=document.createElement('p');meaning.textContent=record.meaning;card.append(meaning);
+    const detail=document.createElement('small');detail.textContent=new Date(record.at).toLocaleString()+' · 第'+record.wave+'波 · '+record.scene;card.append(detail);
+    const example=document.createElement('button');example.textContent='听原句示范';example.onclick=()=>{if(!localSpeech.speak(record.text.replaceAll(' / ',' ')))toast('当前系统没有可用的英文朗读声音。');};card.append(example);
+    if(!record.attempts.length){const p=document.createElement('p');p.textContent='本句未留下识别结果，暂时无法分析差异。';card.append(p);}
+    record.attempts.forEach((attempt,i)=>{
+      const row=document.createElement('div');row.className='review-attempt';const p=document.createElement('p');p.textContent='第'+(i+1)+'次：'+(attempt.text||attempt.error||'未识别到文字');row.append(p);
+      if(attempt.text){const diff=document.createElement('p');diff.className='review-diff';GuluSpeechReview.compare(record.code,attempt.text).forEach(part=>{const span=document.createElement('span');span.className='diff-'+part.type;span.textContent=part.type==='same'?part.expected:part.type==='missing'?'未识别到 '+part.expected:part.type==='extra'?'多识别 '+part.heard:part.expected+' → '+part.heard;diff.append(span);});row.append(diff);}
+      if(attempt.audioId&&window.GuluNative?.playAudio){const play=document.createElement('button');play.textContent='回听这次录音';play.onclick=()=>GuluNative.playAudio(attempt.audioId).catch(e=>toast(e.message));row.append(play);}
+      else{const noAudio=document.createElement('small');noAudio.textContent='这次没有可回听的录音。';row.append(noAudio);}
+      card.append(row);
+    });
+    const collect=document.createElement('button');collect.textContent='加入自定义句子组';collect.onclick=()=>window.GuluLibraryUI?.addSentence(record.text,record.meaning);card.append(collect);
+    const remove=document.createElement('button');remove.textContent='删除这条记录';remove.onclick=()=>{try{reviewStore.remove(record.id);window.GuluNative?.deleteAudio?.(record.attempts.map(a=>a.audioId).filter(Boolean));card.remove();}catch(e){toast('删除失败：'+e.message);}};card.append(remove);dialog.append(card);
+  }
+  dialog.addEventListener('close',()=>{localSpeech.cancel();window.GuluNative?.stopAudio?.();dialog.remove();if(resume&&game.status==='paused')game.resume();updateHud(true);});
+  document.body.append(dialog);dialog.showModal();
 }
 function saveMenu(){
   if(game.status==='upgrade'){persistRun(true);return;}
@@ -84,11 +176,7 @@ function saveMenu(){
   }
   showDialog('<div class="dialog-icon">💾</div><h2>把冒险装进口袋</h2><p>自动保存波次、卡牌、护盾、敌人位置和施法进度。<br>存档保存在当前浏览器，刷新或关闭后可继续。</p><button class="primary-button" id="saveAndContinue">保存并继续 →</button><button class="secondary-button" id="saveAndExit">保存并返回开始画面</button>',true);
   $('#saveAndContinue').onclick=()=>{if(persistRun(true))closeDialog();};
-  $('#saveAndExit').onclick=()=>{
-    if(!persistRun()) {toast(saveProblem||'未能保存，请稍后重试。');return;}
-    $('#gameDialog').close();dialogResume=false;game.status='ready';game.shooting=false;
-    $('#startScreen').hidden=false;refreshSaveMenu();updateHud(true);
-  };
+  $('#saveAndExit').onclick=returnHome;
 }
 readSavedRun();
 window.addEventListener('pagehide',()=>{persistRun();soundscape.stop();});
@@ -110,6 +198,7 @@ function updateFireControl(){
   $('#fireStrengthValue').textContent=percent===0?'已关闭':percent+'%';
   $('#fireStrength').setAttribute('aria-valuetext',percent===0?'普通射击已关闭':percent===100?'100%，原版火力':percent+'% 射速');
   $('#aimHint').textContent=percent===0?'✧ 普通射击已关闭 · 敲字母放大招':game.auto?'✦ 自动瞄准中 · 双手专心放大招':'⌖ 鼠标瞄准 · 按住左键连续射击';
+  if($('#settingsSummary'))$('#settingsSummary').textContent=($('#difficulty').selectedOptions[0]?.textContent||'游戏')+' · 火力 '+percent+'%';
 }
 $('#fireStrength').addEventListener('input',event=>{
   game.setFireStrength(Number(event.target.value)/100);updateFireControl();
@@ -118,29 +207,71 @@ $('#fireStrength').addEventListener('input',event=>{
 updateFireControl();
 try {
   const prefs=JSON.parse(localStorage.getItem('gulu-typing-settings'));
-  if(prefs){if(typeof prefs.maxSpellLength==='number')game.setMaxSpellLength(prefs.maxSpellLength);if(Number.isInteger(prefs.englishLevel)&&prefs.englishLevel>=0&&prefs.englishLevel<=4)game.englishLevel=prefs.englishLevel;if(typeof prefs.magicSlow==='boolean')game.magicSlow=prefs.magicSlow;}
+  if(prefs){if(typeof prefs.maxSpellLength==='number')game.setMaxSpellLength(prefs.maxSpellLength);if(typeof prefs.maxLearningLoad==='number')game.setMaxLearningLoad(prefs.maxLearningLoad);if(Number.isInteger(prefs.englishLevel)&&prefs.englishLevel>=0&&prefs.englishLevel<=4)game.englishLevel=prefs.englishLevel;if(typeof prefs.magicSlow==='boolean')game.magicSlow=prefs.magicSlow;}
 }catch{}
 function updateTypingControls(){
-  const english=['english','sentences'].includes($('#difficulty').value);
-  if($('#sentenceSpace'))$('#sentenceSpace').hidden=$('#difficulty').value!=='sentences';
-  const labels=$('#difficulty').value==='sentences'?['幼儿 · 问候短句','一级 · 生活表达','二级 · 日常问答','三级 · 场景交流','四级 · 完整表达']:['幼儿 · 常见事物','一级 · 日常生活','二级 · 自然与家庭','三级 · 动作与表达','四级 · 进阶词汇'];
+  const mode=$('#difficulty').value,english=['english','sentences','speaking'].includes(mode),speaking=mode==='speaking';
+  if($('#sentenceSpace'))$('#sentenceSpace').hidden=!['english','sentences'].includes(mode);
+  document.querySelectorAll('.word-punctuation').forEach(b=>b.hidden=!['english','sentences'].includes(mode));
+  window.GuluLibraryUI?.refresh();
+  const labels=['sentences','speaking'].includes(mode)?DIALOGUE_STAGES.map(s=>s.name+' · '+s.groups+'组 / '+s.sentences+'句'):ENGLISH_STAGES.map(s=>s.name+' · '+s.count+'词');
   [...$('#englishLevel').options].forEach((o,i)=>o.textContent=labels[i]);
-  $('#englishControl').hidden=!english;$('.spell-control').hidden=english;
+  const custom=game.status==='ready'?window.GuluLibraryUI?.selected():game.customBank;
+  $('#englishControl').hidden=!english||Boolean(custom);$('#learningLoadControl').hidden=!english||custom?.kind==='sentence';$('.spell-control').hidden=english;
+  $('#speechControl').hidden=!speaking;$('.keyboard-toggle-row').hidden=speaking;$('#touchKeyboard').hidden=speaking||$('#keyboardButton').getAttribute('aria-expanded')!=='true';
   $('#englishLevel').value=String(game.englishLevel);
   $('#maxSpellLength').value=game.maxSpellLength;$('#maxSpellLengthValue').textContent=game.maxSpellLength;
+  $('#maxLearningLoad').value=game.maxLearningLoad;$('#maxLearningLoadValue').textContent=game.maxLearningLoad+(mode==='english'?' 遍':' 句');$('#learningLoadHelp').textContent=mode==='english'?'每 3 波增加 1 遍，最多 '+game.maxLearningLoad+' 遍':'每 3 波增加 1 句，最多 '+Math.min(3,game.maxLearningLoad)+' 句连贯上下文';
   $('#maxSpellLength').setAttribute('aria-valuetext','最多 '+game.maxSpellLength+' 个字母，下一组提示生效');
   $('#magicSlowButton').setAttribute('aria-checked',String(game.magicSlow));$('#magicSlowValue').textContent=game.magicSlow?'开':'关';
+  $('#settingsSummary').textContent=($('#difficulty').selectedOptions[0]?.textContent||'游戏')+' · 火力 '+Math.round(game.fireStrength*100)+'%';
+}
+function syncMobileSpeechTarget(){
+  if(!phoneSpeech||game.learningMode!=='speaking'||!['playing','paused'].includes(game.status))return;
+  const visible=document.querySelector('.skill-card.iphone-visible');
+  const index=Number(visible?.dataset.skill??document.body.dataset.visibleSkill??0);
+  if(!Number.isInteger(index)||index<0||index>2||game.typing===index)return;
+  const previous=game.typing;game.typing=index;
+  if(previous>=0){speechFeedback='';stopListening();}
+}
+document.addEventListener('gulu-visible-skill',()=>{syncMobileSpeechTarget();updateHud(true);});
+function updateSpeechControl(){
+  const selected=game.learningMode==='speaking'&&game.typing>=0?game.skills[game.typing]:null;
+  const ready=game.status==='playing'&&selected&&selected.cd<=0,phase=microphone.phase;
+  const granting=['microphone','system'].includes(permissionPhase);
+  $('#speechSkip').disabled=!ready||phase!=='idle';
+  $('#speechEnable').hidden=speechAuthorized;$('#speechEnable').disabled=granting;
+  $('#speechEnable').textContent=permissionPhase==='microphone'?'请允许浏览器使用麦克风…':permissionPhase==='system'?'正在授权／准备英文语音资源…':permissionPhase==='error'?'重新申请语音权限':'启用语音权限';
+  $('#speechButton').disabled=!ready||!nativeSpeechReady||!speechAuthorized||phase==='recognizing';
+  $('#speechButton').classList.toggle('listening',phase==='recording');$('#speechButton').setAttribute('aria-pressed',String(microphone.held));
+  $('#speechExample').disabled=!ready||granting||phase!=='idle'||!localSpeech.available();
+  $('#speechButtonLabel').textContent=phase==='preparing'?'正在准备／等待系统授权…':phase==='recording'?'正在录音 · 松开识别':phase==='recognizing'?'录音已停止 · 正在识别':!speechAuthorized?'先启用语音权限':!ready?(phoneSpeech&&selected?'当前大招充能中':'先选择一张大招卡'):'按住麦克风说话';
+  $('#speechTranscript').textContent=permissionPhase==='microphone'?'正在申请麦克风权限。此步骤不录制、不上传语音。':permissionPhase==='system'?'麦克风权限已通过。请允许系统识别；首次可能需要下载 Apple 英文识别资源，请保持页面打开。':phase==='recording'?'麦克风已开启，松开后立即停止录音，最多30秒。':phase==='recognizing'?(phoneSpeech?'正在用手机语音服务识别，匹配成功后自动放招。':'正在用 Mac 系统识别，匹配成功后自动放招。'):phase==='preparing'?'首次使用请允许系统语音识别和麦克风权限；授权后重新按住按钮。':speechFeedback||(phoneSpeech?'朗读当前卡片 → 按住录音 → 松开识别；点上方技能可切换。':'选一句 → 按住录音 → 松开停止并自动识别。');
+  const last=selected?(speechAttempts.get(selected.code)||[]).at(-1):null;
+  const diffs=last?.text?GuluSpeechReview.compare(selected.code,last.text).filter(p=>p.type!=='same'):[];
+  const diffBox=$('#speechDiff');diffBox.hidden=!diffs.length;
+  const signature=JSON.stringify(diffs);if(diffBox.dataset.signature!==signature){diffBox.dataset.signature=signature;diffBox.replaceChildren();for(const part of diffs){const item=document.createElement('span');item.textContent=part.type==='missing'?'未识别到：'+part.expected:part.type==='extra'?'多识别：'+part.heard:part.expected+' → 识别成 '+part.heard;diffBox.append(item);}}
+  $('#speechExample').title=localSpeech.available()?'使用本地英文声音示范':'请在系统语音设置中添加英文声音';
+}
+function stopListening(){localSpeech.cancel();microphone.cancel();listening=false;speechHeld=false;}
+function startListening(event){
+  syncMobileSpeechTarget();
+  if(event?.button!==undefined&&event.button!==0)return;
+  if(!nativeSpeechReady||!speechAuthorized||game.learningMode!=='speaking'||game.status!=='playing'||game.typing<0)return;
+  event?.preventDefault();if(event?.pointerId!==undefined)$('#speechButton').setPointerCapture(event.pointerId);
+  localSpeech.cancel();speechFeedback='';microphone.start({index:game.typing,code:game.skills[game.typing].code});
 }
 function saveTypingSettings(){
-  try{localStorage.setItem('gulu-typing-settings',JSON.stringify({maxSpellLength:game.maxSpellLength,magicSlow:game.magicSlow,englishLevel:game.englishLevel}));}catch{}
+  try{localStorage.setItem('gulu-typing-settings',JSON.stringify({maxSpellLength:game.maxSpellLength,maxLearningLoad:game.maxLearningLoad,magicSlow:game.magicSlow,englishLevel:game.englishLevel}));}catch{}
   persistRun();updateTypingControls();updateHud(true);
 }
+$('#maxLearningLoad').addEventListener('input',event=>{game.setMaxLearningLoad(event.target.value);saveTypingSettings();});
 $('#maxSpellLength').addEventListener('input',event=>{game.setMaxSpellLength(event.target.value);saveTypingSettings();});
 $('#englishLevel').onchange=()=>{game.englishLevel=Number($('#englishLevel').value);saveTypingSettings();};
 $('#magicSlowButton').onclick=()=>{game.magicSlow=!game.magicSlow;saveTypingSettings();};
 updateTypingControls();
 function onEvent(type, data = {}) {
-  if(['start','pause','upgrade','finish'].includes(type))soundscape.stop();
+  if(['start','pause','upgrade','finish'].includes(type)){soundscape.stop();stopListening();}
   if(type==='nibble')soundscape.play('nibble',data);
   if(type==='critical')soundscape.play('critical',data);
   if(['start','wave','upgrade','pause'].includes(type))persistRun();
@@ -154,14 +285,19 @@ function onEvent(type, data = {}) {
     puff(data.x,data.y,'#fff4a0',15); floatText(data.x,data.y-20,'+'+data.score);
     soundscape.play(data.boss?'boss':'kill',data);
   }
-  if (type === 'letter') { tone(560+(game.skills[data.index].typed%8)*90,.12); }
+  if (type === 'letter') { tone([659.25,783.99,880,987.77,1174.66][game.skills[data.index].typed%5],.055,'sine',.018); }
   if (type === 'wrong') {
     toast(data.expected ? '没关系，接着敲 '+(data.expected===' '?'空格':data.expected)+' 就好 ✧' : '大招正在充能，先突突突！', 1600);
     tone(270,.09,'sine',.025,350);
     const card = document.querySelector('.skill-card.selected');
     if(card){card.classList.remove('wrong');void card.offsetWidth;card.classList.add('wrong');}
   }
-  if (type === 'typing') { toast('按技能卡里的顺序敲字母，战斗会继续',1600); }
+  if (type === 'typing') { toast(GuluModeCopy.practiceCopy(game.learningMode,{mobile:phoneSpeech}).action,2200); }
+  if(type==='repeat'){toast('很好！再输入 '+(data.total-data.done)+' 遍就能释放大招 ✦',1800);}
+  if(type==='speech'){
+    if(data.matched){speechFeedback='朗读内容匹配成功！';$('#speechTranscript').textContent=speechFeedback;tone(720,.16,'sine',.04,980);}
+    else{const heard=data.heard?data.heard.toLowerCase():'没有听清';speechFeedback='识别成：'+heard+' · 请再试一次';$('#speechTranscript').textContent=speechFeedback;toast('识别文字没有匹配当前句子，可以再朗读一次。',3000);tone(270,.09,'sine',.025,350);}
+  }
   if (type === 'cooldown') { toast('还要 '+Math.ceil(game.skills[data.index].cd/game.rechargeRate)+' 秒，先用豌豆突突突',1400); }
   if (type === 'empty') { toast('僵尸还没到，不浪费你的大招～'); }
   if (type === 'cast') {
@@ -175,7 +311,7 @@ function onEvent(type, data = {}) {
   }
   if (type === 'explosion') { puff(data.x,data.y,'#ffd98a',45,'BOOM!');soundscape.play('explosion',data);shake=.55; }
   if (type === 'breach') { shake=.3;soundscape.play('warning');toast(game.health<=0?'向日葵全倒了！3 秒内修复防线或清场！':'向日葵正在被啃食！快保护它们！'); }
-  if (type === 'wave') { toast(data.wave===1?'第 1 波！试试敲 A 放激光 🌈':'第 '+data.wave+' 波来啦！强化生效，僵尸也变强了！',2800); }
+  if (type === 'wave') { toast(data.wave===1?GuluModeCopy.practiceCopy(game.learningMode,{mobile:phoneSpeech}).action:'第 '+data.wave+' 波来啦！强化生效，僵尸也变强了！',2800); }
   if (type === 'clear') { toast('这波守住啦！歇一口气，下一波马上来 ✦',2700);tone(660,.25,'sine',.04,880); }
   if (type === 'boss') { soundscape.play('boss',{x:950});toast('大个子来串门！用冰冻和西瓜招呼它！',3500); }
   if (type === 'finish') { finishSavedRun();finishScreen(data.win); }
@@ -194,7 +330,9 @@ function spellKeysMarkup(skill,active){
   return rows.join('');
 }
 function updateHud(force=false) {
-  const values = JSON.stringify([game.health,game.maxHealth,game.learningMode,game.englishLevel,game.stacks,game.wave,game.kills,game.score,game.status,game.spawned,game.typing,game.freeze>0,Math.ceil((3-game.breachElapsed)*10),game.magicSlow,game.maxSpellLength,game.skills.map(s=>[s.code,s.typed,Math.ceil(s.cd*10)])]);
+  syncMobileSpeechTarget();
+  document.body.dataset.gameState=game.status;document.body.dataset.learningMode=game.learningMode;
+  const values = JSON.stringify([game.health,game.maxHealth,game.learningMode,game.englishLevel,game.stacks,game.wave,game.kills,game.score,game.status,game.spawned,game.typing,game.freeze>0,Math.ceil((3-game.breachElapsed)*10),game.magicSlow,game.maxSpellLength,game.maxLearningLoad,listening,game.skills.map(s=>[s.code,s.typed,Math.ceil(s.cd*10)])]);
   if(!force && values===lastHud)return;lastHud=values;
   document.body.classList.toggle('in-run',game.status!=='ready');
   $('#score').textContent=game.score;
@@ -209,28 +347,39 @@ function updateHud(force=false) {
   $('#hearts').setAttribute('aria-label','向日葵防御 '+Number(game.health.toFixed(1))+' / '+game.maxHealth);
   $('#waveProgressText').textContent='第 '+game.wave+' 波 · ∞';
   $('#waveFill').style.width=Math.min(100,(game.spawned-game.enemies.length)/game.quota*100)+'%';
-  $('#pauseButton').disabled=game.status!=='playing';
+  $('#pauseButton').disabled=game.status!=='playing';$('#homeButton').hidden=game.status==='ready';
   $('#difficulty').disabled=['playing','paused','upgrade'].includes(game.status);
   $('#fieldStatus').textContent=game.status==='ready'?'小院准备就绪':game.status==='lost'?'向日葵防线已突破':game.health<=0?'防线告急 · '+Math.max(0,3-game.breachElapsed).toFixed(1)+' 秒':game.freeze>0?'全场冰冻中 · 伤害翻倍':game.waveBreak>0?'这波守住啦':'小院保卫战进行中';
-  $('#arsenalNote').textContent=game.typing>=0?(game.typingSlow?'慢动作中 · ':'自动换行 · ')+'已完成 '+game.skills[game.typing].typed+' / '+game.skills[game.typing].code.length+' 字母':'回蓝速度 ×'+game.rechargeRate.toFixed(2);
-  $('#progressHint').textContent=game.learningMode==='sentences'?'输入英文句子 · ␣ 代表空格 · 不区分大小写，无需标点 · 下组生效':game.learningMode==='english'?'输入完整单词放大招 · 中文帮助理解 · 可点选技能 · 游戏内分级，非考试等级':game.adaptive?'本波新提示 '+game.spellLength+' 个字母 · 只显示当前两行，自动跟随输入':'固定 A / S / D · 回蓝和僵尸强度仍随波次提升';
+  $('#arsenalNote').textContent=game.learningMode==='speaking'?(game.typing>=0?'按住录音，松开识别':'选择大招，再按住麦克风'):game.typing>=0?(game.typingSlow?'慢动作中 · ':'自动换行 · ')+'已完成 '+game.skills[game.typing].typed+' / '+game.skills[game.typing].code.length+' 字母'+(game.learningMode==='english'?' · 第 '+(game.skills[game.typing].repeatsDone+1)+'/'+game.learningLoad+' 遍':''):'回蓝速度 ×'+game.rechargeRate.toFixed(2);
+  $('#progressHint').textContent=game.learningMode==='sentences'?'输入英文句子 · ␣ 代表空格 · 不区分大小写，无需标点 · 下组生效':game.learningMode==='english'?(game.customBank?game.customBank.name+' · '+game.customBank.entries.length+'条自定义词句':ENGLISH_STAGES[game.englishLevel].name+' · '+ENGLISH_STAGES[game.englishLevel].count+'词')+' · 按显示输入空格和标点':game.learningMode==='speaking'?'朗读 '+Math.min(3,game.learningLoad)+' 句连贯对话后释放大招':game.adaptive?'本波新提示 '+game.spellLength+' 个字母 · 只显示当前两行，自动跟随输入':'';
   document.querySelectorAll('.skill-card').forEach((card,index)=>{
-    const s=game.skills[index],sentence=game.learningMode==='sentences',learning=game.learningMode!=='letters';
-    const entry=(sentence?ENGLISH_SENTENCES:ENGLISH_WORDS).flat().find(entry=>entry.word===s.code);
-    card.classList.toggle('learning-card',learning);card.classList.toggle('sentence-card',sentence);
+    const s=game.skills[index],sentence=['sentences','speaking'].includes(game.learningMode),speaking=game.learningMode==='speaking',learning=game.learningMode!=='letters';
+    const entry=sentence?lookupSentence(s.code):game.learningMode==='english'?lookupWord(s.code):null;
+    let contextLabel=card.querySelector('.dialogue-context');if(!contextLabel){contextLabel=document.createElement('span');contextLabel.className='dialogue-context';card.querySelector('.skill-info').prepend(contextLabel);}
+    contextLabel.hidden=!sentence||!entry?.scene;contextLabel.textContent=entry?.scene||'';
+    contextLabel.title=entry?.scene?[entry.reference,entry.goal,entry.grammar].join(' · '):'';
+    card.classList.toggle('learning-card',learning);card.classList.toggle('sentence-card',sentence);card.classList.toggle('speaking-card',speaking);
     card.querySelector('.skill-info strong').textContent=sentence?(entry?.text||s.code):s.name;
     $('#wordMeaning'+index).hidden=!learning;$('#wordMeaning'+index).textContent=learning?(entry?.meaning||''):'';
-    $('#wordIpa'+index).hidden=game.learningMode!=='english';$('#wordIpa'+index).textContent=entry?.ipa?'美 /'+entry.ipa+'/':'';
-    card.querySelector('.skill-info').title=learning?[entry?.text||s.code,entry?.meaning,entry?.ipa?'美 /'+entry.ipa+'/':''].filter(Boolean).join(' · '):s.name;
+    $('#wordIpa'+index).hidden=game.learningMode!=='english';$('#wordIpa'+index).textContent=entry?.ipa?'音标 /'+entry.ipa+'/':'';
+    card.querySelector('.skill-info').title=learning?[entry?.text||s.code,entry?.meaning,entry?.ipa?'音标 /'+entry.ipa+'/':'',entry?.goal,entry?.grammar].filter(Boolean).join(' · '):s.name;
     card.classList.toggle('selected',game.typing===index);card.classList.toggle('cooling',s.cd>0);
-    card.setAttribute('aria-label',s.name+'，'+(entry?.meaning?entry.meaning+'，':'')+(s.cd>0?'回蓝中 '+Math.ceil(s.cd/game.rechargeRate)+' 秒':'依次输入 '+s.code));
-    $('#skillKeys'+index).innerHTML=spellKeysMarkup(s,game.typing===index);
+    card.setAttribute('aria-label',s.name+'，'+(entry?.meaning?entry.meaning+'，':'')+(s.cd>0?'回蓝中 '+Math.ceil(s.cd/game.rechargeRate)+' 秒':speaking?'选择并朗读 '+s.code:'依次输入 '+s.code));
+    $('#skillKeys'+index).hidden=speaking;$('#skillKeys'+index).innerHTML=speaking?'':spellKeysMarkup(s,game.typing===index);
     card.classList.toggle('long-spell',s.code.length>6);
-    $('#skillStatus'+index).textContent=s.cd>0?Math.ceil(s.cd/game.rechargeRate)+' 秒回蓝':game.typing===index?'第 '+(Math.floor(s.typed/6)+1)+' / '+Math.ceil(s.code.length/6)+' 行 · '+s.typed+'/'+s.code.length:'准备好啦 · '+s.code.length+' 字母';
+    $('#skillStatus'+index).textContent=s.cd>0?Math.ceil(s.cd/game.rechargeRate)+' 秒回蓝':speaking?(phoneSpeech&&game.typing===index?'当前朗读目标 · 按住录音':game.typing===index?'已选择 · 按住录音':'点击选择这句'):game.typing===index?'第 '+(Math.floor(s.typed/6)+1)+' / '+Math.ceil(s.code.length/6)+' 行 · '+s.typed+'/'+s.code.length:'准备好啦 · '+s.code.length+' 字母';
     $('#cooldown'+index).style.width=(1-s.cd/s.duration)*100+'%';
   });
-  const expected=game.typing>=0?[game.skills[game.typing].code[game.skills[game.typing].typed]]:game.skills.filter(s=>s.cd<=0).map(s=>s.code[0]);
-  document.querySelectorAll('.touch-key').forEach(button=>button.classList.toggle('hint',expected.includes(button.dataset.key)));
+  updateSpeechControl();
+  const hints=GuluMobile.keySkillHints(game.skills,game.typing,game.learningMode);
+  const names=['激光','冰冻','西瓜'];
+  document.querySelectorAll('.touch-key').forEach(button=>{
+    const index=hints[button.dataset.key],hint=index!==undefined;
+    button.classList.toggle('hint',hint);
+    if(hint){button.dataset.hintSkill=String(index);button.dataset.skillLabel=names[index];}
+    else{delete button.dataset.hintSkill;delete button.dataset.skillLabel;}
+    button.setAttribute('aria-label',(button.dataset.key===' '?'空格':button.dataset.key)+(hint?'，'+names[index]+'的下一个字母':''));
+  });
 }
 
 function drawEmoji(text,x,y,size,angle=0) {
@@ -416,8 +565,9 @@ function begin(force=false) {
     $('#confirmNewRun').onclick=()=>begin(true);$('#keepRun').onclick=()=>closeDialog();return;
   }
   if($('#gameDialog').open)closeDialog(false);
-  claimSave();particles.length=0;game.learningMode=['english','sentences'].includes($('#difficulty').value)?$('#difficulty').value:'letters';game.adaptive=$('#difficulty').value!=='fixed';
-  $('#startScreen').hidden=true;game.start();canvas.focus({preventScroll:true});updateHud(true);
+  claimSave();particles.length=0;game.learningMode=['english','sentences','speaking'].includes($('#difficulty').value)?$('#difficulty').value:'letters';game.adaptive=true;
+  if(window.GuluLibraryUI){try{game.setCustomBank(GuluLibraryUI.selected());}catch(e){toast(e.message);return;}}
+  $('#startScreen').hidden=true;$('#settingsPanel').open=false;game.start();canvas.focus({preventScroll:true});updateHud(true);
 }
 function showDialog(html,resume=game.status==='playing') {
   $('#closeDialog').hidden=game.status==='upgrade';
@@ -436,21 +586,24 @@ function closeDialog(resume=true) {
 }
 function pauseScreen() {
   if(game.status!=='playing')return;
-  showDialog('<div class="dialog-icon">☁️</div><h2>小院暂停营业</h2><p>僵尸们也在休息，准备好再继续。</p><button class="primary-button" id="resumeButton">继续突突突 →</button><button class="secondary-button" id="restartButton">重新开始这一局</button>',true);
-  $('#resumeButton').onclick=()=>closeDialog();$('#restartButton').onclick=begin;
+  showDialog('<div class="dialog-icon">☁️</div><h2>小院暂停营业</h2><p>僵尸们也在休息，准备好再继续。</p><button class="primary-button" id="resumeButton">继续突突突 →</button><button class="secondary-button" id="pauseHomeButton">保存并返回主页</button><button class="secondary-button" id="restartButton">重新开始这一局</button>',true);
+  $('#pauseHomeButton').onclick=returnHome;$('#resumeButton').onclick=()=>closeDialog();$('#restartButton').onclick=begin;
 }
 function finishScreen(win) {
+  const copy=GuluModeCopy.practiceCopy(game.learningMode,{correct:game.correct,casts:game.casts,mobile:phoneSpeech});
   best=Math.max(best,game.score);try{localStorage.setItem('gulu-shooter-best',String(best));}catch{}
   $('#bestScore').textContent=best;
-  showDialog('<div class="dialog-icon">'+(win?'🏆':'🌻')+'</div><h2>'+(win?'小院守住啦！':'这一局也很勇敢！')+'</h2><p>'+(win?'你和豌豆小队赶跑了全部捣蛋鬼！':'你守到了第 '+game.wave+' 波！<br>下次试试另一套强化组合，挑战更远。')+'</p><div class="result-grid"><div><strong>'+game.score+'</strong><span>本局得分</span></div><div><strong>'+game.kills+'</strong><span>击退僵尸</span></div><div><strong>'+game.casts+'</strong><span>释放大招</span></div></div><p>你敲对了 '+game.correct+' 个字母，魔法越来越熟练啦！</p><button class="primary-button" id="againButton">再来一局 →</button>',false);
-  $('#againButton').onclick=begin;
+  showDialog('<div class="dialog-icon">'+(win?'🏆':'🌻')+'</div><h2>'+(win?'小院守住啦！':'这一局也很勇敢！')+'</h2><p>'+(win?'你和豌豆小队赶跑了全部捣蛋鬼！':'你守到了第 '+game.wave+' 波！<br>下次试试另一套强化组合，挑战更远。')+'</p><div class="result-grid"><div><strong>'+game.score+'</strong><span>本局得分</span></div><div><strong>'+game.kills+'</strong><span>击退僵尸</span></div><div><strong>'+game.casts+'</strong><span>释放大招</span></div></div><p>'+copy.summary+'</p><button class="primary-button" id="againButton">'+copy.again+'</button><button class="secondary-button" id="finishHomeButton">返回主页</button>',false);
+  $('#againButton').onclick=begin;$('#finishHomeButton').onclick=returnHome;
   if(win){tone(520,.3,'sine',.04,1040);for(let i=0;i<7;i++)puff(180+Math.random()*650,140+Math.random()*230,'#ffef92',20,'✦');}
 }
 
 function upgradeScreen(){
   const nextWave=game.wave+1;
+  const modeNote=GuluModeCopy.practiceCopy(game.learningMode,{mobile:phoneSpeech}).wave;
   const forecast=nextWave%5===0?'👑 下一波：巨型首领，会不断召唤跑跑僵尸':nextWave===2?'⚡ 下一波解锁：闪电跑跑、铁桶卫士':nextWave===3?'🛡️ 下一波解锁：盾牌兵、分裂软糖':nextWave===4?'💚 下一波解锁：治疗僵尸、爆破客':'下一波：更多敌人，更高生命，更快进攻';
-  showDialog('<div class="upgrade-eyebrow">WAVE '+game.wave+' CLEAR</div><h2>守住了！选一张，变更强</h2><p>所有强化整局有效，同名卡牌可以叠加。</p><div class="upgrade-options">'+game.offers.map((c,i)=>'<button class="upgrade-card cat-'+c.category+'" data-upgrade="'+c.id+'"><span class="upgrade-category">'+c.category+' <kbd>'+(i+1)+'</kbd></span><span class="upgrade-art">'+c.icon+'</span><strong>'+c.name+'</strong><span class="upgrade-description">'+c.description+'</span><span class="upgrade-stack">'+(game.stack(c.id)?'叠加强化：'+game.stack(c.id)+' → '+(game.stack(c.id)+1)+' 层':'新强化 · 获得第 1 层')+'</span><span class="choose-label">选择并迎战第 '+nextWave+' 波 →</span></button>').join('')+'</div><div class="next-wave-info">'+forecast+'</div><p class="upgrade-recovery">向日葵修复 '+(1+game.stack('repair'))+' 护盾 · 大招充能推进 3 秒 · 选卡时战场暂停</p>',false);
+  showDialog('<div class="upgrade-eyebrow">WAVE '+game.wave+' CLEAR</div><h2>守住了！选一张，变更强</h2><p>所有强化整局有效，同名卡牌可以叠加。<br>'+modeNote+'</p><div class="upgrade-options">'+game.offers.map((c,i)=>'<button class="upgrade-card cat-'+c.category+'" data-upgrade="'+c.id+'"><span class="upgrade-category">'+c.category+' <kbd>'+(i+1)+'</kbd></span><span class="upgrade-art">'+c.icon+'</span><strong>'+c.name+'</strong><span class="upgrade-description">'+c.description+'</span><span class="upgrade-stack">'+(game.stack(c.id)?'叠加强化：'+game.stack(c.id)+' → '+(game.stack(c.id)+1)+' 层':'新强化 · 获得第 1 层')+'</span><span class="choose-label">选择并迎战第 '+nextWave+' 波 →</span></button>').join('')+'</div><div class="next-wave-info">'+forecast+'</div><p class="upgrade-recovery">向日葵修复 '+(1+game.stack('repair'))+' 护盾 · 大招充能推进 3 秒 · 选卡时战场暂停</p><button class="secondary-button" id="upgradeHomeButton">保存并返回主页</button>',false);
+  $('#upgradeHomeButton').onclick=returnHome;
   $('#gameDialog').classList.add('upgrade-dialog');
   document.querySelectorAll('[data-upgrade]').forEach(b=>b.onclick=()=>pickUpgrade(b.dataset.upgrade));
 }
@@ -467,14 +620,16 @@ function showBuild(){
 
 function help() {
   const resume=game.status==='playing'||dialogResume;
-  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>滑块可随时调低射速，调到 0 就完全关闭普通子弹。按住空格也能射击。开启「自动瞄准射击」，可以腾出双手打字。</div></div><div class="help-row"><span>⌨</span><div><strong>敲对技能卡上的字母放大招</strong><br>字母模式第一波 A 激光、S 冰冻、D 西瓜。英语模式输入卡片上的完整单词；同屏单词首字母不同，也可先点技能卡再拼写。单词下方显示中文与美式音标。日常英语句子模式显示英文及中文，请输入字母与空格，不区分大小写，无需输入标点。句子模式的空格键不会射击，鼠标和自动射击照常使用。激光和西瓜会朝准星释放。</div></div><div class="help-row"><span>✧</span><div><strong>向日葵就是小院防线</strong><br>僵尸靠近后会停下啃食，花瓣逐渐掉落，吃完只剩残茎。全部倒下后有 3 秒抢救时间；恢复护盾、修理或加固都能修复向日葵。<br><strong>每一波结束，三选一叠加强化</strong><br>敌人每波增多、变强，大招回蓝也更快。施法从 1～3 个字母逐步增加至多行，最多 60 个；逐行输入，不用回车。按错保留进度，每 5 波有首领！字母上限可用滑块控制，慢动作可自行开启或关闭。</div></div><p>不想增加难度？开局前选「固定 A · S · D」。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
+  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>滑块可随时调低射速，调到 0 就完全关闭普通子弹。按住空格也能射击。开启「自动瞄准射击」，可以腾出双手练习。</div></div><div class="help-row"><span>⌨</span><div><strong>打字或开口朗读来放大招</strong><br>字母、单词和句子模式按卡片提示输入。英语口语模式先选择一张技能卡，按住麦克风朗读，松开停止录音并自动识别，文字匹配成功就释放大招。首次请允许系统语音识别和麦克风权限；这不是发音评分。激光和西瓜会朝准星释放。</div></div><div class="help-row"><span>✧</span><div><strong>向日葵就是小院防线</strong><br>僵尸靠近后会停下啃食，花瓣逐渐掉落，吃完只剩残茎。全部倒下后有 3 秒抢救时间；恢复护盾、修理或加固都能修复向日葵。<br><strong>每一波结束，三选一叠加强化</strong><br>敌人每波增多、变强，大招回蓝也更快。施法从 1～3 个字母逐步增加至多行，最多 60 个；逐行输入，不用回车。按错保留进度，每 5 波有首领！字母上限可用滑块控制，慢动作可自行开启或关闭。</div></div><p>单词模式每 3 波增加 1 遍输入；句子和口语模式每 3 波增加 1 句连贯上下文，最高练习量可在设置中调整。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
 }
 for(const row of ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM']){
   const line=document.createElement('div');line.className='key-row';
   for(const letter of row){const button=document.createElement('button');button.className='touch-key';button.textContent=letter;button.dataset.key=letter;button.setAttribute('aria-label','输入字母 '+letter);button.onclick=()=>{game.input(letter);updateHud(true);button.classList.add('pressed');setTimeout(()=>button.classList.remove('pressed'),130);};line.append(button);}
   $('#touchKeyboard').append(line);
 }
-const spaceButton=document.createElement('button');spaceButton.id='sentenceSpace';spaceButton.className='touch-key sentence-space';spaceButton.dataset.key=' ';spaceButton.textContent='␣ 空格';spaceButton.hidden=true;spaceButton.onclick=()=>{game.input(' ');updateHud(true);};$('#touchKeyboard').append(spaceButton);updateTypingControls();
+const spaceButton=document.createElement('button');spaceButton.id='sentenceSpace';spaceButton.className='touch-key sentence-space';spaceButton.dataset.key=' ';spaceButton.textContent='␣ 空格';spaceButton.hidden=true;spaceButton.onclick=()=>{game.input(' ');updateHud(true);};$('#touchKeyboard').append(spaceButton);
+for(const key of ["'",'-','.']){const b=document.createElement('button');b.className='touch-key word-punctuation';b.textContent=key;b.dataset.key=key;b.hidden=true;b.onclick=()=>{game.input(key);updateHud(true);};$('#touchKeyboard').append(b);}
+updateTypingControls();
 function pointerAim(event) {
   const rect=canvas.getBoundingClientRect();game.setAim((event.clientX-rect.left)/rect.width*1000,(event.clientY-rect.top)/rect.height*530);
 }
@@ -493,19 +648,42 @@ document.addEventListener('keydown',event=>{
   if(['INPUT','TEXTAREA','SELECT'].includes(event.target.tagName))return;
   if(event.key==='Escape'){event.preventDefault();pauseScreen();return;}
   if(event.key==='Enter'&&game.status==='ready'&&event.target.tagName!=='BUTTON'){event.preventDefault();if(availableSave)continueRun();else begin();return;}
-  if(event.key===' '&&game.status==='playing'&&game.learningMode==='sentences'){event.preventDefault();if(!event.repeat){game.input(' ');updateHud(true);}return;}
+  if(event.key===' '&&game.status==='playing'&&['english','sentences'].includes(game.learningMode)){event.preventDefault();if(!event.repeat){game.input(' ');updateHud(true);}return;}
   if(event.key===' '&&game.status==='playing'&&event.target.tagName!=='BUTTON'){event.preventDefault();game.shooting=true;return;}
   if(event.repeat)return;
-  if(/^[a-z]$/i.test(event.key)&&game.status==='playing'){event.preventDefault();game.input(event.key);updateHud(true);}
+  if((/^[a-z]$/i.test(event.key)||(['english','sentences'].includes(game.learningMode)&&/^[.'-]$/.test(event.key)))&&game.status==='playing'){event.preventDefault();game.input(event.key);updateHud(true);}
   if(event.key==='Backspace'&&game.status==='playing'){event.preventDefault();game.backspace();updateHud(true);}
 });
 document.addEventListener('keyup',event=>{if(event.key===' ')game.shooting=false;});
-$('#saveButton').onclick=saveMenu;$('#continueButton').onclick=continueRun;$('#buildButton').onclick=showBuild;$('#startButton').onclick=begin;$('#pauseButton').onclick=pauseScreen;$('#helpButton').onclick=help;
+$('#homeButton').onclick=returnHome;$('#saveButton').onclick=saveMenu;$('#continueButton').onclick=continueRun;$('#buildButton').onclick=showBuild;$('#startButton').onclick=begin;$('#pauseButton').onclick=pauseScreen;$('#helpButton').onclick=help;
+$('#soundVolume').value=Math.round(soundscape.volume*100);$('#soundVolumeValue').textContent=Math.round(soundscape.volume*100)+'%';
+$('#soundVolume').addEventListener('input',event=>{const value=Number(event.target.value);soundscape.setVolume(value/100);$('#soundVolumeValue').textContent=value+'%';try{localStorage.setItem('gulu-sfx-volume-v2',String(value/100));}catch{}});
 $('#soundButton').onclick=()=>{soundOn=!soundOn;soundscape.setEnabled(soundOn);$('#soundButton').setAttribute('aria-pressed',String(soundOn));$('#soundButton').setAttribute('aria-label',soundOn?'关闭音效':'开启音效');tone(700,.12);};
 $('#autoButton').onclick=()=>{game.auto=!game.auto;$('#autoButton').setAttribute('aria-pressed',String(game.auto));updateFireControl();if(game.status==='playing')canvas.focus({preventScroll:true});};
 $('#keyboardButton').onclick=()=>{const expanded=$('#touchKeyboard').hidden;$('#touchKeyboard').hidden=!expanded;$('#keyboardButton').setAttribute('aria-expanded',String(expanded));};
-$('#difficulty').onchange=()=>{game.learningMode=['english','sentences'].includes($('#difficulty').value)?$('#difficulty').value:'letters';game.adaptive=$('#difficulty').value!=='fixed';updateTypingControls();updateHud(true);};
-document.querySelectorAll('.skill-card').forEach((button,index)=>button.onclick=()=>{if(game.status!=='playing'){toast('先开始保卫小院吧！');return;}game.select(index);if(window.matchMedia('(pointer: coarse)').matches){$('#touchKeyboard').hidden=false;$('#keyboardButton').setAttribute('aria-expanded','true');}updateHud(true);});
+$('#difficulty').onchange=()=>{game.learningMode=['english','sentences','speaking'].includes($('#difficulty').value)?$('#difficulty').value:'letters';game.adaptive=true;speechFeedback='';if(['english','sentences','speaking'].includes($('#difficulty').value))$('#settingsPanel').open=true;updateTypingControls();updateHud(true);if(game.learningMode==='speaking'&&!speechAuthorized)enableSpeech();};
+document.querySelectorAll('.skill-card').forEach((button,index)=>button.onclick=()=>{if(game.status!=='playing'){toast('先开始保卫小院吧！');return;}stopListening();speechFeedback='';if(phoneSpeech)document.body.dataset.visibleSkill=String(index);game.select(index);if(game.learningMode!=='speaking'&&window.matchMedia('(pointer: coarse)').matches){$('#touchKeyboard').hidden=game.learningMode==='speaking';$('#keyboardButton').setAttribute('aria-expanded','true');}updateHud(true);});
+$('#speechSkip').onclick=skipSpeechPrompt;$('#speechReview').onclick=openSpeechReview;
+$('#speechEnable').addEventListener('click',enableSpeech);
+$('#speechButton').addEventListener('pointerdown',startListening);
+$('#speechButton').addEventListener('pointerup',()=>microphone.release());
+$('#speechButton').addEventListener('pointercancel',stopListening);
+$('#speechButton').addEventListener('lostpointercapture',()=>{if(microphone.held)microphone.release();});
+$('#speechButton').addEventListener('contextmenu',e=>e.preventDefault());
+$('#speechButton').addEventListener('keydown',e=>{if([' ','Enter'].includes(e.key)){e.preventDefault();e.stopPropagation();if(!e.repeat)startListening();}});
+$('#speechButton').addEventListener('keyup',e=>{if([' ','Enter'].includes(e.key)){e.preventDefault();e.stopPropagation();microphone.release();}});
+window.addEventListener('pointerup',()=>{if(microphone.held)microphone.release();});
+window.addEventListener('blur',stopListening);window.addEventListener('pagehide',stopListening);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stopListening();});
+if(!phoneSpeech)fetch('/api/speech/status').then(r=>r.json()).then(info=>{nativeSpeechReady=info.available;if(!info.available)speechFeedback=info.error;updateSpeechControl();}).catch(()=>{speechFeedback='请通过本机游戏启动器开启系统语音助手。';updateSpeechControl();});
+$('#speechExample').addEventListener('click',()=>{
+  const index=game.typing;if(index<0||game.status!=='playing')return;
+  if(!localSpeech.speak((lookupSentence(game.skills[index].code)?.text||game.skills[index].code.toLowerCase()).replaceAll(' / ',' '),()=>{speechFeedback='系统朗读未成功，请检查系统英文声音。';updateSpeechControl();})){speechFeedback='没有可用的本地英文声音，请在系统设置中添加。';updateSpeechControl();}
+});
+window.speechSynthesis?.addEventListener('voiceschanged',updateSpeechControl);
+
 $('#closeDialog').onclick=()=>closeDialog();$('#gameDialog').addEventListener('cancel',event=>{event.preventDefault();closeDialog();});
-if(window.matchMedia('(pointer: coarse)').matches){$('#touchKeyboard').hidden=false;$('#keyboardButton').setAttribute('aria-expanded','true');}
+if(window.matchMedia('(pointer: coarse)').matches){$('#touchKeyboard').hidden=game.learningMode==='speaking';$('#keyboardButton').setAttribute('aria-expanded','true');}
 updateHud(true);window.requestAnimationFrame(frame);
+
+const reviewEntry=document.createElement('button');reviewEntry.type='button';reviewEntry.textContent='口语复盘 · 查看跳过的句子';reviewEntry.onclick=openSpeechReview;document.querySelector('.difficulty-controls').append(reviewEntry);

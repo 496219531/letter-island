@@ -1,0 +1,69 @@
+/* The native web view already excludes the iPhone safe areas. */
+html:has(.native-iphone){height:100%;overflow:hidden}
+body.native-iphone{height:100dvh;min-height:0;overflow:hidden!important;display:flex;flex-direction:column}
+.native-iphone .fullscreen-button,.native-iphone .brand,.native-iphone .old-game,.native-iphone footer{display:none!important}
+.native-iphone .topbar{flex:0 0 44px;min-height:44px;height:44px!important;padding:2px 6px;box-sizing:border-box}
+.native-iphone .header-actions{width:100%;flex-wrap:nowrap;gap:3px;min-width:0}
+.native-iphone .round-button{width:32px;min-height:36px;height:36px;flex:none}
+.native-iphone .build-button{font-size:10px;padding:0 5px;min-height:36px;white-space:nowrap}
+.native-iphone .settings-panel>summary{min-height:36px;font-size:10px;padding:0 5px}
+.native-iphone .game-shell{flex:1;min-height:0;height:auto;padding:2px 4px 4px;display:flex;flex-direction:column;overflow:hidden}
+.native-iphone .game-frame{flex:1;min-height:0;display:grid;grid-template-rows:34px minmax(135px,27dvh) minmax(0,1fr);overflow:hidden}
+.native-iphone .game-toolbar{min-height:0;height:34px;padding:2px 6px;flex-wrap:nowrap;gap:5px;overflow:hidden}
+.native-iphone .pause-button{height:30px;min-height:30px;width:30px;flex:none}
+.native-iphone .hearts-wrap{gap:2px;margin-left:auto;min-width:0}
+.native-iphone #hearts{gap:1px;font-size:10px}
+.native-iphone .wave-info strong{font-size:12px}
+.native-iphone .battle-score{font-size:13px;margin-left:2px}
+.native-iphone .battlefield{height:auto;min-height:0;aspect-ratio:auto;overflow:hidden}
+.native-iphone .auto-button{min-height:28px;padding:3px 7px;font-size:10px}
+.native-iphone .field-bottom{bottom:4px;left:4px;right:4px}
+.native-iphone .wave-progress{top:4px;font-size:9px;padding:3px 6px}
+.native-iphone .arsenal{min-height:0;padding:3px 5px;display:flex;flex-direction:column;gap:3px;overflow:hidden}
+.native-iphone .arsenal-heading,.native-iphone .run-strip,.native-iphone .keyboard-toggle-row{display:none}
+.native-iphone .iphone-skill-tabs{display:flex;gap:5px;flex:none}
+.native-iphone .iphone-skill-tabs button{flex:1;min-width:0;min-height:36px;font-size:12px;border:1px solid #82955a;background:#203c2d;color:#fff1bd;border-radius:8px;padding:3px}
+.native-iphone .iphone-skill-tabs button[aria-pressed=true]{background:#536b38;border-color:#ffe5a1}
+.native-iphone .skill-grid{flex:1;min-height:0;overflow:hidden;display:block;padding:0}
+.native-iphone .skill-card{display:none;min-height:0;height:100%;max-height:none;min-width:0;padding:7px;overflow:auto;gap:4px;box-sizing:border-box}
+.native-iphone .skill-card.iphone-visible{display:flex}
+.native-iphone .skill-card.selected{padding:6px}
+.native-iphone .skill-info{flex:none}
+.native-iphone .skill-info>.word-meaning:not([hidden]){font-size:13px;line-height:1.35}
+.native-iphone .sentence-card .skill-info strong{font-size:13px;line-height:1.35;max-height:none;overflow:visible}
+.native-iphone .word-ipa{font-size:11px}
+.native-iphone .skill-keys{flex:none;min-height:26px;max-height:58px;margin:0;padding:0}
+.native-iphone .skill-status{font-size:10px;line-height:14px;flex:none;margin-top:2px}
+.native-iphone #touchKeyboard{flex:none;margin:0;padding:3px 0 0;gap:3px;display:grid;grid-template-columns:repeat(3,1fr);border:0}
+.native-iphone #touchKeyboard .key-row{grid-column:1/-1;margin:0;gap:3px}
+.native-iphone #touchKeyboard .touch-key{min-height:39px;height:39px;max-width:none;font-size:16px;margin:0}
+.native-iphone #touchKeyboard .sentence-space{grid-column:1/-1;width:100%;min-width:0;font-size:13px}
+.native-iphone #touchKeyboard .word-punctuation{min-height:27px;height:27px;font-size:15px}
+.native-iphone .speech-control{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:2px 0;margin:0}
+.native-iphone #speechButton{grid-column:1/-1;grid-row:1;min-height:52px}
+.native-iphone #speechEnable,.native-iphone #speechExample{min-height:32px;font-size:11px;padding:4px}
+.native-iphone #speechTranscript{grid-column:1/-1;font-size:11px;line-height:1.3;max-height:42px;overflow:auto}
+.native-iphone[data-game-state=ready] .game-frame{grid-template-rows:34px minmax(0,1fr)}
+.native-iphone[data-game-state=ready] .arsenal{display:none}
+.native-iphone .start-screen{overflow:auto;padding:12px}
+.native-iphone .start-panel{max-height:100%;overflow:auto}
+@media(max-height:650px){.native-iphone .game-frame{grid-template-rows:30px minmax(115px,24dvh) minmax(0,1fr)}.native-iphone #touchKeyboard .touch-key{height:34px;min-height:34px}.native-iphone #touchKeyboard .word-punctuation{height:24px;min-height:24px}}
+
+body.native-iphone #skillGrid{display:block!important;width:100%}
+body.native-iphone .skill-card.iphone-visible{width:100%;max-width:none}
+body.native-iphone #touchKeyboard{max-height:none;height:auto;overflow:visible}
+
+body.native-iphone #touchKeyboard .word-punctuation{width:100%;justify-self:stretch}
+body.native-iphone .word-ipa{color:#d1dfc2}
+
+body.native-iphone .skill-info>.word-ipa:not([hidden]){color:#d1dfc2}
+
+/* Battle notices must not hide enemies on the compact phone battlefield. */
+body.native-iphone .battle-toast{display:none;position:static;inset:auto;transform:none;max-width:100%;width:100%;margin:0;padding:5px 8px;font-size:11px;line-height:1.35;white-space:normal;pointer-events:none;flex:none;border-radius:7px;box-sizing:border-box}
+body.native-iphone .battle-toast.visible{display:block;transform:none;opacity:1}
+
+body.native-iphone .home-button{min-height:30px;height:30px;padding:2px 5px;font-size:11px}
+body.native-iphone .game-toolbar .wave-info{min-width:0;flex-shrink:1}
+body.native-iphone .game-toolbar .wave-info strong{font-size:11px}
+body.native-iphone #speechSkip,body.native-iphone #speechReview{min-height:32px;padding:4px;font-size:11px}
+body.native-iphone #speechDiff{grid-column:1/-1;font-size:11px;max-height:64px;overflow:auto}

@@ -6,7 +6,11 @@
   "scripts": {
     "build": "node build.mjs",
     "dev": "python3 -m http.server 4173 --bind 127.0.0.1",
-    "test": "node tests/engine.test.cjs && node tests/save.test.cjs && node tests/sound.test.cjs",
-    "test:memory": "node --expose-gc tests/memory.test.cjs"
+    "test": "node tests/engine.test.cjs && node tests/save.test.cjs && node tests/sound.test.cjs && node --test tests/custom-library.test.cjs tests/library-service.test.mjs tests/speech-review.test.cjs tests/mode-copy.test.cjs tests/mobile.test.cjs tests/dialogues.test.cjs tests/vocabulary.test.cjs tests/system-speech.test.cjs tests/press-to-talk.test.cjs && npm run test:lan",
+    "test:memory": "node --expose-gc tests/memory.test.cjs",
+    "lan": "node lan-server.mjs",
+    "test:lan": "node --test tests/duel.test.cjs tests/lan.test.mjs tests/speech-route.test.mjs",
+    "start": "node launch.mjs",
+    "build:dialogues": "node build-dialogues.mjs"
   }
 }

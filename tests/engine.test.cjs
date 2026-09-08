@@ -146,11 +146,23 @@ test('English tiers generate real words with unique initials and preserve in-fli
 test('every learning word includes Chinese and American IPA',()=>{
  const {ENGLISH_WORDS}=require('../engine.js');for(const tier of ENGLISH_WORDS)for(const e of tier){assert.ok(e.meaning);assert.ok(e.ipa,e.word+' missing IPA');}
 });
+test('learning library has a broad, duplicate-free rotation at every level',()=>{
+ const {ENGLISH_WORDS,ENGLISH_CONTEXTS}=require('../engine.js');
+ assert.deepEqual(ENGLISH_WORDS.map(tier=>tier.length),[200,505,1600,2101,3097]);
+ assert.deepEqual(ENGLISH_CONTEXTS.map(tier=>tier.length),[60,60,60,60,60]);
+ for(const tier of ENGLISH_WORDS)assert.equal(new Set(tier.map(e=>e.word)).size,tier.length);
+ for(let i=1;i<5;i++){const words=new Set(ENGLISH_WORDS[i].map(e=>e.word));assert.ok(ENGLISH_WORDS[i-1].every(e=>words.has(e.word)));}
+ for(const tier of ENGLISH_CONTEXTS){
+  for(const context of tier){assert.equal(context.length,3);assert.equal(new Set(context.map(line=>line.word)).size,3);}
+ }
+ const prompts=ENGLISH_CONTEXTS.flat().map(context=>context.map(line=>line.word).join(' '));
+ assert.equal(new Set(prompts).size,prompts.length);
+});
 test('sentence tiers use complete phrases, require spaces, and only cast at completion',()=>{
- const {ENGLISH_SENTENCES}=require('../engine.js');const g=make();g.learningMode='sentences';
+ const {ENGLISH_SENTENCES,findSentenceEntry}=require('../engine.js');const g=make();g.learningMode='sentences';
  for(let level=0;level<5;level++){
   g.englishLevel=level;g.start();assert.equal(new Set(g.skills.map(s=>s.code[0])).size,3);
-  for(const skill of g.skills)assert.ok(ENGLISH_SENTENCES[level].some(e=>e.word===skill.code));
+  for(const skill of g.skills)assert.ok(findSentenceEntry(skill.code));
   g.skills[0].code=ENGLISH_SENTENCES[level].find(e=>e.word.includes(' ')).word;const phrase=g.skills[0].code,space=phrase.indexOf(' ');
   for(const c of phrase.slice(0,space))g.input(c.toLowerCase());g.input('z');assert.equal(g.skills[0].typed,space);assert.equal(g.casts,0);
   g.input(' ');assert.equal(g.skills[0].typed,space+1);g.backspace();assert.equal(g.skills[0].typed,space);
@@ -158,4 +170,26 @@ test('sentence tiers use complete phrases, require spaces, and only cast at comp
   for(const c of phrase.slice(space))g.input(c.toLowerCase());assert.equal(g.casts,1);assert.equal(g.shooting,false);
  }
  g.learningMode='letters';g.start();assert.equal(g.input(' '),false);
+});
+test('speaking mode accepts only a complete recognized phrase and never accepts typing',()=>{
+ const {findSentenceEntry}=require('../engine.js'),events=[],g=new GardenGame({random:()=>.35,emit:(type,data)=>events.push({type,data})});
+ g.learningMode='speaking';g.englishLevel=1;g.start();
+ for(const skill of g.skills)assert.ok(findSentenceEntry(skill.code));
+ const phrase=g.skills[0].code;assert.equal(g.input(phrase[0]),false);assert.equal(g.skills[0].typed,0);
+ assert.equal(g.speak(0,'totally different words'),false);assert.equal(g.casts,0);assert.equal(g.typing,0);
+ assert.equal(events.at(-1).type,'speech');assert.equal(events.at(-1).data.matched,false);
+ assert.equal(g.speak(0,'  '+phrase.toLowerCase()+'!  '),true);assert.equal(g.casts,1);assert.equal(g.typing,-1);
+ assert.equal(events.some(event=>event.type==='speech'&&event.data.matched),true);
+ assert.equal(g.speak(1,g.skills[1].code),true);assert.equal(g.casts,2);
+ assert.equal(g.speak(1,g.skills[1].code),false);
+});
+
+test('learning load rises every three waves and respects the adjustable cap',()=>{
+ const g=make();g.setMaxLearningLoad(4);assert.equal(g.learningLoad,1);g.wave=4;assert.equal(g.learningLoad,2);g.wave=10;assert.equal(g.learningLoad,4);g.setMaxLearningLoad(2);assert.equal(g.learningLoad,2);
+});
+test('word mode requires the current number of repetitions before casting',()=>{
+ const g=make();g.learningMode='english';g.wave=4;g.start();g.wave=4;const word=g.skills[0].code;for(const c of word)g.input(c);assert.equal(g.casts,0);assert.equal(g.skills[0].repeatsDone,1);for(const c of word)g.input(c);assert.equal(g.casts,1);
+});
+test('sentence and speaking prompts grow as coherent context prefixes',()=>{
+ const {findSentenceEntry}=require('../engine.js');for(const mode of ['sentences','speaking']){const g=make();g.learningMode=mode;g.start();g.wave=7;for(let i=0;i<3;i++)g.skills[i].code=g.nextCode(i);for(const skill of g.skills){const entry=findSentenceEntry(skill.code);assert.ok(entry);assert.equal(entry.text.split(' / ').length,3);}}
 });

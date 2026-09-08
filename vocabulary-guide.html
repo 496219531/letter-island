@@ -1,0 +1,15 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>词库与课标依据 · 咕噜游乐场</title><link rel="icon" href="data:,"><style>
+body{font:15px/1.85 system-ui,'PingFang SC',sans-serif;background:#eff3ea;color:#26372d;margin:0}main{max-width:860px;margin:35px auto;padding:28px;background:#fbfcf7;border:1px solid #dce3d7;border-radius:18px}a{color:#446641}h1{font-size:28px}h2{font-size:19px;margin-top:28px}table{border-collapse:collapse;width:100%;font-size:14px}td,th{padding:10px;border-bottom:1px solid #dce3d7;text-align:left}small{color:#697566}.scroll{overflow:auto}li{margin:8px 0}@media(max-width:600px){main{margin:10px;padding:18px}}
+</style></head><body><main><a href="duel.html">← 后院对决</a> · <a href="./">单人模式</a><h1>按学段练习，逐步扩大词汇量</h1><p>适用于上海学生选择练习范围。上海实行小学五年、初中四年的学制，具体年级进度以学校使用的教材为准；这里使用国家课标的累计目标，不把游戏分组当成上海逐年级考试要求。</p>
+<div class="scroll"><table><thead><tr><th>练习范围</th><th>课标累计参考</th><th>当前可练</th></tr></thead><tbody id="stages"></tbody></table></div>
+<p><small>小学入门的200词是游戏精选分组。其余范围逐级包含前一阶段，累计词数不能相加。词库按独立拼写统计，与课标约数的统计口径不同。</small></p>
+<h2>依据与适用范围</h2><ul>
+<li><a href="https://edu.sh.gov.cn/mbjy_fgwx_qt/20220720/02b90de93ebd49099e43063f7a6e2630.html" target="_blank" rel="noopener">上海市教委转发的《义务教育英语课程标准（2022年版）》</a>：印刷页20的表10明确二级约500词、三级约1600词；附录3的二级表列505词，三级表含这505词。可根据实际情况接触相关主题的100—300个拓展词。本游戏不把可选拓展量说成统一最低要求。</li>
+<li><a href="https://dfl.aku.edu.cn/info/1565/10089.htm" target="_blank" rel="noopener">《普通高中英语课程标准（2017年版2025年修订）》原文</a>（高校公开全文）：印刷页18和附录2给出必修累计约2100词、选择性必修累计约3100词。词表以星号区分课程阶段。选修提高类另有要求，不与选择性必修混为一谈。</li>
+<li><a href="https://screle.shisu.edu.cn/ea/de/c16360a191198/page.htm" target="_blank" rel="noopener">上海市英语教育教学研究基地：五四制教材编写说明</a>明确六至九年级为初中教材范围，以国家标准为编写目标。<a href="https://www.shmeea.edu.cn/page/08000/20250106/19021.html" target="_blank" rel="noopener">上海市教育考试院2025年春考英语评析</a>说明命题紧扣国家课程标准。这里提供课标练习池，不声称覆盖所有上海教材单元或历年考试用词。</li>
+</ul>
+<h2>为什么实际数量略有不同</h2><p>词表中的括号异体拼写和变形不重复计数；China/china、Miss/miss等相同拼写的不同用法合并解释。2022二级中的fond在2025高中词表中分类不同，本库保留其已学位置，因此高中必修累计池为2101项。高中选择性必修池整理为3097个独立拼写项。界面显示实际收词数，不用课标约数代替实际覆盖。</p>
+<h2>日常用语与口语句库</h2><p>句子与口语模式共用新编的300组完整情境对话，包含900句去重英文，每档60组。每组标注学段参考、交际目标和语法点。这些是原创练习和编写标注，不是官方教材原句或固定背诵指标。<a href="dialogue-guide.html">查看完整句库、筛选场景与编写依据 →</a></p><h2>怎样出题</h2><p>每名玩家优先抽取自己还没遇到的词，同时保持三张卡片的首字母不同，方便键盘选招。如果剩余新词的首字母被另外两张卡占用，就暂时复习最早出现的可用词；可用新词会在卡片更新后继续出现。已见词数只表示出现过，不代表已经掌握。</p><p>空格、连字符、撇号和缩写中的句点都需要按题目输入。单人存档保留出题记录；对战双方记录独立，同一房间再来一局仍保留各自的记录。</p>
+<h2>释义与音标</h2><p>课标负责确定词汇范围，本身不提供中文释义和音标。这里的简明释义、参考音标来自<a href="https://github.com/skywind3000/ECDICT" target="_blank" rel="noopener">ECDICT</a>并对常用词、缩写和明显不合适的释义作了修订，保留<a href="licenses/ECDICT.txt">MIT许可</a>。参考音标含英、美变体，不统一标注为美音；学习一词多义与实际用法时仍应结合语境。</p><small>资料核对：2026年9月7日。</small></main><script src="vocabulary.js"></script><script>
+for(const s of GuluVocabulary.stages){const row=document.createElement('tr');for(const text of [s.name,s.target?'约 '+s.target+' 词':'游戏精选',s.count+' 个拼写项']){const cell=document.createElement('td');cell.textContent=text;row.append(cell);}document.querySelector('#stages').append(row);}
+</script></body></html>

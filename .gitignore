@@ -4,3 +4,11 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# Generated native builds and prepared web bundle
+/ios/build/
+/ios/sim-build/
+/ios/GuluGarden/Web/
+/native/*.app/
+**/xcuserdata/
+*.xcuserstate

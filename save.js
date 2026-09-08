@@ -1,7 +1,8 @@
 /* Versioned run snapshots. Only game data is serialized, never callbacks or UI. */
 (function(root){
   'use strict';
-  const FIELDS=['learningMode','englishLevel','flowerHealth','breachElapsed','stacks','maxHealth','healKills','health','score','kills','casts','correct','wave','spawned','quota','spawnIn','waveBreak','shotIn','time','freeze','combo','typing','activeTime','serial','adaptive','auto','fireStrength','maxSpellLength','magicSlow','aim','hero','skills','enemies','effects'];
+  const CUSTOM=typeof module!=='undefined'&&module.exports?require('./custom-library.js'):root.GuluCustomLibrary;
+  const FIELDS=['customBank','promptHistory','learningMode','englishLevel','flowerHealth','breachElapsed','stacks','maxHealth','healKills','health','score','kills','casts','correct','wave','spawned','quota','spawnIn','waveBreak','shotIn','time','freeze','combo','typing','activeTime','serial','adaptive','auto','fireStrength','maxSpellLength','maxLearningLoad','magicSlow','aim','hero','skills','enemies','effects'];
   const numeric=['maxHealth','healKills','health','score','kills','casts','correct','wave','spawned','quota','spawnIn','waveBreak','shotIn','time','freeze','combo','typing','activeTime','serial','fireStrength'];
   function encode(game){
     if(!['playing','paused','upgrade'].includes(game.status)||game.health<0)return null;
@@ -22,17 +23,29 @@
     const s=save.state,cardIds=new Set(root.GARDEN_CARDS.map(c=>c.id));
     if(!['paused','upgrade'].includes(s.status)||numeric.some(k=>typeof s[k]!=='number'))return false;
     if(s.health<0||(s.health===0&&s.breachElapsed===undefined)||s.maxHealth<s.health||s.wave<1||!Number.isInteger(s.wave)||s.fireStrength<0||s.fireStrength>1||s.typing< -1||s.typing>2||!Number.isInteger(s.typing))return false;
-    if(s.learningMode!==undefined&&!['letters','english','sentences'].includes(s.learningMode))return false;
+    if(s.customBank!==undefined&&s.customBank!==null&&(!CUSTOM.validate(s.customBank)||(s.learningMode==='english')!==(s.customBank.kind==='word')||s.learningMode==='letters'))return false;
+    if(s.learningMode!==undefined&&!['letters','english','sentences','speaking'].includes(s.learningMode))return false;
     if(s.englishLevel!==undefined&&(!Number.isInteger(s.englishLevel)||s.englishLevel<0||s.englishLevel>4))return false;
-    if(['english','sentences'].includes(s.learningMode)&&s.englishLevel===undefined)return false;
+    if(['english','sentences','speaking'].includes(s.learningMode)&&s.englishLevel===undefined)return false;
     if(s.breachElapsed!==undefined&&(!Number.isFinite(s.breachElapsed)||s.breachElapsed<0||s.breachElapsed>=3))return false;
     if(s.flowerHealth!==undefined&&(!Array.isArray(s.flowerHealth)||s.flowerHealth.length!==8||s.flowerHealth.some(h=>!Number.isFinite(h)||h<0||h>s.maxHealth/8)||Math.abs(s.flowerHealth.reduce((a,b)=>a+b,0)-s.health)>.000001))return false;
     if(s.maxSpellLength!==undefined&&(!Number.isInteger(s.maxSpellLength)||s.maxSpellLength<1||s.maxSpellLength>60))return false;
+    if(s.maxLearningLoad!==undefined&&(!Number.isInteger(s.maxLearningLoad)||s.maxLearningLoad<1||s.maxLearningLoad>5))return false;
     if(s.magicSlow!==undefined&&typeof s.magicSlow!=='boolean')return false;
     if(typeof s.adaptive!=='boolean'||typeof s.auto!=='boolean'||!s.stacks||Array.isArray(s.stacks))return false;
     if(Object.entries(s.stacks).some(([k,v])=>!cardIds.has(k)||!Number.isInteger(v)||v<1))return false;
     if(!s.aim||!s.hero||![s.aim.x,s.aim.y,s.hero.x,s.hero.y].every(Number.isFinite))return false;
-    if(!Array.isArray(s.skills)||s.skills.length!==3||s.skills.some((k,i)=>!k||!(s.learningMode==='sentences'?root.ENGLISH_SENTENCES.some(tier=>tier.some(entry=>entry.word===k.code)):s.learningMode==='english'?root.ENGLISH_WORDS.some(tier=>tier.some(entry=>entry.word===k.code)):new RegExp('^'+['A','S','D'][i]+'[A-Z]{0,59}$').test(k.code))||!Number.isInteger(k.typed)||k.typed<0||k.typed>=k.code.length||!Number.isFinite(k.cd)||k.cd<0||k.duration!==[8,12,11][i]||!Number.isInteger(k.uses)))return false;
+    if(!Array.isArray(s.skills)||s.skills.length!==3||s.skills.some((k,i)=>!k||!(s.customBank?s.customBank.entries.some(e=>e.word===k.code):['sentences','speaking'].includes(s.learningMode)?Boolean(root.findSentenceEntry(k.code)):s.learningMode==='english'?Boolean(root.findWordEntry(k.code)):new RegExp('^'+['A','S','D'][i]+'[A-Z]{0,59}$').test(k.code))||!Number.isInteger(k.typed)||k.typed<0||k.typed>=k.code.length||(k.repeatsDone!==undefined&&(!Number.isInteger(k.repeatsDone)||k.repeatsDone<0||k.repeatsDone>4))||!Number.isFinite(k.cd)||k.cd<0||k.duration!==[8,12,11][i]||!Number.isInteger(k.uses)))return false;
+    if(s.promptHistory!==undefined){
+      if(!s.promptHistory||typeof s.promptHistory!=='object'||Array.isArray(s.promptHistory)||Object.keys(s.promptHistory).length>20)return false;
+      for(const [key,history] of Object.entries(s.promptHistory)){
+        if(key==='custom'){if(!s.customBank||!Array.isArray(history)||history.length>s.customBank.entries.length||history.some(w=>!s.customBank.entries.some(e=>e.word===w)))return false;continue;}
+        const match=/^(english|context):([0-4])(?::([1-3]))?$/.exec(key);
+        if(!match||(match[1]==='context')!==Boolean(match[3]))return false;
+        const limit=match[1]==='english'?root.ENGLISH_WORDS[Number(match[2])].length:root.ENGLISH_CONTEXTS[Number(match[2])].length;
+        if(!Array.isArray(history)||history.length>limit||new Set(history).size!==history.length||history.some(word=>typeof word!=='string'||word.length>300||!/^[A-Z .'-]+$/.test(word)))return false;
+      }
+    }
     const enemyNumbers=['id','x','y','hp','maxHp','speed','radius','hit','phase','gait','shield','poison','poisonTime','chill','ability','slowTime'];
     if(!Array.isArray(s.enemies)||s.enemies.length>500||s.enemies.some(z=>!z||!Object.hasOwn(root.ZOMBIE_TYPES,z.type)||enemyNumbers.some(k=>!Number.isFinite(z[k]))||z.hp<=0))return false;
     if(!Array.isArray(s.bullets)||s.bullets.length>4000||s.bullets.some(b=>!b||['x','y','px','py','vx','vy','life','damage','pierce','bounces'].some(k=>!Number.isFinite(b[k]))||!Array.isArray(b.hitIds)||b.hitIds.some(x=>!Number.isInteger(x))))return false;
@@ -46,8 +59,10 @@
     const s=JSON.parse(JSON.stringify(save.state));
     for(const key of FIELDS)game[key]=s[key];
     game.flowerHealth=s.flowerHealth?[...s.flowerHealth]:Array(8).fill(0);game.health=s.health;game.breachElapsed=s.breachElapsed??0;
+    game.customBank=s.customBank||null;game.promptHistory=s.promptHistory||{};
     game.learningMode=s.learningMode??'letters';game.englishLevel=s.englishLevel??0;
-    game.maxSpellLength=s.maxSpellLength??60;game.magicSlow=s.magicSlow??false;
+    game.maxSpellLength=s.maxSpellLength??60;game.maxLearningLoad=s.maxLearningLoad??3;game.magicSlow=s.magicSlow??false;
+    for(const skill of game.skills)skill.repeatsDone=skill.repeatsDone??0;
     game.bullets=s.bullets.map(b=>({...b,hitIds:new Set(b.hitIds)}));
     game.offers=s.offers.map(id=>root.GARDEN_CARDS.find(c=>c.id===id));
     game.status=s.status;game.dead=[];game.shooting=false;

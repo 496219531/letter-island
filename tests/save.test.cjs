@@ -24,9 +24,9 @@ test('finished or not-started games cannot replace an active save',()=>{
  const g=new GardenGame();assert.equal(encode(g),null);g.start();g.finish(false);assert.equal(encode(g),null);
 });
 test('typing settings round trip and older saves retain compatible defaults',()=>{
- const g=new GardenGame();g.start();g.setMaxSpellLength(8);g.magicSlow=true;const save=encode(g);const loaded=new GardenGame();assert.ok(restore(loaded,save));assert.equal(loaded.maxSpellLength,8);assert.equal(loaded.magicSlow,true);
- delete save.state.maxSpellLength;delete save.state.magicSlow;assert.ok(restore(loaded,save));assert.equal(loaded.maxSpellLength,60);assert.equal(loaded.magicSlow,false);
- for(const values of [{maxSpellLength:0},{maxSpellLength:61},{maxSpellLength:1.5},{magicSlow:'true'}]){const bad=JSON.parse(JSON.stringify(save));Object.assign(bad.state,values);assert.equal(validate(bad),false);}
+ const g=new GardenGame();g.start();g.setMaxSpellLength(8);g.setMaxLearningLoad(5);g.magicSlow=true;const save=encode(g);const loaded=new GardenGame();assert.ok(restore(loaded,save));assert.equal(loaded.maxSpellLength,8);assert.equal(loaded.maxLearningLoad,5);assert.equal(loaded.magicSlow,true);
+ delete save.state.maxSpellLength;delete save.state.maxLearningLoad;delete save.state.magicSlow;assert.ok(restore(loaded,save));assert.equal(loaded.maxSpellLength,60);assert.equal(loaded.maxLearningLoad,3);assert.equal(loaded.magicSlow,false);
+ for(const values of [{maxSpellLength:0},{maxSpellLength:61},{maxSpellLength:1.5},{maxLearningLoad:0},{maxLearningLoad:6},{magicSlow:'true'}]){const bad=JSON.parse(JSON.stringify(save));Object.assign(bad.state,values);assert.equal(validate(bad),false);}
 });
 test('sunflower damage and rescue countdown survive saves; old saves grow a matching defense',()=>{
  const g=new GardenGame();g.start();g.damageDefense(.25,110);const s=encode(g),loaded=new GardenGame();assert.ok(restore(loaded,s));assert.deepEqual(loaded.flowerHealth,g.flowerHealth);
@@ -42,4 +42,9 @@ test('English run saves words, progress and level; old runs default to letters',
 test('sentence saves retain spaces and partially typed progress',()=>{
  const g=new GardenGame();g.learningMode='sentences';g.englishLevel=2;g.start();g.skills[0].code='WHAT TIME IS IT';for(const c of 'WHAT ')g.input(c);const save=encode(g),loaded=new GardenGame();assert.ok(restore(loaded,save));assert.equal(loaded.learningMode,'sentences');assert.equal(loaded.skills[0].typed,5);assert.equal(loaded.skills[0].code,'WHAT TIME IS IT');loaded.resume();for(const c of 'TIME IS IT')loaded.input(c);assert.equal(loaded.casts,1);
  const bad=JSON.parse(JSON.stringify(save));bad.state.skills[0].code='FAKE SENTENCE';assert.equal(validate(bad),false);
+});
+test('speaking saves retain sentence prompts and reject non-library phrases',()=>{
+ const g=new GardenGame();g.learningMode='speaking';g.englishLevel=4;g.start();g.select(1);const save=encode(g),loaded=new GardenGame();
+ assert.ok(validate(save));assert.ok(restore(loaded,save));assert.equal(loaded.learningMode,'speaking');assert.equal(loaded.englishLevel,4);assert.equal(loaded.skills[1].code,g.skills[1].code);assert.equal(loaded.typing,1);
+ const bad=JSON.parse(JSON.stringify(save));bad.state.skills[0].code='SAY SOMETHING ELSE';assert.equal(validate(bad),false);
 });

@@ -1,43 +1,126 @@
-/* Original cartoon sound synthesis: bounded buffers, voices and event rates. */
+/* Dry, layered arcade sound design. No vocal/formant buzz or low sliding notes. */
 (function(root){
-  const SPECS={shot:[.11,310],flesh:[.15,115],metal:[.3,690],shield:[.25,940],iceHit:[.19,1350],kill:[.42,135],groan:[.95,83],boss:[1.25,58],nibble:[.2,170],laser:[.65,170],freeze:[.75,1100],melon:[.55,480],explosion:[.6,70],critical:[.22,720],warning:[.27,155]};
-  const GAPS={shot:.045,flesh:.07,metal:.08,shield:.09,iceHit:.08,kill:.18,groan:2.8,boss:3,nibble:.22,explosion:.16,critical:.12,warning:1.8};
-  function samples(kind,variant=0,rate=22050){
-    const [duration,base]=SPECS[kind],out=new Float32Array(Math.ceil(duration*rate));let phase=0,low=0,seed=12345+variant*3571;
+  'use strict';
+  const RATE=44100,TAU=Math.PI*2;
+  const SPECS={shot:[.085,880],flesh:[.095,640],metal:[.22,1480],shield:[.28,1046.5],iceHit:[.18,2093],kill:[.24,783.99],groan:[.32,430],boss:[.65,261.63],nibble:[.11,920],laser:[.38,1244.5],freeze:[.65,1567.98],melon:[.36,740],explosion:[.42,130],critical:[.25,1567.98],warning:[.4,523.25]};
+  const GAPS={shot:.07,flesh:.065,metal:.09,shield:.1,iceHit:.09,kill:.13,groan:6,boss:3,nibble:.18,laser:.18,freeze:.4,melon:.2,explosion:.22,critical:.16,warning:2.5};
+  const LEVELS={shot:.16,flesh:.16,metal:.13,shield:.16,iceHit:.12,kill:.18,groan:.055,boss:.24,nibble:.1,laser:.26,freeze:.22,melon:.18,explosion:.26,critical:.18,warning:.16};
+  const CAPS={shot:3,flesh:5,metal:4,shield:3,iceHit:4,kill:3,groan:1,boss:1,nibble:2,laser:2,freeze:1,melon:2,explosion:2,critical:2,warning:1};
+  const SPELLS=new Set(['laser','freeze','melon','explosion','boss']);
+  function samples(kind,variant=0,rate=RATE){
+    if(!SPECS[kind])throw new Error('Unknown sound: '+kind);
+    const [duration,base]=SPECS[kind],out=new Float32Array(Math.ceil(duration*rate)),pitch=base*(1+(variant-1)*.023);
+    let seed=12345+variant*3571,slow=0,fast=0,phase=0,previous=0,high=0,smooth=0;
+    const cutoff=kind==='explosion'?85:kind==='boss'?150:kind==='groan'?260:220;
+    const hp=Math.exp(-TAU*cutoff/rate),lp=1-Math.exp(-TAU*7200/rate);
+    function bell(t,f,decay){return (Math.sin(TAU*f*t)+.23*Math.sin(TAU*f*2.01*t)*Math.exp(-t*16)+.07*Math.sin(TAU*f*3.97*t)*Math.exp(-t*28))*Math.exp(-t*decay);}
     for(let i=0;i<out.length;i++){
-      const t=i/rate,p=t/duration,attack=Math.min(1,t/.008),env=attack*Math.pow(1-p,1.6);
-      seed=(Math.imul(seed,1664525)+1013904223)>>>0;const noise=seed/2147483648-1;low+=.15*(noise-low);
-      const pitch=base*(1+(variant-1)*.075);let v=0;
-      if(['groan','boss','kill'].includes(kind)){
-        const hz=pitch*(1+.05*Math.sin(t*29))*(1-.3*p);phase+=2*Math.PI*hz/rate;
-        // Glottal harmonics with two vowel resonances give a silly, rounded "urr-ah".
-        for(let h=1;h<=12;h++){const f=h*hz,formant=280+220*p;const w=.12/h+.28*Math.exp(-Math.pow((f-formant)/130,2))+.1*Math.exp(-Math.pow((f-1000)/230,2));v+=Math.sin(phase*h)*w;}
-        v=(v*.65+low*.14)*(.8+.2*Math.sin(t*19));
-      }else if(kind==='metal'||kind==='shield'||kind==='iceHit'){
-        for(const [r,w] of [[1,.5],[1.47,.26],[2.31,.16],[3.82,.08]])v+=Math.sin(2*Math.PI*pitch*r*t)*w*Math.exp(-p*r*4);
-        v+=noise*.12*Math.exp(-p*30);
-      }else if(kind==='explosion'){v=low*2.5*Math.exp(-p*3)+Math.sin(2*Math.PI*(pitch*t-35*t*t))*.45*Math.exp(-p*5);}
-      else if(kind==='nibble'){const pulse=Math.pow(Math.max(0,Math.sin(t*85)),3);v=noise*.55*pulse+Math.sin(2*Math.PI*pitch*t)*.25*pulse;}
-      else if(kind==='freeze'){v=(Math.sin(2*Math.PI*(pitch*t+1200*t*t))*.35+Math.sin(2*Math.PI*pitch*1.5*t)*.2+noise*.3)*(.7+.3*Math.sin(t*55));}
-      else if(kind==='laser'){phase+=2*Math.PI*pitch*(1+7*p)/rate;v=Math.sin(phase)*.45+Math.sin(phase*2)*.2+noise*.08;}
-      else if(kind==='melon'){phase+=2*Math.PI*pitch*(1-.85*p)/rate;v=Math.sin(phase)*.65+Math.sin(phase*2)*.14;}
-      else if(kind==='flesh'){v=low*1.6*Math.exp(-p*7)+Math.sin(2*Math.PI*(pitch*t-100*t*t))*.5*Math.exp(-p*5);}
-      else {phase+=2*Math.PI*pitch*(kind==='shot'?1-.7*p:1+.5*p)/rate;v=Math.sin(phase)*.65+noise*.15*Math.exp(-p*14);}
-      out[i]=Math.tanh(v*1.2)*env*.65;
+      const t=i/rate,p=t/duration;
+      seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+      const white=seed/2147483648-1;slow+=.055*(white-slow);fast+=.48*(white-fast);
+      const brush=fast-slow,air=white-fast;
+      let v=0;
+      switch(kind){
+        case 'shot':
+          // A tiny wooden spring plus a dry air click; no sub-bass pitch dive.
+          v=.65*bell(t,pitch,67)+.24*brush*Math.exp(-t*100)+.1*air*Math.exp(-t*180);break;
+        case 'flesh':
+          v=.6*brush*Math.exp(-t*55)+.32*bell(t,pitch,60)+.12*bell(t,pitch*1.61,90);break;
+        case 'metal':
+          v=.48*bell(t,pitch,24)+.2*bell(t,pitch*1.47,35)+.07*air*Math.exp(-t*95);break;
+        case 'shield':
+          v=.55*bell(t,pitch,18)+.22*bell(t,pitch*1.5,22)+.07*bell(t,pitch*2.5,35);break;
+        case 'iceHit':
+          v=.35*bell(t,pitch,32)+.25*bell(t,pitch*1.26,38)+.3*air*Math.exp(-t*75);break;
+        case 'kill':{
+          const second=Math.max(0,t-.055);
+          v=.42*bell(t,pitch,25)+(t>.055?.34*bell(second,pitch*1.5,28):0);break;
+        }
+        case 'groan':
+          // Compatibility sound only: a soft rustle, never an automatic low groan.
+          v=brush*.3*Math.sin(Math.PI*p)*Math.exp(-p*3);break;
+        case 'boss':
+          v=(.4*bell(t,pitch,6)+.3*bell(t,pitch*1.5,7)+.16*bell(t,pitch*2,10))+.12*brush*Math.exp(-t*28);break;
+        case 'nibble':{
+          const second=Math.max(0,t-.045);
+          v=.45*brush*(Math.exp(-t*110)+(t>.045?.65*Math.exp(-second*110):0))+.22*bell(t,pitch,90);break;
+        }
+        case 'laser':
+          phase+=TAU*(pitch*(1-.23*p))/rate;
+          v=(.5*Math.sin(phase)+.13*Math.sin(phase*2))*(1-Math.exp(-t*250))*Math.exp(-t*11)+.14*brush*Math.exp(-t*35);break;
+        case 'freeze':{
+          v=.08*air*Math.sin(Math.PI*p)*Math.exp(-p*2);
+          for(let n=0;n<4;n++){const age=t-n*.055;if(age>=0)v+=.27*bell(age,pitch*[1,1.25,1.5,2][n],12+n*3);}
+          break;
+        }
+        case 'melon':
+          phase+=TAU*pitch*(1+.6*p)/rate;
+          v=.3*brush*Math.sin(Math.PI*p)*Math.exp(-p*1.2)+.3*Math.sin(phase)*Math.sin(Math.PI*p)*Math.exp(-p*2);break;
+        case 'explosion':
+          v=brush*.95*Math.exp(-t*22)+slow*.65*Math.exp(-t*17)+.36*Math.sin(TAU*pitch*t)*Math.exp(-t*23)+.2*air*Math.exp(-t*65);break;
+        case 'critical':
+          v=.5*bell(t,pitch,22)+.28*bell(t,pitch*1.5,25);break;
+        case 'warning':{
+          const age=t% .18;
+          v=t<.34?.42*bell(age,pitch*(t<.18?1:1.25),24):0;break;
+        }
+      }
+      // Remove rumble/DC and tame the highest hiss without saturating the signal.
+      high=hp*(high+v-previous);previous=v;smooth+=lp*(high-smooth);
+      const attack=Math.min(1,t/.0025),tail=Math.min(1,(duration-t)/.022);
+      out[i]=smooth*attack*Math.max(0,tail);
     }
+    const peak=out.reduce((m,x)=>Math.max(m,Math.abs(x)),0),gain=peak>.001?.7/peak:1;
+    for(let i=0;i<out.length;i++)out[i]*=gain;
+    out[0]=0;out[out.length-1]=0;
     return out;
   }
   class GardenAudio{
-    constructor(factory){this.factory=factory;this.context=null;this.enabled=true;this.voices=new Set();this.cache=new Map();this.last=new Map();this.nextGroan=2;}
-    init(){if(!this.enabled)return false;if(!this.context){this.context=this.factory();const c=this.context;this.master=c.createGain();this.master.gain.value=.65;this.compressor=c.createDynamicsCompressor();this.compressor.threshold.value=-16;this.compressor.ratio.value=5;this.master.connect(this.compressor);this.compressor.connect(c.destination);}if(this.context.state==='suspended')this.context.resume().catch(()=>{});return true;}
-    start(buffer,volume,pan=0){if(this.voices.size>=32)return false;const c=this.context,source=c.createBufferSource(),gain=c.createGain(),stereo=c.createStereoPanner();source.buffer=buffer;gain.gain.value=volume;stereo.pan.value=Math.max(-.65,Math.min(.65,pan));source.connect(gain);gain.connect(stereo);stereo.connect(this.master);
-      const voice={source,cleanup:()=>{if(!this.voices.delete(voice))return;source.onended=null;source.disconnect();gain.disconnect();stereo.disconnect();}};this.voices.add(voice);source.onended=voice.cleanup;try{source.start();}catch(e){voice.cleanup();throw e;}return true;
+    constructor(factory){this.factory=factory;this.context=null;this.enabled=true;this.volume=.6;this.voices=new Set();this.cache=new Map();this.last=new Map();this.duckUntil=0;this.nextGroan=Infinity;}
+    init(){
+      if(!this.enabled)return false;
+      if(!this.context){const c=this.context=this.factory();this.master=c.createGain();this.master.gain.value=this.volume*.65;this.compressor=c.createDynamicsCompressor();
+        this.compressor.threshold.value=-12;this.compressor.ratio.value=3;
+        if(this.compressor.knee)this.compressor.knee.value=18;if(this.compressor.attack)this.compressor.attack.value=.004;if(this.compressor.release)this.compressor.release.value=.12;
+        this.master.connect(this.compressor);this.compressor.connect(c.destination);
+      }
+      if(this.context.state==='suspended')this.context.resume().catch(()=>{});return true;
     }
-    play(kind,{x=500,boss=false}={}){if(!SPECS[kind]||!this.enabled)return;try{if(!this.init())return;const now=this.context.currentTime;if(now-(this.last.get(kind)??-Infinity)<(GAPS[kind]||.1))return;this.last.set(kind,now);const variant=Math.floor(Math.random()*3),key=kind+variant;let buffer=this.cache.get(key);if(!buffer){const data=samples(kind,variant);buffer=this.context.createBuffer(1,data.length,22050);buffer.getChannelData(0).set(data);this.cache.set(key,buffer);}const quiet=['groan','boss'].includes(kind)?.28:kind==='shot'?.28:kind==='warning'?.3:.45;this.start(buffer,quiet,(x-500)/700);}catch{this.setEnabled(false);}}
-    tone(frequency,duration=.1,type='sine',volume=.035,end=frequency){if(!this.enabled)return;try{if(!this.init()||this.voices.size>=32)return;const rate=22050,buffer=this.context.createBuffer(1,Math.ceil(duration*rate),rate),data=buffer.getChannelData(0);let phase=0;for(let i=0;i<data.length;i++){const p=i/data.length;phase+=2*Math.PI*(frequency+(end-frequency)*p)/rate;data[i]=Math.sin(phase)*Math.min(1,p*20)*Math.pow(1-p,2);}this.start(buffer,Math.min(.3,volume*3));}catch{this.setEnabled(false);}}
-    stop(){for(const voice of [...this.voices]){try{voice.source.stop();}catch{}voice.cleanup();}this.nextGroan=2;}
-    setEnabled(value){this.enabled=value;if(!value)this.stop();}
-    update(dt,game){if(!this.enabled||!this.context||game.status!=='playing'||game.freeze>0)return;this.nextGroan-=dt;if(this.nextGroan>0)return;this.nextGroan=3+Math.random()*4;const candidates=game.enemies.filter(z=>z.hp>0&&z.x<1000);if(candidates.length){const z=candidates[Math.floor(Math.random()*candidates.length)];this.play(z.boss?'boss':'groan',{x:z.x});}}
+    start(buffer,volume,pan=0,kind='ui'){
+      if(this.voices.size>=32)return false;
+      const c=this.context,source=c.createBufferSource(),gain=c.createGain(),stereo=c.createStereoPanner();source.buffer=buffer;gain.gain.value=volume;stereo.pan.value=Math.max(-.6,Math.min(.6,pan));
+      source.connect(gain);gain.connect(stereo);stereo.connect(this.master);
+      const voice={source,kind,cleanup:()=>{if(!this.voices.delete(voice))return;source.onended=null;source.disconnect();gain.disconnect();stereo.disconnect();}};
+      this.voices.add(voice);source.onended=voice.cleanup;try{source.start();}catch(e){voice.cleanup();throw e;}return true;
+    }
+    play(kind,{x=500}={}){
+      if(!SPECS[kind]||!this.enabled||this.volume===0)return;
+      try{
+        if(!this.init())return;
+        const now=this.context.currentTime;if(now-(this.last.get(kind)??-Infinity)<GAPS[kind])return;
+        if([...this.voices].filter(v=>v.kind===kind).length>=CAPS[kind])return;
+        const variant=Math.floor(Math.random()*3),key=kind+variant;let buffer=this.cache.get(key);
+        if(!buffer){const data=samples(kind,variant);buffer=this.context.createBuffer(1,data.length,RATE);buffer.getChannelData(0).set(data);this.cache.set(key,buffer);}
+        if(SPELLS.has(kind))this.duckUntil=now+.25;
+        const duck=now<this.duckUntil&&!SPELLS.has(kind)?.5:1;
+        if(this.start(buffer,LEVELS[kind]*duck,(x-500)/900,kind))this.last.set(kind,now);
+      }catch{this.setEnabled(false);}
+    }
+    tone(frequency,duration=.1,type='sine',volume=.035,end=frequency){
+      if(!this.enabled||this.volume===0)return;
+      try{
+        if(!this.init()||this.voices.size>=32)return;
+        const now=this.context.currentTime;if(now-(this.last.get('ui')??-Infinity)<.045)return;this.last.set('ui',now);
+        const length=Math.max(.025,Math.min(.32,duration)),buffer=this.context.createBuffer(1,Math.ceil(length*RATE),RATE),data=buffer.getChannelData(0);let phase=0;
+        for(let i=0;i<data.length;i++){const t=i/RATE,p=i/(data.length-1);phase+=TAU*(frequency+(end-frequency)*p)/RATE;data[i]=(Math.sin(phase)+.12*Math.sin(phase*2))*Math.min(1,t/.003)*Math.exp(-t*35)*Math.pow(1-p,1.5)*.65;}
+        this.start(buffer,Math.min(.12,volume*2),0,'ui');
+      }catch{this.setEnabled(false);}
+    }
+    setVolume(value){const n=Number(value);if(!Number.isFinite(n))return;this.volume=Math.max(0,Math.min(1,n));if(this.master){const gain=this.master.gain;if(gain.setTargetAtTime)gain.setTargetAtTime(this.volume*.65,this.context.currentTime,.025);else gain.value=this.volume*.65;}if(this.volume===0)this.stop();}
+    stop(){for(const voice of [...this.voices]){try{voice.source.stop();}catch{}voice.cleanup();}this.duckUntil=0;this.last.clear();}
+    setEnabled(value){this.enabled=Boolean(value);if(!value)this.stop();}
+    // Silence between actions is intentional; no recurring synthetic zombie groans.
+    update(){}
   }
-  root.GardenAudio=GardenAudio;if(typeof module!=='undefined')module.exports={GardenAudio,samples,SPECS};
+  root.GardenAudio=GardenAudio;if(typeof module!=='undefined')module.exports={GardenAudio,samples,SPECS,LEVELS,GAPS,CAPS,RATE};
 })(typeof globalThis!=='undefined'?globalThis:this);

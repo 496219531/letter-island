@@ -1,0 +1,17 @@
+.game-app .custom-source{display:flex;flex-direction:column;gap:5px;margin:8px 0;color:#eddfbc;font-size:12px}
+.game-app .custom-source select{width:100%;min-height:40px;padding:6px;background:#243e2b;color:#ffecbd;border:1px solid #7e9266;border-radius:8px;font-size:14px}
+.game-app .custom-source button{min-height:36px;font-size:12px;background:#2e4933;color:#ffecbd;border:1px solid #7e9266;border-radius:8px}
+.game-app .library-dialog{width:min(640px,calc(100vw - 20px));max-width:calc(100vw - 20px);max-height:calc(100dvh - 20px);height:calc(100dvh - 24px);padding:0;margin:auto;overflow:hidden;border:1px solid #a4b077;border-radius:16px;background:#173322;color:#fff1bd;box-sizing:border-box}
+.game-app .library-dialog[open]{display:flex;flex-direction:column}
+.game-app .library-dialog::backdrop{background:#061b12b8}
+.game-app .library-dialog header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #72895c;gap:12px;flex:none}
+.game-app .library-dialog h2{font-size:21px;margin:0}
+.game-app .library-body{overflow:auto;min-height:0;padding:14px;overscroll-behavior:contain}
+.game-app .library-dialog p{font-size:12px;line-height:1.5;color:#d7dfc5;text-align:left;white-space:normal}
+.game-app .library-dialog label{display:block;margin:10px 0;color:#eee2bd;font-size:13px}
+.game-app .library-dialog input,.game-app .library-dialog textarea,.game-app .library-dialog select{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:9px;background:#10291c;color:#fff1bd;border:1px solid #72895c;border-radius:8px;font:16px/1.4 system-ui;margin-top:5px}
+.game-app .library-dialog button{min-height:42px;padding:8px 12px;margin:4px 6px 4px 0;color:#ffebba;background:#375336;border:1px solid #8a9d69;border-radius:8px;font-size:13px}
+.game-app .library-dialog button:disabled{opacity:.5}
+.game-app .library-image{display:block;width:100%;max-height:280px;object-fit:contain;background:#10291c}
+.game-app .library-entry,.game-app .library-group{padding:10px;border:1px solid #72895c;border-radius:10px;margin-top:12px}
+.game-app .library-dialog h3{font-size:16px;margin:3px 0}

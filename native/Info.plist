@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>com.gulu.garden.speechhelper</string>
+<key>CFBundleName</key><string>花园语音小助手</string>
+<key>CFBundleExecutable</key><string>GuluSpeech</string>
+<key>CFBundleDisplayName</key><string>花园语音小助手</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>NSPrincipalClass</key><string>NSApplication</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>NSSpeechRecognitionUsageDescription</key><string>将你在游戏中按住麦克风录制的英语在本机识别为文字，用于匹配大招题目。</string>
+<key>LSUIElement</key><true/>
+</dict></plist>
