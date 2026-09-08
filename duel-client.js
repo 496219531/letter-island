@@ -1,6 +1,25 @@
 'use strict';
 const $=s=>document.querySelector(s),sessionKey='gulu-lan-session-v1';
 let session=null,stream=null,state=null,connected=false,queue=Promise.resolve(),noticeTimer,lastAim=0,skillSignature='',feedbackId='',localAuto=true;
+const duelAudio=new GardenAudio(()=>new (window.AudioContext||window.webkitAudioContext)());
+let audioPrevious=null;
+function unlockDuelAudio(){try{duelAudio.init();}catch{}}
+document.addEventListener('pointerdown',unlockDuelAudio,{passive:true});
+document.addEventListener('keydown',unlockDuelAudio);
+$('#duelSound').onclick=()=>{duelAudio.setEnabled(!duelAudio.enabled);$('#duelSound').textContent=duelAudio.enabled?'🔊 声音':'🔇 静音';$('#duelSound').setAttribute('aria-pressed',String(duelAudio.enabled));if(duelAudio.enabled){unlockDuelAudio();duelAudio.play('laser');}};
+function playDuelSounds(s){
+  if(s.status!=='playing'||s.paused){duelAudio.stop();audioPrevious=null;return;}
+  const field=s.fields?.[s.side];if(!field)return;
+  const key=s.code+':'+s.round;
+  if(audioPrevious?.key===key){
+    if(field.shotKick>0&&audioPrevious.shotKick<=0)duelAudio.play('shot');
+    if(field.kills>audioPrevious.kills)duelAudio.play('kill');
+    if(field.health<audioPrevious.health)duelAudio.play('nibble');
+    s.skills.forEach((skill,i)=>{if(skill.uses>audioPrevious.uses[i])duelAudio.play(['laser','freeze','melon'][i]);});
+    if(field.enemies.some(z=>z.hit>0))duelAudio.play('flesh');
+  }
+  audioPrevious={key,shotKick:field.shotKick,kills:field.kills,health:field.health,uses:s.skills.map(skill=>skill.uses)};
+}
 const zombie=new Image();zombie.src='assets/zombie.png';
 const arenaArt=new Image();arenaArt.src='assets/duel-garden-v2.png';
 const captainArt=new Image();captainArt.src='assets/pea-captain-v1.png';
@@ -41,7 +60,7 @@ function action(command) {
   });
   return queue;
 }
-function reset(){document.body.dataset.duelState='lobby';stream?.close();stream=null;session=null;state=null;connected=false;try{sessionStorage.removeItem(sessionKey);}catch{}$('#lobby').hidden=false;$('#room').hidden=true;}
+function reset(){duelAudio.stop();audioPrevious=null;const clean=new URL(location.href);clean.searchParams.delete('room');history.replaceState(null,'',clean);document.body.dataset.duelState='lobby';stream?.close();stream=null;session=null;state=null;connected=false;try{sessionStorage.removeItem(sessionKey);}catch{}$('#lobby').hidden=false;$('#room').hidden=true;}
 function invitation(){const url=new URL(addresses[0]||location.href);url.pathname='/duel.html';url.search='';url.searchParams.set('room',session.code);return url.href;}
 function attach() {
   $('#lobby').hidden=true;$('#room').hidden=false;$('#codeLabel').textContent=session.code;$('#invite').value=invitation();
@@ -85,13 +104,16 @@ $('#copy').onclick=async()=>{
     let copied=false;try{copied=document.execCommand('copy');}catch{}input.remove();notice(copied?'邀请地址已复制':text);
   }
 };
-async function leaveRoom(){
+async function leaveRoom(returnSolo=false){
   if(state?.status==='playing'&&!confirm('退出房间将结束当前对局，确定退出吗？'))return;
-  try{if(session)await request(`/api/room/${session.code}/leave`,{method:'POST',body:'{}'});reset();notice('已退出房间，可以重新创建或加入');}
-  catch(e){if(e.status===401){reset();return;}notice('退出未成功，请重试：'+e.message);}
+  try{if(session)await request(`/api/room/${session.code}/leave`,{method:'POST',body:'{}'});reset();if(returnSolo){location.href=new URLSearchParams(location.search).get('source')==='ios'?'gulugarden://home':'/index.html';return;}notice('已退出房间，可以重新创建或加入');}
+  catch(e){if(returnSolo){reset();location.href=new URLSearchParams(location.search).get('source')==='ios'?'gulugarden://home':'/index.html';return;}if(e.status===401){reset();return;}notice('退出未成功，请重试：'+e.message);}
 }
-$('#leave').onclick=leaveRoom;
-$('#leaveWaiting').onclick=leaveRoom;
+$('#leave').onclick=()=>leaveRoom();
+$('#leaveWaiting').onclick=()=>leaveRoom();
+$('#exitSolo').onclick=()=>leaveRoom(true);
+$('#exitSoloWaiting').onclick=()=>leaveRoom(true);
+document.querySelectorAll('.topbar a').forEach(a=>a.onclick=e=>{e.preventDefault();leaveRoom(true);});
 $('#unready').onclick=()=>action({type:'unready'});
 $('#surrender').onclick=()=>{if(confirm('确定认输并结束这一局吗？'))action({type:'surrender'});};
 $('#auto').onchange=()=>{localAuto=$('#auto').checked;action({type:'auto',value:localAuto});};
@@ -125,6 +147,7 @@ for(const [unit,icon,name,cost] of [['runner','⚡','疾跑僵尸',18],['armor',
   const b=document.createElement('button');b.innerHTML=`<span>${icon} ${name}</span><small>☀ ${cost}</small>`;b.onclick=()=>{action({type:'send',unit});$('#myCanvas').focus({preventScroll:true});};$('#units').append(b);unitButtons[unit]=b;
 }
 function render() {
+  playDuelSounds(state);
   document.body.dataset.duelState=state.status;
   const s=state,me=s.players[s.side],other=s.players[1-s.side],playing=s.status==='playing',finished=s.status==='finished',live=playing&&!s.paused&&connected;
   if(s.feedback?.text&&feedbackId!==`${s.code}:${s.round}:${s.feedback.id}`){feedbackId=`${s.code}:${s.round}:${s.feedback.id}`;notice(s.feedback.text);}
@@ -186,7 +209,7 @@ $('#myCanvas').onpointerdown=e=>{if(e.button!==0)return;e.preventDefault();$('#m
 window.addEventListener('pointercancel',()=>{if(state?.status==='playing'&&!localAuto)action({type:'fire',value:false});});
 window.addEventListener('pointerup',()=>{if(state?.status==='playing'&&!localAuto)action({type:'fire',value:false});});
 window.addEventListener('blur',()=>{if(state?.status==='playing'&&!localAuto)action({type:'fire',value:false});});
-window.addEventListener('pagehide',()=>stream?.close());
+window.addEventListener('pagehide',()=>{duelAudio.stop();stream?.close();});
 window.addEventListener('pageshow',e=>{if(e.persisted&&session)attach();});
 
 function drawBattle(canvas,s) {

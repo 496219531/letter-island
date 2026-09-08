@@ -2,9 +2,15 @@ import UIKit
 import WebKit
 import Speech
 import AVFoundation
+import SafariServices
 
 @main class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
+    func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        guard url.scheme == "gulugarden", url.host == "home" else { return false }
+        window?.rootViewController?.dismiss(animated: true)
+        return true
+    }
     func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         window = UIWindow(frame: UIScreen.main.bounds)
         window?.rootViewController = GameController()
@@ -228,14 +234,18 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         guard let url = action.request.url else { decisionHandler(.cancel); return }
         if url.scheme == "gulu" && url.lastPathComponent == "duel.html" {
             decisionHandler(.cancel)
-            let alert = UIAlertController(title: "连接局域网对战", message: "电脑启动对战服务后，填写显示的局域网地址。手机需连接同一 Wi-Fi；对战将在浏览器打开。", preferredStyle: .alert)
+            let alert = UIAlertController(title: "连接局域网对战", message: "电脑启动对战服务后，填写显示的局域网地址。手机需连接同一 Wi-Fi；结束对战后点“完成”即可回到本地单机。", preferredStyle: .alert)
             alert.addTextField { field in field.placeholder = "http://192.168.1.10:4174"; field.keyboardType = .URL; field.autocapitalizationType = .none; field.text = UserDefaults.standard.string(forKey: "duelAddress") }
             alert.addAction(UIAlertAction(title: "取消", style: .cancel))
             alert.addAction(UIAlertAction(title: "连接", style: .default) { _ in
                 let text = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 guard var parts = URLComponents(string: text), ["http", "https"].contains(parts.scheme ?? ""), parts.host != nil else { return }
-                parts.path = "/duel.html"; parts.query = nil; parts.fragment = nil
-                if let target = parts.url { UserDefaults.standard.set(text, forKey: "duelAddress"); UIApplication.shared.open(target) }
+                parts.path = "/duel.html"; parts.fragment = nil
+                var items = parts.queryItems ?? []
+                items.removeAll { $0.name == "source" }
+                items.append(URLQueryItem(name: "source", value: "ios"))
+                parts.queryItems = items
+                if let target = parts.url { UserDefaults.standard.set(text, forKey: "duelAddress"); self.present(SFSafariViewController(url: target), animated: true) }
             })
             present(alert, animated: true)
         } else if url.scheme == "gulu" && url.host == "game" { decisionHandler(.allow) } else { decisionHandler(.cancel); if ["http","https"].contains(url.scheme ?? "") { UIApplication.shared.open(url) } }
