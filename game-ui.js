@@ -34,7 +34,9 @@
   function fit(){
     const width=stage.clientWidth,height=stage.clientHeight;
     if(width<=0||height<=0)return;
-    const scale=Math.min(width/1000,height/530),w=1000*scale,h=530*scale;
+    const fillPhoneDuel=!solo&&Boolean(window.GuluMobile?.active);
+    const scale=Math.min(width/1000,height/530);
+    const w=fillPhoneDuel?width:1000*scale,h=fillPhoneDuel?height:530*scale;
     stage.style.setProperty('--scene-width',w+'px');stage.style.setProperty('--scene-height',h+'px');
     const dpr=Math.min(2,window.devicePixelRatio||1),pixelsW=Math.round(w*dpr),pixelsH=Math.round(h*dpr);
     if(canvas.width!==pixelsW||canvas.height!==pixelsH){canvas.width=pixelsW;canvas.height=pixelsH;canvas.getContext('2d').setTransform(pixelsW/1000,0,0,pixelsH/530,0,0);}
