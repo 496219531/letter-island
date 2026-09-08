@@ -1,11 +1,9 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {DuelMatch}=require('../duel.cjs');
-function match(config,empty=true) {
+function match(config) {
   const m=new DuelMatch(config);m.join('甲');m.join('乙');m.connect(0,true);m.connect(1,true);
   m.command(0,{type:'ready'});m.command(1,{type:'ready'});
-  // Isolate combat rules from the opening army; its real behavior is tested separately.
-  if(empty){m.games.forEach(g=>g.enemies=[]);m.players.forEach(p=>p.sent=0);}
   return m;
 }
 function ticks(m,seconds){for(let i=0;i<Math.ceil(seconds/.05);i++)m.tick(.05);}
@@ -15,10 +13,10 @@ test('room starts only after both connected players are ready; full rooms reject
   assert.throws(()=>m.join('丙'));assert.throws(()=>new DuelMatch({mode:'speaking'}));
 });
 test('automatic troops and paid units attack only the opposing yard',()=>{
-  const m=match();ticks(m,1.25);assert.equal(m.games[0].enemies.length,5);assert.equal(m.games[1].enemies.length,5);
+  const m=match();ticks(m,1.1);assert.equal(m.games[0].enemies.length,1);assert.equal(m.games[1].enemies.length,1);
   assert.equal(m.games[0].enemies[0].owner,1);assert.equal(m.games[1].enemies[0].owner,0);
   const before=m.players[0].sun;m.command(0,{type:'send',unit:'runner'});
-  assert.equal(m.games[0].enemies.length,5);assert.equal(m.games[1].enemies.at(-1).type,'runner');assert.equal(m.players[0].sun,before-18);
+  assert.equal(m.games[0].enemies.length,1);assert.equal(m.games[1].enemies.at(-1).type,'runner');assert.equal(m.players[0].sun,before-18);
   assert.throws(()=>m.command(0,{type:'send',unit:'runner'}),/冷却/);
   m.players[0].dispatchCd=0;assert.throws(()=>m.command(0,{type:'send',unit:'bomber'}),/阳光/);
   assert.throws(()=>m.command(0,{type:'send',unit:'__proto__'}));
@@ -37,7 +35,7 @@ test('independent questions and typing: casting harms incoming enemies but never
 });
 test('ice and delayed melon are confined to the caster yard',()=>{
   for(const index of [1,2]){
-    const m=match();const [a,b]=m.games;a.auto=b.auto=false;a.setAim(450,280);
+    const m=match();m.waveIn=999;const [a,b]=m.games;a.auto=b.auto=false;a.setAim(450,280);
     a.spawn(450,280,'walker',false);b.spawn(450,280,'walker',false);
     for(const key of a.skills[index].code)m.command(0,{type:'key',key});
     if(index===1){assert.ok(a.freeze>0);assert.equal(b.freeze,0);}
@@ -123,15 +121,14 @@ test('a defender intercepting at the yard stops both bites and bomber damage to 
   }
 });
 
-test('opening armies match solo wave five count, fill every lane and advance faster',()=>{
-  const m=match({random:()=>.35},false);
-  for(const g of m.games){
-    assert.equal(g.enemies.length,25);
-    for(const y of [140,215,290,365,430])assert.equal(g.enemies.filter(z=>z.y===y).length,5);
-    assert.equal(g.enemies[0].speed,(23+2.3)*2.4);
-  }
-  assert.deepEqual(m.games[0].enemies.map(z=>[z.x,z.y]),m.games[1].enemies.map(z=>[z.x,z.y]));
-  ticks(m,1.25);assert.equal(m.players[0].sent,30);assert.equal(m.players[1].sent,30);
-  ticks(m,20);assert.equal(m.games[0].wave,2);
-  assert.ok(m.games.every(g=>g.enemies.length<=70));
+test('solo wave five pacing emits individual troops rather than an opening burst',()=>{
+  const m=match({random:()=>.35});
+  assert.ok(m.games.every(g=>g.enemies.length===0));
+  ticks(m,.6);assert.equal(m.players[0].sent,0);
+  ticks(m,.15);assert.equal(m.players[0].sent,1);assert.equal(m.players[1].sent,1);
+  assert.equal(m.games[0].enemies[0].speed,(23+2.3)*1.65);
+  ticks(m,1);assert.equal(m.players[0].sent,1);
+  ticks(m,.3);assert.equal(m.players[0].sent,2);
+  ticks(m,30);assert.equal(m.players[0].sent,25);assert.equal(m.players[1].sent,25);
+  assert.equal(m.games[0].wave,1);
 });
