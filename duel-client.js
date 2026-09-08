@@ -19,7 +19,7 @@ function drawDuelFlowers(c,field){
   if(ratio>0){
    c.strokeStyle='#36792d';c.lineWidth=5;c.beginPath();c.moveTo(0,15);c.lineTo(0,-4);c.stroke();
    c.fillStyle='#65b93d';c.beginPath();c.ellipse(-7,8,9,4,-.5,0,Math.PI*2);c.fill();
-   for(let p=0;p<Math.max(2,Math.ceil(ratio*10));p++){c.save();c.rotate(p/10*Math.PI*2);c.fillStyle=ratio<.4?'#cf9d3c':'#ffda42';c.beginPath();c.ellipse(0,-13,5,10,0,Math.PI*2);c.fill();c.restore();}
+   for(let p=0;p<Math.max(2,Math.ceil(ratio*10));p++){c.save();c.rotate(p/10*Math.PI*2);c.fillStyle=ratio<.4?'#cf9d3c':'#ffda42';c.beginPath();c.ellipse(0,-13,5,10,0,0,Math.PI*2);c.fill();c.restore();}
    c.fillStyle='#80532e';c.beginPath();c.arc(0,0,10,0,Math.PI*2);c.fill();c.fillStyle='#fff5b9';c.beginPath();c.arc(-3,-2,1.4,0,Math.PI*2);c.arc(3,-2,1.4,0,Math.PI*2);c.fill();
   }else{c.strokeStyle='#88754b';c.lineWidth=3;c.beginPath();c.moveTo(0,17);c.lineTo(2,10);c.stroke();}
   c.restore();
