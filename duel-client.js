@@ -225,13 +225,19 @@ function drawBattle(canvas,s) {
   if(mine.health<=0||other.health<=0){c.fillStyle='#993a26';c.font='bold 20px system-ui';c.textAlign='center';c.fillText(`${mine.health<=0?'我的':'对方'}后院告急 · ${Math.max(0,3-(mine.health<=0?mine.breach:other.breach)).toFixed(1)} 秒`,500,510);c.textAlign='left';}
 }
 async function boot(){
-  const code=new URLSearchParams(location.search).get('room');if(code)$('#roomCode').value=code.toUpperCase().slice(0,6);
+  const code=(new URLSearchParams(location.search).get('room')||'').trim().toUpperCase();
+  const invited=/^[A-F0-9]{6}$/.test(code);if(invited)$('#roomCode').value=code;
   try{
     const info=await request('/api/lan');if(!Array.isArray(info.addresses))throw new Error();addresses=info.addresses;stages=info.stages||[];dialogueStages=info.dialogueStages||[];updateLevels();
     const note=$('#networkNote');note.replaceChildren(document.createTextNode('手机或电脑打开：'));
     const url=addresses[0]||location.origin+'/duel.html';const a=document.createElement('a');a.href=url;a.textContent=url;note.append(a,document.createTextNode(' · 房主电脑保持运行。'));
     try{session=JSON.parse(sessionStorage.getItem(sessionKey));}catch{}
-    if(session?.code&&session?.token){await request(`/api/room/${session.code}/state`);attach();}
+    if(session?.code&&session?.token&&(!invited||session.code===code)){
+      try{await request(`/api/room/${session.code}/state`);attach();return;}
+      catch(error){if(error.status!==401)throw error;reset();}
+    }
+    if(invited){session=null;await enter(code);}
+
   }catch(e){
     if(e.status===401){reset();notice('上一个房间已过期，可以重新开房');return;}
     $('#networkNote').replaceChildren(document.createTextNode('此地址尚未启动局域网对战服务。请在房主电脑的游戏目录运行 '));const cmd=document.createElement('code');cmd.textContent='npm run lan';$('#networkNote').append(cmd,document.createTextNode('，然后打开终端显示的对战地址。'));$('#create').disabled=true;$('#join').disabled=true;
