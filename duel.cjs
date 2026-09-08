@@ -74,9 +74,14 @@ class DuelMatch {
     if(this.games)this.games[side].shooting=false;
   }
   begin() {
-    this.round++;this.status='playing';this.elapsed=0;this.waveIn=1;this.winner=null;this.reason='';
+    this.round++;this.status='playing';this.elapsed=0;this.waveIn=1.2;this.winner=null;this.reason='';
     this.games=[0,1].map(side=>{const g=new DuelGarden(side,{random:this.random});g.promptHistory=this.promptHistories[side];g.prepare(this.config.mode,this.config.level);return g;});
     this.players.forEach(p=>Object.assign(p,{sun:24,sent:0,dispatchCd:0,ready:false,offline:0}));
+    // Match solo wave five's 25-unit count, spread symmetrically over five lanes.
+    for(let row=0;row<5;row++)for(const lane of [140,215,290,365,430])for(const side of [0,1]){
+      this.send(side,'walker',false,lane);
+      this.games[1-side].enemies.at(-1).x=800+row*32;
+    }
   }
   end(winner,reason) {this.status='finished';this.winner=winner;this.reason=reason;this.players.forEach(p=>{if(p)p.ready=false;});}
   send(side,type,paid=false,laneY=null) {
@@ -87,7 +92,7 @@ class DuelMatch {
     const zombie=target.spawn(800,laneY,type,false);
     if(!zombie)return false;
     // Faster crossing keeps two-player rounds lively without changing solo rules.
-    zombie.speed*=1.65;this.players[side].sent++;
+    zombie.speed*=2.4;this.players[side].sent++;
     if(paid){this.players[side].sun-=UNITS[type].cost;this.players[side].dispatchCd=2;}
     return true;
   }
@@ -154,12 +159,12 @@ class DuelMatch {
       return;
     }
     this.elapsed+=dt;this.waveIn-=dt;
-    const wave=Math.min(8,1+Math.floor(this.elapsed/40));
+    const wave=Math.min(8,1+Math.floor(this.elapsed/20));
     this.games.forEach(g=>{g.wave=wave;});
     this.players.forEach(p=>{p.sun=Math.min(100,p.sun+dt*2);p.dispatchCd=Math.max(0,p.dispatchCd-dt);});
     if(this.waveIn<=0) {
-      const lane=[140,215,290,365,430][Math.floor(this.random()*5)];
-      this.send(0,'walker',false,lane);this.send(1,'walker',false,lane);this.waveIn=Math.max(1.8,4-(wave-1)*.3);
+      for(const lane of [140,215,290,365,430]){this.send(0,'walker',false,lane);this.send(1,'walker',false,lane);}
+      this.waveIn=Math.max(.6,1.2-(wave-1)*.08);
     }
     this.clash(dt);
     this.games.forEach(g=>g.update(dt));
