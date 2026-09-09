@@ -40,13 +40,15 @@
     new MutationObserver(syncHome).observe(document.body,{attributes:true,attributeFilter:['data-game-state']});
     requestAnimationFrame(syncHome);
     document.querySelector('.arsenal').prepend(document.getElementById('battleToast'));
+    const promptBoard=document.getElementById('skillGrid');
+    promptBoard.setAttribute('role','region');promptBoard.setAttribute('aria-label','单词提示看板');
     const cards=[...document.querySelectorAll('.skill-card')];
     const tabs=document.createElement('div');tabs.className='iphone-skill-tabs';tabs.setAttribute('aria-label','选择大招');
     let active=0;
     function show(index){active=index;cards.forEach((c,i)=>c.classList.toggle('iphone-visible',i===index));[...tabs.children].forEach((b,i)=>b.setAttribute('aria-pressed',String(i===index)));document.body.dataset.visibleSkill=String(index);document.dispatchEvent(new Event('gulu-visible-skill'));}
     ['🌈 激光','❄️ 冰冻','🍉 西瓜'].forEach((label,i)=>{const b=document.createElement('button');b.type='button';b.dataset.skill=String(i);b.textContent=label;b.onclick=()=>{show(i);cards[i].click();};tabs.append(b);});
-    document.getElementById('skillGrid').before(tabs);show(0);
-    new MutationObserver(()=>{const index=cards.findIndex(c=>c.classList.contains('selected'));if(index>=0&&index!==active)show(index);}).observe(document.getElementById('skillGrid'),{subtree:true,attributes:true,attributeFilter:['class']});
+    promptBoard.before(tabs);show(0);
+    new MutationObserver(()=>{const index=cards.findIndex(c=>c.classList.contains('selected'));if(index>=0&&index!==active)show(index);}).observe(promptBoard,{subtree:true,attributes:true,attributeFilter:['class']});
     document.getElementById('keyboardButton').setAttribute('aria-expanded','true');
     // Controls are already initialized by the game client.
 

@@ -76,14 +76,14 @@ body.native-iphone{height:100dvh;min-height:0;overflow:hidden!important;display:
 .native-iphone .iphone-skill-tabs button{flex:1;min-width:0;min-height:38px;padding:3px;border:1px solid var(--app-line);border-radius:12px;background:#fff;color:var(--app-muted);font-size:12px;font-weight:800}
 .native-iphone .iphone-skill-tabs button[aria-pressed=true]{border-color:var(--app-ink);background:var(--app-ink);color:#fff}
 .native-iphone .skill-grid{flex:1 1 auto;min-height:0;display:block;width:100%;overflow:hidden;padding:0}
-.native-iphone .skill-card{display:none;min-height:0;height:100%;max-height:none;min-width:0;padding:13px;border:1px solid var(--app-line);border-radius:15px;background:#fff;overflow:auto;gap:6px;box-sizing:border-box;box-shadow:none}
-.native-iphone .skill-card.iphone-visible{display:flex;width:100%;min-height:100%;max-width:none;grid-column:1/-1}
+.native-iphone .skill-card{display:none;min-height:0;height:100%;max-height:none;min-width:0;padding:13px;border:1px solid var(--app-line);border-radius:15px;background:#fff;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;gap:6px;box-sizing:border-box;box-shadow:none}
+.native-iphone .skill-card.iphone-visible{display:flex;width:100%;min-height:0;max-width:none;grid-column:1/-1}
 .native-iphone .skill-card.selected{border:2px solid var(--app-gold-deep);padding:12px;box-shadow:none}
 .native-iphone .skill-art{display:none}.native-iphone .skill-info{flex:none}.native-iphone .skill-info strong{font-size:16px;color:var(--app-ink)}
 .native-iphone .skill-info>span:not([hidden]){color:var(--app-muted)}
 .native-iphone .skill-info>.word-meaning:not([hidden]){font-size:14px;line-height:1.4}.native-iphone .word-ipa,.native-iphone .skill-info>.word-ipa:not([hidden]){color:#778b7b;font-size:12px}
 .native-iphone .skill-keys{flex:none;min-height:26px;max-height:62px;margin:0;padding:0}.native-iphone .skill-status{font-size:11px;line-height:14px;color:var(--app-muted);flex:none;margin-top:2px}
-.native-iphone #touchKeyboard{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:0;padding:4px 0 0;border:0;background:var(--app-paper)}
+.native-iphone #touchKeyboard{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:0;padding:4px 0 0;border:0;background:var(--app-paper);overflow:visible}
 .native-iphone #touchKeyboard .key-row{grid-column:1/-1;margin:0;gap:4px}.native-iphone #touchKeyboard .touch-key{min-height:40px;height:40px;max-width:none;margin:0;border:1px solid var(--app-line);border-bottom:2px solid #c4d1bd;border-radius:10px;background:#fff;color:var(--app-ink);font-size:16px}.native-iphone #touchKeyboard .touch-key.hint{background:#f8e0a0;border-color:#e4bd5d;color:#5e471a}.native-iphone #touchKeyboard .sentence-space{grid-column:1/-1;width:100%;min-width:0;font-size:13px}.native-iphone #touchKeyboard .word-punctuation{min-height:28px;height:28px;font-size:14px}
 .native-iphone .speech-control{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0;margin:0}.native-iphone #speechButton{grid-column:1/-1;grid-row:1;min-height:54px;border-radius:14px;background:var(--app-ink);color:#fff}.native-iphone #speechEnable,.native-iphone #speechExample,.native-iphone #speechSkip,.native-iphone #speechReview{min-height:38px;border-radius:12px;font-size:12px;padding:5px}.native-iphone #speechTranscript{grid-column:1/-1;font-size:11px;line-height:1.35;max-height:42px;overflow:auto;color:var(--app-muted)}
 
