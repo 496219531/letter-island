@@ -72,12 +72,12 @@ body.native-iphone{height:100dvh;min-height:0;overflow:hidden!important;display:
 .native-iphone .wave-progress{top:8px;right:8px;padding:4px 7px;border-radius:9px;background:#173629c9;color:#fff;font-size:9px}.native-iphone .wave-progress>div{display:none}
 .native-iphone .arsenal{min-height:0;padding:7px 7px 6px;display:flex;flex-direction:column;gap:6px;background:var(--app-paper);overflow:hidden}
 .native-iphone .arsenal-heading,.native-iphone .run-strip,.native-iphone .keyboard-toggle-row{display:none}
-.native-iphone .iphone-skill-tabs{display:flex;gap:6px;flex:none}
+.native-iphone .iphone-skill-tabs{display:flex;gap:6px;flex:0 0 auto}
 .native-iphone .iphone-skill-tabs button{flex:1;min-width:0;min-height:38px;padding:3px;border:1px solid var(--app-line);border-radius:12px;background:#fff;color:var(--app-muted);font-size:12px;font-weight:800}
 .native-iphone .iphone-skill-tabs button[aria-pressed=true]{border-color:var(--app-ink);background:var(--app-ink);color:#fff}
-.native-iphone .skill-grid{flex:1;min-height:0;display:block;overflow:hidden;padding:0}
+.native-iphone .skill-grid{flex:1 1 auto;min-height:0;display:block;width:100%;overflow:hidden;padding:0}
 .native-iphone .skill-card{display:none;min-height:0;height:100%;max-height:none;min-width:0;padding:13px;border:1px solid var(--app-line);border-radius:15px;background:#fff;overflow:auto;gap:6px;box-sizing:border-box;box-shadow:none}
-.native-iphone .skill-card.iphone-visible{display:flex}
+.native-iphone .skill-card.iphone-visible{display:flex;width:100%;min-height:100%;max-width:none;grid-column:1/-1}
 .native-iphone .skill-card.selected{border:2px solid var(--app-gold-deep);padding:12px;box-shadow:none}
 .native-iphone .skill-art{display:none}.native-iphone .skill-info{flex:none}.native-iphone .skill-info strong{font-size:16px;color:var(--app-ink)}
 .native-iphone .skill-info>span:not([hidden]){color:var(--app-muted)}
@@ -90,8 +90,8 @@ body.native-iphone{height:100dvh;min-height:0;overflow:hidden!important;display:
 /* Settings and library use the same sheet geometry as system apps. */
 .native-iphone #mobileSettingsDialog,.native-iphone .library-dialog,.native-iphone #gameDialog{width:calc(100vw - 24px);max-width:520px;max-height:calc(100dvh - 24px);padding:0;border:0;border-radius:24px;background:var(--app-paper);color:var(--app-text);box-shadow:0 18px 60px #10281950}
 .native-iphone #mobileSettingsDialog::backdrop,.native-iphone .library-dialog::backdrop,.native-iphone #gameDialog::backdrop{background:#10281972;backdrop-filter:blur(3px)}
-.native-iphone #gameDialog{inset:auto 0 0;width:100vw;max-width:none;max-height:82dvh;margin:0;border-radius:24px 24px 0 0;background:var(--app-paper);overflow:hidden}
-.native-iphone #gameDialog #dialogContent{max-height:calc(82dvh - 24px);overflow-y:auto;padding:22px 18px calc(18px + env(safe-area-inset-bottom));overscroll-behavior:contain}
+.native-iphone #gameDialog{inset:auto 0 0;width:100vw!important;min-width:100vw!important;max-width:100vw!important;height:auto!important;min-height:0!important;max-height:68dvh!important;margin:0!important;border-radius:24px 24px 0 0;background:var(--app-paper);overflow:hidden}
+.native-iphone #gameDialog #dialogContent{max-height:68dvh;overflow-y:auto;padding:22px 18px calc(18px + env(safe-area-inset-bottom));overscroll-behavior:contain}
 .native-iphone #gameDialog .dialog-close{top:12px;right:14px;width:36px;height:36px;border-radius:12px;background:#fff;color:var(--app-ink);border:1px solid var(--app-line)}
 .native-iphone .mobile-settings-header,.native-iphone .library-dialog header{padding:16px 18px;border-bottom:1px solid var(--app-line);background:#fff}.native-iphone .mobile-settings-header strong,.native-iphone .library-dialog h2{font-size:18px;color:var(--app-ink)}
 .native-iphone #mobileSettingsDialog .difficulty-controls{padding:14px;background:var(--app-paper);gap:14px}.native-iphone #mobileSettingsDialog button,.native-iphone .library-dialog button{min-height:42px;border-radius:12px}.native-iphone .library-dialog{height:calc(100dvh - 24px)}.native-iphone .library-body{padding:14px}.native-iphone .library-dialog input,.native-iphone .library-dialog textarea,.native-iphone .library-dialog select{border-color:var(--app-line);background:#fff;color:var(--app-text);border-radius:12px}.native-iphone .library-entry,.native-iphone .library-group{border-color:var(--app-line);background:#fff;border-radius:14px}.native-iphone .library-dialog button{background:var(--app-ink);border-color:var(--app-ink);color:#fff}
