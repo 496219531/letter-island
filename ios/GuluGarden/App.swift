@@ -84,6 +84,35 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     @objc func background() { cancel(); web.evaluateJavaScript("window.dispatchEvent(new Event('blur')); document.dispatchEvent(new Event('gulu-background'))") }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--keyboard-qa") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                self.web.evaluateJavaScript("document.querySelector('#difficulty').value='sentences';begin(true);updateTypingControls();game.update=()=>{};updateHud(true);") { _, error in
+                    guard error == nil else { return }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                        self.web.evaluateJavaScript("""
+                        (()=>{
+                          const rect=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};
+                          const keyboard=document.querySelector('#touchKeyboard'),board=document.querySelector('.skill-card.iphone-visible');
+                          const keys=[...keyboard.querySelectorAll('button')].filter(e=>e.getClientRects().length).map(e=>({key:e.dataset.key,...rect(e)}));
+                          const within=r=>r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth;
+                          const original=rect(keyboard),before=window.scrollY;
+                          const probe=document.createElement('div');probe.style.cssText='height:1200px;flex:none';board.append(probe);
+                          board.scrollTop=board.scrollHeight;
+                          const after=rect(keyboard);
+                          const scrollWorks=board.scrollTop>0;probe.remove();board.scrollTop=0;
+                          const skill=game.skills[0];game.select(0);const first=spellKeysMarkup(skill,true);for(const char of skill.code.slice(0,6))game.input(char);updateHud(true);
+                          const follows=skill.typed===6&&spellKeysMarkup(skill,true)!==first&&!!document.querySelector('#skillKeys0 .next');
+                          return JSON.stringify({mode:game.learningMode,viewport:{width:innerWidth,height:innerHeight},keyboard:original,board:rect(board),keys,allKeysVisible:keys.length>=30&&keys.every(within),keyboardInsideArsenal:original.bottom<=document.querySelector('.arsenal').getBoundingClientRect().bottom,boardFillsGap:Math.abs(rect(board).bottom-original.top)<=8,scrollWorks,follows,keyboardStationary:original.top===after.top&&window.scrollY===before,errors:window.guluErrors});
+                        })()
+                        """) { result, error in
+                            let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("keyboard-qa.json")
+                            try? String(describing: result ?? error as Any).write(to: url, atomically: true, encoding: .utf8)
+                        }
+                    }
+                }
+            }
+            return
+        }
         if let flag = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--layout-qa=") }) {
             let mode = String(flag.dropFirst("--layout-qa=".count))
             guard ["english", "sentences", "speaking", "ready", "settings", "settings-check", "battle", "home-check", "colors-check", "settings-focus", "speech-target-check", "ending-check", "review-check", "diff-preview", "audio-check", "library-editor", "library-check"].contains(mode) else { return }
