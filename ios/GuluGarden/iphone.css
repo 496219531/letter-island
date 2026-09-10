@@ -1,4 +1,4 @@
-/* Native iPhone design system: one calm surface, one primary action, and 44pt controls. */
+/* Native iPhone design system. WKWebView supplies the native safe-area bounds. */
 :root{--app-ink:#173629;--app-ink-2:#224635;--app-paper:#f7f5ec;--app-mist:#e6eddf;--app-line:#d7e0cf;--app-leaf:#4d7d58;--app-gold:#efc968;--app-gold-deep:#dcae43;--app-text:#173629;--app-muted:#738173;--app-radius:18px}
 html:has(.native-iphone){height:100%;overflow:hidden;background:var(--app-paper)}
 body.native-iphone{height:100dvh;min-height:0;overflow:hidden!important;display:flex;flex-direction:column;background:var(--app-paper);color:var(--app-text);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",system-ui,sans-serif}
@@ -104,3 +104,7 @@ body.native-iphone #touchKeyboard>.word-punctuation{width:100%;justify-self:stre
 .native-iphone #mobileSettingsDialog .difficulty-controls{padding:14px;background:var(--app-paper);gap:14px}.native-iphone #mobileSettingsDialog button,.native-iphone .library-dialog button{min-height:42px;border-radius:12px}.native-iphone .library-dialog{height:calc(100dvh - 24px)}.native-iphone .library-body{padding:14px}.native-iphone .library-dialog input,.native-iphone .library-dialog textarea,.native-iphone .library-dialog select{border-color:var(--app-line);background:#fff;color:var(--app-text);border-radius:12px}.native-iphone .library-entry,.native-iphone .library-group{border-color:var(--app-line);background:#fff;border-radius:14px}.native-iphone .library-dialog button{background:var(--app-ink);border-color:var(--app-ink);color:#fff}
 
 @media(max-height:650px){.native-iphone .topbar{flex-basis:50px;min-height:50px;height:50px!important}.native-iphone .start-panel{padding:17px 18px}.native-iphone .start-panel h2{font-size:24px}.native-iphone .native-home-mode{margin:12px 0 9px}.native-iphone .game-frame{grid-template-rows:44px minmax(110px,24dvh) minmax(0,1fr)}.native-iphone #touchKeyboard .touch-key{height:34px;min-height:34px}.native-iphone #touchKeyboard .word-punctuation{height:24px;min-height:24px}.native-iphone .iphone-skill-tabs button{min-height:32px}.native-iphone .skill-card{padding:10px}}
+/* Size from measured controls, not a per-model viewport preset. */
+body.native-iphone:not([data-game-state=ready]) .game-frame{grid-template-rows:auto var(--native-field-height,24dvh) minmax(0,1fr);height:100%;min-height:0}
+body.native-iphone:not([data-game-state=ready]) .battlefield{min-height:0;height:auto}
+body.native-iphone .skill-card .skill-info,body.native-iphone .skill-card .skill-keys{overflow-wrap:anywhere}

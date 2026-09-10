@@ -53,6 +53,32 @@
     // Controls are already initialized by the game client.
 
     const sheet=document.createElement('link');sheet.rel='stylesheet';sheet.href='iphone.css';document.head.append(sheet);
+    // WKWebView already occupies the native safe area. Budget its actual size,
+    // including every visible input row, before giving space to the battlefield.
+    const frame=document.querySelector('.game-frame'),arsenal=document.querySelector('.arsenal');
+    let layoutFrame=0;
+    function fitLayout(){
+      layoutFrame=0;
+      if(document.body.dataset.gameState==='ready')return;
+      const css=getComputedStyle(arsenal),gap=parseFloat(css.rowGap)||0;
+      const visible=[...arsenal.children].filter(e=>e.getClientRects().length&&getComputedStyle(e).display!=='none');
+      const fixed=visible.filter(e=>e!==promptBoard).reduce((sum,e)=>{
+        const style=getComputedStyle(e);return sum+e.getBoundingClientRect().height+(parseFloat(style.marginTop)||0)+(parseFloat(style.marginBottom)||0);
+      },0)+(parseFloat(css.paddingTop)||0)+(parseFloat(css.paddingBottom)||0)+(parseFloat(css.borderTopWidth)||0)+Math.max(0,visible.length-1)*gap;
+      const height=frame.clientHeight,toolbar=document.querySelector('.game-toolbar').getBoundingClientRect().height;
+      const available=Math.max(0,height-toolbar-fixed);
+      const boardMinimum=Math.min(120,available*.48);
+      const field=Math.max(0,Math.min(height*.29,available-boardMinimum));
+      const value=field.toFixed(2)+'px';
+      if(frame.style.getPropertyValue('--native-field-height')!==value)frame.style.setProperty('--native-field-height',value);
+    }
+    function scheduleLayout(){if(!layoutFrame)layoutFrame=requestAnimationFrame(fitLayout);}
+    const sizes=new ResizeObserver(scheduleLayout);sizes.observe(frame);
+    for(const element of arsenal.children)if(element!==promptBoard)sizes.observe(element);
+    sizes.observe(document.querySelector('.game-toolbar'));
+    new MutationObserver(scheduleLayout).observe(document.body,{attributes:true,attributeFilter:['data-game-state','data-learning-mode']});
+    window.addEventListener('resize',scheduleLayout);window.visualViewport?.addEventListener('resize',scheduleLayout);
+    sheet.addEventListener('load',scheduleLayout);scheduleLayout();
     document.addEventListener('gulu-background',()=>{if(typeof stopListening==='function')stopListening();if(typeof game!=='undefined'&&game.status==='playing')game.pause();});
   });
 })();
