@@ -21,7 +21,7 @@
     return {start,release,cancel,get held(){return held;},get phase(){return phase;}};
   }
   function keySkillHints(skills,typing,mode){
-    const hints={};if(mode==='speaking')return hints;
+    const hints={};if(mode==='speaking'||typing>=0)return hints;
     skills.forEach((skill,index)=>{
       if(skill.cd>0||(typing>=0&&typing!==index))return;
       const key=skill.code[typing>=0?skill.typed:0];

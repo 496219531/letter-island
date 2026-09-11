@@ -7,6 +7,10 @@ const captainSprite=new Image();captainSprite.src='assets/pea-captain-v1.png';
 const particles = [];
 const MAX_PARTICLES=260;
 const soundscape=new GardenAudio(()=>new (window.AudioContext||window.webkitAudioContext)());
+function resumeGameAudio(){try{soundscape.init();}catch{}}
+document.addEventListener('pointerdown',resumeGameAudio,{passive:true});
+document.addEventListener('keydown',resumeGameAudio);
+document.addEventListener('gulu-audio-ready',resumeGameAudio);
 try{const volume=localStorage.getItem('gulu-sfx-volume-v2');if(volume!==null)soundscape.setVolume(Number(volume));}catch{}
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let soundOn = true, best = 0, lastTime = 0, lastHud = '', hudClock = 0;

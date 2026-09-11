@@ -80,8 +80,19 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         NSLayoutConstraint.activate([web.leadingAnchor.constraint(equalTo: view.leadingAnchor), web.trailingAnchor.constraint(equalTo: view.trailingAnchor), web.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), web.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)])
         web.load(URLRequest(url: URL(string: "gulu://game/index.html")!))
         NotificationCenter.default.addObserver(self, selector: #selector(background), name: UIApplication.willResignActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(restoreGameAudio), name: UIApplication.didBecomeActiveNotification, object: nil)
+        restoreGameAudio()
     }
-    @objc func background() { cancel(); web.evaluateJavaScript("window.dispatchEvent(new Event('blur')); document.dispatchEvent(new Event('gulu-background'))") }
+    @objc func restoreGameAudio() {
+        guard activeID == 0 else { return }
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try session.setActive(true)
+            web?.evaluateJavaScript("document.dispatchEvent(new Event('gulu-audio-ready'))")
+        } catch { NSLog("Game audio restoration failed: %@", error.localizedDescription) }
+    }
+    @objc func background() { cancel(restorePlayback: false); web.evaluateJavaScript("window.dispatchEvent(new Event('blur')); document.dispatchEvent(new Event('gulu-background'))") }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--keyboard-qa") {
@@ -225,7 +236,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         }
     }
     func start(_ id: Int) {
-        cancel(); player?.stop(); activeID = id
+        cancel(restorePlayback: false); player?.stop(); activeID = id
         guard SFSpeechRecognizer.authorizationStatus() == .authorized, AVAudioSession.sharedInstance().recordPermission == .granted else { fail(id, "请先允许麦克风和语音识别权限"); return }
         guard let recognizer = recognizer, recognizer.isAvailable else { fail(id, "系统英语语音识别当前不可用"); return }
         do {
@@ -257,7 +268,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         } catch { fail(id, error.localizedDescription) }
     }
     func stopAudio() { engine.stop(); if tapped { engine.inputNode.removeTap(onBus: 0); tapped = false }; audioFile = nil }
-    func cancel() { activeID = 0; audioID = nil; timeout?.cancel(); timeout = nil; stopAudio(); request?.endAudio(); task?.cancel(); task = nil; request = nil; try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }
+    func cancel(restorePlayback: Bool = true) { activeID = 0; audioID = nil; timeout?.cancel(); timeout = nil; stopAudio(); request?.endAudio(); task?.cancel(); task = nil; request = nil; try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation); if restorePlayback && UIApplication.shared.applicationState == .active { restoreGameAudio() } }
     func fail(_ id: Int, _ text: String) { stopAudio(); send(["type":"error", "id":id, "error":text, "audioId":audioID ?? ""]); cancel() }
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = action.request.url else { decisionHandler(.cancel); return }

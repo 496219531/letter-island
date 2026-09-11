@@ -30,3 +30,9 @@ a.setEnabled(false);a.setRecording(true);a.setRecording(false);assert.equal(a.en
 a.setEnabled(true);a.setVolume(0);a.setRecording(true);a.setRecording(false);assert.equal(a.master.gain.value,0);
 const cold=new GardenAudio(()=>fake);cold.setRecording(true);cold.init();assert.equal(cold.master.gain.value,.6*.65*.15);cold.setRecording(false);assert.equal(cold.master.gain.value,.6*.65);
 console.log('PASS recording ducking, lazy initialization, volume changes and mute preservation');
+let resumed=0;fake.resume=()=>{resumed++;return Promise.resolve();};
+fake.state='interrupted';cold.init();assert.equal(resumed,1);
+fake.state='suspended';cold.init();assert.equal(resumed,2);
+cold.setEnabled(false);cold.init();assert.equal(resumed,2,'muted audio must remain muted after an interruption');
+fake.state='running';
+console.log('PASS interrupted and suspended audio recovery respects mute');

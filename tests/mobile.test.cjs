@@ -27,11 +27,13 @@ test('permission failure clears recording and allows retry',()=>{
  const s=setup();s.mic.start({index:0});s.r.onerror({error:'not-allowed'});assert.equal(s.mic.phase,'idle');assert.match(s.errors[0],/权限/);s.mic.start({index:1});assert.equal(s.mic.phase,'preparing');s.mic.cancel();
 });
 
-test('skill hints retain ownership through selection, cooldown and punctuation',()=>{
+test('skill hints appear only before selection and return after input ends',()=>{
  const {keySkillHints}=require('../mobile.js');
  const skills=[{code:'APPLE',typed:0,cd:0},{code:'ICE CREAM',typed:0,cd:0},{code:'MELON',typed:0,cd:0}];
  assert.deepEqual(keySkillHints(skills,-1,'english'),{A:0,I:1,M:2});
- skills[1].typed=3;assert.deepEqual(keySkillHints(skills,1,'english'),{' ':1});
+ assert.deepEqual(keySkillHints(skills,1,'english'),{});
+ skills[1].typed=3;assert.deepEqual(keySkillHints(skills,1,'english'),{});
+ assert.deepEqual(keySkillHints(skills,-1,'english'),{A:0,I:1,M:2});
  skills[1].cd=2;assert.deepEqual(keySkillHints(skills,-1,'english'),{A:0,M:2});
  skills[2].code='APRICOT';assert.deepEqual(keySkillHints(skills,-1,'english'),{A:0});
  assert.deepEqual(keySkillHints(skills,-1,'speaking'),{});

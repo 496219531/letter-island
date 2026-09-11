@@ -84,7 +84,7 @@
         if(this.compressor.knee)this.compressor.knee.value=18;if(this.compressor.attack)this.compressor.attack.value=.004;if(this.compressor.release)this.compressor.release.value=.12;
         this.master.connect(this.compressor);this.compressor.connect(c.destination);
       }
-      if(this.context.state==='suspended')this.context.resume().catch(()=>{});return true;
+      if(['suspended','interrupted'].includes(this.context.state))this.context.resume().catch(()=>{});return true;
     }
     start(buffer,volume,pan=0,kind='ui'){
       if(this.voices.size>=32)return false;
