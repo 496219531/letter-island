@@ -108,3 +108,59 @@ body.native-iphone #touchKeyboard>.word-punctuation{width:100%;justify-self:stre
 body.native-iphone:not([data-game-state=ready]) .game-frame{grid-template-rows:auto var(--native-field-height,24dvh) minmax(0,1fr);height:100%;min-height:0}
 body.native-iphone:not([data-game-state=ready]) .battlefield{min-height:0;height:auto}
 body.native-iphone .skill-card .skill-info,body.native-iphone .skill-card .skill-keys{overflow-wrap:anywhere}
+.native-iphone .landscape-center{display:contents}
+.native-iphone .landscape-settings{display:none}
+.native-iphone .landscape-choice{display:flex;flex-direction:column;gap:8px;color:var(--app-ink)}
+.native-iphone .landscape-choice select{min-height:44px;width:100%;font-size:16px}
+@media(orientation:landscape){
+ body.native-iphone{overflow:hidden!important}
+ body.native-iphone:not([data-game-state=ready]) .topbar{display:none!important}
+ body.native-iphone:not([data-game-state=ready]) .game-shell{padding:4px;min-height:0}
+ body.native-iphone:not([data-game-state=ready]) .game-frame{position:relative;gap:4px;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);grid-template-rows:36px minmax(0,1fr);background:#173629 url('assets/garden.png') center/cover;border-radius:14px}
+ body.native-iphone .game-toolbar{grid-row:1;grid-column:1/-1;height:36px;min-height:36px;padding:0 8px;gap:8px}
+ body.native-iphone .game-toolbar .landscape-settings{display:block;width:32px;height:32px;min-height:32px;background:#ffffff22;border:1px solid #ffffff50;border-radius:9px;color:#fff}
+ body.native-iphone:not([data-game-state=ready]) .battlefield{grid-row:2;grid-column:1;height:auto;min-height:0}
+ body.native-iphone .arsenal{grid-row:2;grid-column:2;min-height:0;padding:4px;gap:4px;border:0;background:#17362945}
+ body.native-iphone .iphone-skill-tabs{gap:4px}
+ body.native-iphone .iphone-skill-tabs button{height:30px;min-height:30px;font-size:11px;padding:2px}
+ body.native-iphone #skillGrid{flex:1 1 0;min-height:0;height:0}
+ body.native-iphone #skillGrid .skill-card{padding:6px;gap:3px;background:#173629aa!important;border:1px solid #ffefc080;box-shadow:none;backdrop-filter:none}
+ body.native-iphone #skillGrid .skill-info{flex-shrink:0;max-height:none}
+ body.native-iphone #skillGrid .skill-info strong{font-size:13px;line-height:1.3;color:#fff1bd}
+ body.native-iphone #skillGrid .word-meaning{font-size:12px;line-height:1.3;color:#fff1bd}
+ body.native-iphone #skillGrid .word-ipa{font-size:10px;color:#deead2}
+ body.native-iphone #skillGrid .skill-status{font-size:10px;color:#deead2}
+ body.native-iphone #skillGrid .skill-keys{max-height:none;height:auto;min-height:24px}
+ body.native-iphone #skillGrid .skill-keys kbd{height:22px;min-width:15px;font-size:14px;line-height:1}
+ body.native-iphone #touchKeyboard{display:block;flex:none;height:auto;max-height:none;padding:0;background:transparent}
+ body.native-iphone .landscape-key-bank{display:flex;flex-direction:column;gap:4px}
+ body.native-iphone .landscape-key-row{display:flex;gap:3px;justify-content:center;min-width:0}
+ body.native-iphone #touchKeyboard .touch-key{width:0;max-width:none;min-width:0;flex:1 1 0;height:32px;min-height:32px;border:1px solid #e5efcf80;border-radius:7px;background:#183c2a88;color:#fff;font-size:14px;padding:0;box-shadow:none}
+ body.native-iphone #touchKeyboard .sentence-space{flex:2.5 1 0;font-size:12px}
+ body.native-iphone #touchKeyboard .word-punctuation{height:32px;min-height:32px;width:0;flex:1 1 0}
+ body.native-iphone #touchKeyboard .hint{background:var(--skill-color)!important;color:#152b24}
+ body.native-iphone #speechControl{gap:3px}
+ body.native-iphone #speechButton{min-height:38px;font-size:12px}
+ body.native-iphone #speechEnable,body.native-iphone #speechSkip,body.native-iphone #speechReview,body.native-iphone #speechExample{min-height:28px;font-size:10px}
+ body.native-iphone #speechTranscript{font-size:10px;max-height:26px}
+ body.native-iphone #battleToast{max-height:24px;overflow:auto;font-size:10px;position:static;transform:none;flex:none}
+ body.native-iphone[data-landscape-layout=split]:not([data-game-state=ready]) .game-frame{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);grid-template-rows:36px minmax(75px,1fr) minmax(140px,43%);gap:5px}
+ body.native-iphone[data-landscape-layout=split]:not([data-game-state=ready]) .battlefield{grid-column:1/-1;grid-row:2}
+ body.native-iphone[data-landscape-layout=split] .arsenal{display:contents}
+ body.native-iphone[data-landscape-layout=split] .landscape-center{grid-column:2;grid-row:3;display:flex;flex-direction:column;gap:4px;min-height:0;padding-bottom:4px}
+ body.native-iphone[data-landscape-layout=split] #touchKeyboard:not([hidden]){display:contents}
+ body.native-iphone[data-landscape-layout=split] .left-bank{grid-column:1;grid-row:3;padding:0 0 4px 5px}
+ body.native-iphone[data-landscape-layout=split] .right-bank{grid-column:3;grid-row:3;padding:0 5px 4px 0}
+ body.native-iphone[data-landscape-layout=split] .landscape-key-row{flex:1;min-height:0}
+ body.native-iphone[data-landscape-layout=split] #touchKeyboard .touch-key{height:100%;min-height:28px}
+ body.native-iphone[data-landscape-layout=split] #battleToast{position:absolute;top:40px;left:10px;right:10px;z-index:5;width:auto;max-height:24px;pointer-events:none}
+ body.native-iphone[data-landscape-layout=split][data-learning-mode=speaking] .landscape-center{grid-column:1/-1;flex-direction:row;padding:4px;align-items:stretch}
+ body.native-iphone[data-landscape-layout=split][data-learning-mode=speaking] .iphone-skill-tabs{flex-direction:column;flex:0 0 85px}
+ body.native-iphone[data-landscape-layout=split][data-learning-mode=speaking] #skillGrid{height:auto;flex:1}
+ body.native-iphone[data-landscape-layout=split][data-learning-mode=speaking] #speechControl{flex:0 0 40%}
+ body.native-iphone[data-game-state=ready] .game-frame{display:block}
+ body.native-iphone[data-game-state=ready] .battlefield{height:100%}
+ body.native-iphone[data-game-state=ready] .start-screen{display:block;overflow:auto}
+ body.native-iphone[data-game-state=ready] .start-panel{margin-left:auto;width:55%;min-height:100%;transform:none}
+ body.native-iphone[data-game-state=ready] .arsenal{display:none}
+}

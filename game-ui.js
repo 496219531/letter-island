@@ -34,7 +34,7 @@
   function fit(){
     const width=stage.clientWidth,height=stage.clientHeight;
     if(width<=0||height<=0)return;
-    const fillPhoneDuel=!solo&&Boolean(window.GuluMobile?.active);
+    const fillPhoneDuel=(!solo&&Boolean(window.GuluMobile?.active))||(document.body.classList.contains('native-iphone')&&window.matchMedia('(orientation: landscape)').matches);
     const scale=Math.min(width/1000,height/530);
     const w=fillPhoneDuel?width:1000*scale,h=fillPhoneDuel?height:530*scale;
     stage.style.setProperty('--scene-width',w+'px');stage.style.setProperty('--scene-height',h+'px');

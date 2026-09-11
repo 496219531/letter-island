@@ -42,7 +42,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     var player: AVAudioPlayer?
     var tapped = false
     var timeout: DispatchWorkItem?
-    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .allButUpsideDown }
     override func viewDidLoad() {
         super.viewDidLoad()
         if !UserDefaults.standard.bool(forKey:"qwen37ModelDefault") {
@@ -77,7 +77,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         web.scrollView.contentInsetAdjustmentBehavior = .never
         web.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(web)
-        NSLayoutConstraint.activate([web.leadingAnchor.constraint(equalTo: view.leadingAnchor), web.trailingAnchor.constraint(equalTo: view.trailingAnchor), web.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), web.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)])
+        NSLayoutConstraint.activate([web.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor), web.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor), web.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), web.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)])
         web.load(URLRequest(url: URL(string: "gulu://game/index.html")!))
         NotificationCenter.default.addObserver(self, selector: #selector(background), name: UIApplication.willResignActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(restoreGameAudio), name: UIApplication.didBecomeActiveNotification, object: nil)
@@ -96,7 +96,18 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--keyboard-qa") {
+            if ProcessInfo.processInfo.arguments.contains("--landscape-qa") {
+                setNeedsUpdateOfSupportedInterfaceOrientations()
+                view.window?.windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeLeft))
+            } else {
+                setNeedsUpdateOfSupportedInterfaceOrientations()
+                view.window?.windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                if ProcessInfo.processInfo.arguments.contains("--landscape-qa") {
+                    let choice = ProcessInfo.processInfo.arguments.contains("--split-qa") ? "split" : "sidebar"
+                    self.web.evaluateJavaScript("const choice=document.querySelector('#landscapeLayout');choice.value='\(choice)';choice.dispatchEvent(new Event('change'));")
+                }
                 self.web.evaluateJavaScript("document.querySelector('#difficulty').value='sentences';begin(true);updateTypingControls();game.update=()=>{};updateHud(true);") { _, error in
                     guard error == nil else { return }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
@@ -113,11 +124,18 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
                           const scrollWorks=board.scrollTop>0;probe.remove();board.scrollTop=0;
                           const skill=game.skills[0];game.select(0);const first=spellKeysMarkup(skill,true);for(const char of skill.code.slice(0,6))game.input(char);updateHud(true);
                           const follows=skill.typed===6&&spellKeysMarkup(skill,true)!==first&&!!document.querySelector('#skillKeys0 .next');
-                          return JSON.stringify({mode:game.learningMode,viewport:{width:innerWidth,height:innerHeight},keyboard:original,board:rect(board),keys,allKeysVisible:keys.length>=30&&keys.every(within),keyboardInsideArsenal:original.bottom<=document.querySelector('.arsenal').getBoundingClientRect().bottom,boardFillsGap:Math.abs(rect(board).bottom-original.top)<=8,scrollWorks,follows,keyboardStationary:original.top===after.top&&window.scrollY===before,errors:window.guluErrors});
+                          const choice=document.querySelector('#landscapeLayout'),saved=choice.value;
+                          choice.value=saved==='split'?'sidebar':'split';choice.dispatchEvent(new Event('change'));choice.value=saved;choice.dispatchEvent(new Event('change'));
+                          const letterButtons=[...keyboard.querySelectorAll('button[data-key]')].filter(b=>/^[A-Z]$/.test(b.dataset.key));
+                          const switching=skill.typed===6&&letterButtons.length===26&&new Set(letterButtons.map(b=>b.dataset.key)).size===26&&document.querySelector('#sentenceSpace').textContent.includes('空格');
+                          return JSON.stringify({mode:game.learningMode,layout:document.body.dataset.landscapeLayout,switching,viewport:{width:innerWidth,height:innerHeight},keyboard:original,board:rect(board),keys,allKeysVisible:keys.length>=30&&keys.every(within),keyboardInsideArsenal:original.bottom<=document.querySelector('.arsenal').getBoundingClientRect().bottom,boardFillsGap:Math.abs(rect(board).bottom-original.top)<=8,scrollWorks,follows,keyboardStationary:original.top===after.top&&window.scrollY===before,errors:window.guluErrors});
                         })()
                         """) { result, error in
                             let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("keyboard-qa.json")
                             try? String(describing: result ?? error as Any).write(to: url, atomically: true, encoding: .utf8)
+                            self.web.takeSnapshot(with: nil) { image, _ in
+                                try? image?.pngData()?.write(to: url.deletingLastPathComponent().appendingPathComponent("keyboard-qa.png"))
+                            }
                         }
                     }
                 }
