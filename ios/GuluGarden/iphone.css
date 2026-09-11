@@ -145,7 +145,16 @@ body.native-iphone .skill-card .skill-info,body.native-iphone .skill-card .skill
  body.native-iphone #speechTranscript{font-size:10px;max-height:26px}
  body.native-iphone #battleToast{max-height:24px;overflow:auto;font-size:10px;position:static;transform:none;flex:none}
  body.native-iphone[data-landscape-layout=split]:not([data-game-state=ready]) .game-frame{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);grid-template-rows:36px minmax(75px,1fr) minmax(140px,43%);gap:5px}
- body.native-iphone[data-landscape-layout=split]:not([data-game-state=ready]) .battlefield{grid-column:1/-1;grid-row:2}
+ body.native-iphone[data-landscape-layout=split]:not([data-game-state=ready]) .battlefield{position:absolute;inset:0;z-index:0;width:100%;height:100%;grid-column:auto;grid-row:auto}
+ body.native-iphone[data-landscape-layout=split] .game-toolbar{position:relative;z-index:3;background:#17362980}
+ body.native-iphone[data-landscape-layout=split] .landscape-center,body.native-iphone[data-landscape-layout=split] .landscape-key-bank{position:relative;z-index:2;pointer-events:none}
+ body.native-iphone[data-landscape-layout=split] .landscape-center button,body.native-iphone[data-landscape-layout=split] .landscape-key-bank button,body.native-iphone[data-landscape-layout=split] #skillGrid{pointer-events:auto}
+ body.native-iphone[data-landscape-layout=split] #skillGrid .skill-card{background:#17362959!important;border-color:#fff1bd66;text-shadow:0 1px 3px #0009}
+ body.native-iphone[data-landscape-layout=split] #touchKeyboard .touch-key{background:#17362940;border-color:#fff1bd80;text-shadow:0 1px 3px #000a}
+ body.native-iphone[data-landscape-layout=split] .iphone-skill-tabs button{background:#17362966!important;color:#fff;border-width:1px;box-shadow:none}
+ body.native-iphone[data-landscape-layout=split] .iphone-skill-tabs button[aria-pressed=true]{background:#b18b3566!important;border-color:#ffe08c}
+ body.native-iphone[data-landscape-layout=split] .field-bottom{top:44px;bottom:auto;left:auto;right:8px}
+ body.native-iphone[data-landscape-layout=split] .field-badge,body.native-iphone[data-landscape-layout=split] .wave-progress{display:none}
  body.native-iphone[data-landscape-layout=split] .arsenal{display:contents}
  body.native-iphone[data-landscape-layout=split] .landscape-center{grid-column:2;grid-row:3;display:flex;flex-direction:column;gap:4px;min-height:0;padding-bottom:4px}
  body.native-iphone[data-landscape-layout=split] #touchKeyboard:not([hidden]){display:contents}
