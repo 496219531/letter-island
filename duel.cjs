@@ -99,9 +99,12 @@ class DuelMatch {
       for(const z of army){
         z.engaged=false;z.duelTarget=null;
         if(this.games[index].freeze<=0)z.duelBiteIn=Math.max(0,(z.duelBiteIn||0)-dt);
-        const opponents=armies[1-index].filter(other=>Math.abs(z.y-other.y)<35&&Math.abs(z.x-(1000-other.x))<=z.radius+other.radius+5);
-        if(!opponents.length)continue;
-        const target=opponents.reduce((a,b)=>Math.abs(z.x-(1000-a.x))<Math.abs(z.x-(1000-b.x))?a:b);
+        let target=null,nearest=Infinity;
+        for(const other of armies[1-index]){
+          const distance=Math.abs(z.x-(1000-other.x));
+          if(Math.abs(z.y-other.y)<35&&distance<=z.radius+other.radius+5&&distance<=nearest){target=other;nearest=distance;}
+        }
+        if(!target)continue;
         z.engaged=true;z.duelTarget=target.id;
         if(this.games[index].freeze<=0&&z.duelBiteIn<=0){
           const scale=Math.pow(1.19,this.games[index].wave-1);
@@ -169,8 +172,8 @@ class DuelMatch {
     const lost=this.games.map((g,i)=>g.status==='lost'?i:-1).filter(i=>i>=0);
     if(lost.length)this.end(lost.length===2?null:1-lost[0],lost.length===2?'双方后院同时被攻破':'对方后院已被攻破');
   }
-  snapshot(side) {
-    const fields=this.games?.map(g=>({health:g.health,maxHealth:g.maxHealth,flowers:g.flowerHealth,breach:g.breachElapsed,
+  snapshot(side,sharedFields) {
+    const fields=sharedFields??this.games?.map(g=>({health:g.health,maxHealth:g.maxHealth,flowers:g.flowerHealth,breach:g.breachElapsed,
       enemies:g.enemies.map(z=>({id:z.id,owner:z.owner,type:z.type,x:z.x,y:z.y,hp:z.hp,maxHp:z.maxHp,shield:z.shield,gait:z.gait,hit:z.hit,engaged:!!z.engaged})),
       bullets:g.bullets.map(b=>({x:b.x,y:b.y})),effects:g.effects.map(e=>({...e})),freeze:g.freeze,shotKick:g.shotKick,hero:g.hero,target:g.target(),kills:g.kills,casts:g.casts}));
     const own=this.games?.[side];

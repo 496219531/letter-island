@@ -32,10 +32,17 @@ export function createLanServer(tlsOptions=null) {
     else broadcast(room);
   }
   function broadcast(room) {
+    let fields;
     room.streams.forEach((res,side)=>{
       if(!res||res.destroyed)return;
       if(res.writableLength>256000){res.destroy();return;}
-      res.write(`data: ${JSON.stringify({code:room.code,...room.match.snapshot(side)})}\n\n`);
+      const snapshot=room.match.snapshot(side,fields);fields=snapshot.fields;
+      const data=JSON.stringify({code:room.code,...snapshot});
+      // Keep unchanged rooms alive without retransmitting their full state.
+      const now=Date.now();
+      if(res.lastRoomData===data){if(now-(res.lastRoomSent||0)>15000){res.write(': heartbeat\n\n');res.lastRoomSent=now;}return;}
+      res.lastRoomData=data;res.lastRoomSent=now;
+      res.write(`data: ${data}\n\n`);
     });
   }
   const handler=async(req,res)=>{

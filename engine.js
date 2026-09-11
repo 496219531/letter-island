@@ -233,7 +233,8 @@
       if(this.stack('poison')){z.poison=8*this.stack('poison');z.poisonTime=4;}
       if(this.stack('frost')){z.chill=Math.min(.7,.15*this.stack('frost'));z.slowTime=2;}
       if(this.stack('splash'))for(const other of [...this.enemies])if(other.id!==z.id&&Math.hypot(other.x-z.x,other.y-z.y)<55+20*this.stack('splash'))this.damage(other,amount*.35,'splash');
-      if(b.bounces>0){const next=this.enemies.filter(e=>e.hp>0&&!b.hitIds.has(e.id)).sort((a,c)=>Math.hypot(a.x-z.x,a.y-z.y)-Math.hypot(c.x-z.x,c.y-z.y))[0];
+      if(b.bounces>0){let next=null,distance=Infinity;
+        for(const enemy of this.enemies){if(enemy.hp<=0||b.hitIds.has(enemy.id))continue;const d=Math.hypot(enemy.x-z.x,enemy.y-z.y);if(d<distance){distance=d;next=enemy;}}
         if(next){b.bounces--;b.x=z.x;b.y=z.y;const a=Math.atan2(next.y-z.y,next.x-z.x);b.vx=Math.cos(a)*720;b.vy=Math.sin(a)*720;return;}}
       if(b.pierce>0)b.pierce--;else b.life=0;
     }

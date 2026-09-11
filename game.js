@@ -368,7 +368,8 @@ function updateHud(force=false) {
     card.querySelector('.skill-info').title=learning?[entry?.text||s.code,entry?.meaning,entry?.ipa?'音标 /'+entry.ipa+'/':'',entry?.goal,entry?.grammar].filter(Boolean).join(' · '):s.name;
     card.classList.toggle('selected',game.typing===index);card.classList.toggle('cooling',s.cd>0);
     card.setAttribute('aria-label',s.name+'，'+(entry?.meaning?entry.meaning+'，':'')+(s.cd>0?'回蓝中 '+Math.ceil(s.cd/game.rechargeRate)+' 秒':speaking?'选择并朗读 '+s.code:'依次输入 '+s.code));
-    $('#skillKeys'+index).hidden=speaking;$('#skillKeys'+index).innerHTML=speaking?'':spellKeysMarkup(s,game.typing===index);
+    const keys=$('#skillKeys'+index),markup=speaking?'':spellKeysMarkup(s,game.typing===index);
+    keys.hidden=speaking;if(keys._markup!==markup){keys.innerHTML=markup;keys._markup=markup;}
     card.classList.toggle('long-spell',s.code.length>6);
     $('#skillStatus'+index).textContent=s.cd>0?Math.ceil(s.cd/game.rechargeRate)+' 秒回蓝':speaking?(phoneSpeech&&game.typing===index?'当前朗读目标 · 按住录音':game.typing===index?'已选择 · 按住录音':'点击选择这句'):game.typing===index?'第 '+(Math.floor(s.typed/6)+1)+' / '+Math.ceil(s.code.length/6)+' 行 · '+s.typed+'/'+s.code.length:'准备好啦 · '+s.code.length+' 字母';
     $('#cooldown'+index).style.width=(1-s.cd/s.duration)*100+'%';

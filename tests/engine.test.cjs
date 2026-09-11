@@ -3,6 +3,14 @@ const { GardenGame, CARDS, TYPES } = require('../engine.js');
 const make = () => {const g=new GardenGame({random:()=>.35});g.setFireStrength(1);return g;};
 const advance = (game, seconds) => { for(let i=0;i<seconds*60;i++)game.update(1/60); };
 const test = (name, fn) => { fn(); console.log('PASS',name); };
+test('ricochet keeps nearest-target order and excludes dead or previously hit enemies',()=>{
+  const g=make();g.start();g.enemies=[];
+  const source=g.spawn(500,300,'walker',false),dead=g.spawn(501,300,'walker',false),hit=g.spawn(502,300,'walker',false);
+  dead.hp=0;const first=g.spawn(510,300,'walker',false);g.spawn(496,300,'walker',false);
+  const bullet={damage:1,bounces:1,pierce:0,hitIds:new Set([hit.id]),life:2};
+  g.hitBullet(bullet,source);assert.equal(bullet.bounces,0);assert.equal(bullet.vx,720);assert.equal(bullet.vy,0);
+  assert.ok(first.hp>0);assert.ok(bullet.hitIds.has(source.id));
+});
 test('ordinary shots collide with enemies and score kills',()=>{
   const g=make();g.start();g.auto=true;advance(g,2);assert.ok(g.kills>=1);assert.ok(g.score>=10);
 });

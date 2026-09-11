@@ -19,7 +19,11 @@ test('HTTP + two independent SSE clients: room lifecycle, commands, auth, reconn
   }
   const ca=await connect(a),cb=await connect(b);
   await until(ca,s=>s.players.every(p=>p?.connected));
+  const outgoing=app.rooms.get(a.code).streams[0],write=outgoing.write;
+  let repeated=0;outgoing.write=function(chunk,...args){if(String(chunk).startsWith('data: '))repeated++;return write.call(this,chunk,...args);};
+  await new Promise(resolve=>setTimeout(resolve,350));assert.equal(repeated,0,'unchanged lobby should not retransmit state');
   assert.equal((await post(`/api/room/${a.code}/action`,{type:'ready'},a.token)).status,200);
+  assert.ok(repeated>0,'readiness changes must still be transmitted immediately');outgoing.write=write;
   await post(`/api/room/${b.code}/action`,{type:'ready'},b.token);
   const sa=await until(ca,s=>s.status==='playing'),sb=await until(cb,s=>s.status==='playing');assert.equal(sa.side,0);assert.equal(sb.side,1);
   await post(`/api/room/${a.code}/action`,{type:'send',unit:'runner'},a.token);
