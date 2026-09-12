@@ -79,6 +79,7 @@
     constructor(factory){this.factory=factory;this.context=null;this.enabled=true;this.volume=.6;this.recording=false;this.voices=new Set();this.cache=new Map();this.last=new Map();this.duckUntil=0;this.nextGroan=Infinity;}
     init(){
       if(!this.enabled)return false;
+      if(root.GuluNative?.playEffect)return true;
       if(!this.context){const c=this.context=this.factory();this.master=c.createGain();this.master.gain.value=this.volume*.65*(this.recording?.15:1);this.compressor=c.createDynamicsCompressor();
         this.compressor.threshold.value=-12;this.compressor.ratio.value=3;
         if(this.compressor.knee)this.compressor.knee.value=18;if(this.compressor.attack)this.compressor.attack.value=.004;if(this.compressor.release)this.compressor.release.value=.12;
@@ -95,6 +96,7 @@
     }
     play(kind,{x=500}={}){
       if(!SPECS[kind]||!this.enabled||this.volume===0)return;
+      if(root.GuluNative?.playEffect){const now=Date.now()/1000;if(now-(this.last.get(kind)??-Infinity)<GAPS[kind])return;this.last.set(kind,now);root.GuluNative.playEffect(kind,Math.floor(Math.random()*3),LEVELS[kind],Math.max(-.6,Math.min(.6,(x-500)/900)));return;}
       try{
         if(!this.init())return;
         const now=this.context.currentTime;if(now-(this.last.get(kind)??-Infinity)<GAPS[kind])return;
@@ -104,22 +106,23 @@
         if(SPELLS.has(kind))this.duckUntil=now+.25;
         const duck=now<this.duckUntil&&!SPELLS.has(kind)?.5:1;
         if(this.start(buffer,LEVELS[kind]*duck,(x-500)/900,kind))this.last.set(kind,now);
-      }catch{this.setEnabled(false);}
+      }catch(error){this.lastError=String(error?.message||error);this.setEnabled(false);}
     }
     tone(frequency,duration=.1,type='sine',volume=.035,end=frequency){
       if(!this.enabled||this.volume===0)return;
+      if(root.GuluNative?.playEffect){const now=Date.now()/1000;if(now-(this.last.get('ui')??-Infinity)<.045)return;this.last.set('ui',now);root.GuluNative.playEffect('ui',frequency<720?0:frequency<840?1:2,Math.min(.12,volume*2),0);return;}
       try{
         if(!this.init()||this.voices.size>=32)return;
         const now=this.context.currentTime;if(now-(this.last.get('ui')??-Infinity)<.045)return;this.last.set('ui',now);
         const length=Math.max(.025,Math.min(.32,duration)),buffer=this.context.createBuffer(1,Math.ceil(length*RATE),RATE),data=buffer.getChannelData(0);let phase=0;
         for(let i=0;i<data.length;i++){const t=i/RATE,p=i/(data.length-1);phase+=TAU*(frequency+(end-frequency)*p)/RATE;data[i]=(Math.sin(phase)+.12*Math.sin(phase*2))*Math.min(1,t/.003)*Math.exp(-t*35)*Math.pow(1-p,1.5)*.65;}
         this.start(buffer,Math.min(.12,volume*2),0,'ui');
-      }catch{this.setEnabled(false);}
+      }catch(error){this.lastError=String(error?.message||error);this.setEnabled(false);}
     }
-    applyVolume(){if(this.master){const gain=this.master.gain,target=this.volume*.65*(this.recording?.15:1);if(gain.setTargetAtTime)gain.setTargetAtTime(target,this.context.currentTime,.025);else gain.value=target;}}
+    applyVolume(){const target=this.volume*.65*(this.recording?.15:1);if(root.GuluNative?.setEffectGain)root.GuluNative.setEffectGain(target);if(this.master){const gain=this.master.gain;if(gain.setTargetAtTime)gain.setTargetAtTime(target,this.context.currentTime,.025);else gain.value=target;}}
     setRecording(value){const next=Boolean(value);if(this.recording===next)return;this.recording=next;this.applyVolume();}
     setVolume(value){const n=Number(value);if(!Number.isFinite(n))return;this.volume=Math.max(0,Math.min(1,n));this.applyVolume();if(this.volume===0)this.stop();}
-    stop(){for(const voice of [...this.voices]){try{voice.source.stop();}catch{}voice.cleanup();}this.duckUntil=0;this.last.clear();}
+    stop(){root.GuluNative?.stopEffects?.();for(const voice of [...this.voices]){try{voice.source.stop();}catch{}voice.cleanup();}this.duckUntil=0;this.last.clear();}
     setEnabled(value){this.enabled=Boolean(value);if(!value)this.stop();}
     // Silence between actions is intentional; no recurring synthetic zombie groans.
     update(){}

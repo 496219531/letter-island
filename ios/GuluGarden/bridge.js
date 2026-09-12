@@ -3,6 +3,11 @@
   let serial=0;const waiting=new Map(),sessions=new Map();
   const post=(command,id)=>window.webkit.messageHandlers.gulu.postMessage({command,id});
   window.GuluNative={authorize(){return new Promise((resolve,reject)=>{const id=++serial;waiting.set(id,{resolve,reject});post('authorize',id);});}};
+  Object.assign(window.GuluNative,{
+    playEffect:(kind,variant,volume,pan)=>window.webkit.messageHandlers.gulu.postMessage({command:'playEffect',kind,variant,volume,pan}),
+    setEffectGain:gain=>window.webkit.messageHandlers.gulu.postMessage({command:'setEffectGain',gain}),
+    stopEffects:()=>window.webkit.messageHandlers.gulu.postMessage({command:'stopEffects'})
+  });
   function audioCommand(command,ids=[]){return new Promise((resolve,reject)=>{const id=++serial;waiting.set(id,{resolve,reject});window.webkit.messageHandlers.gulu.postMessage({command,id,ids});});}
   Object.assign(window.GuluNative,{retainAudio:ids=>audioCommand('retainAudio',ids),playAudio:id=>audioCommand('playAudio',[id]),deleteAudio:ids=>audioCommand('deleteAudio',ids).catch(()=>{}),stopAudio:()=>audioCommand('stopAudio').catch(()=>{})});
   function libraryCommand(command,payload={}){return new Promise((resolve,reject)=>{const id=++serial;waiting.set(id,{resolve,reject});window.webkit.messageHandlers.gulu.postMessage({command,id,...payload});});}

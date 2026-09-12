@@ -40,6 +40,26 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     var audioFile: AVAudioFile?
     var audioID: String?
     var player: AVAudioPlayer?
+    var effectPlayers: [(player:AVAudioPlayer,level:Float)] = []
+    var effectData: [String:Data] = [:]
+    var effectGain: Float = 0.39
+    var effectLastError = ""
+    var effectStarts = 0
+    func playEffect(_ data:[String:Any]) {
+        let kinds:Set<String>=["shot","flesh","metal","shield","iceHit","kill","groan","boss","nibble","laser","freeze","melon","explosion","critical","warning","ui"]
+        guard let kind=data["kind"] as? String,kinds.contains(kind),let variant=data["variant"] as? Int,(0...2).contains(variant) else { return }
+        effectPlayers.removeAll { !$0.player.isPlaying }
+        guard effectPlayers.count<24 else { return }
+        do {
+            let key="\(kind)-\(variant)"
+            if effectData[key] == nil { effectData[key]=try Data(contentsOf:Bundle.main.resourceURL!.appendingPathComponent("Web/sfx/\(key).wav")) }
+            let sound=try AVAudioPlayer(data:effectData[key]!)
+            let level=max(0,min(1,(data["volume"] as? NSNumber)?.floatValue ?? 0.2))
+            sound.volume=level*effectGain;sound.pan=max(-0.6,min(0.6,(data["pan"] as? NSNumber)?.floatValue ?? 0))
+            if sound.play(){effectStarts+=1;effectPlayers.append((sound,level))}else{effectLastError="AVAudioPlayer did not start"}
+        } catch { effectLastError=error.localizedDescription;NSLog("Effect playback failed: %@",effectLastError) }
+    }
+    func stopEffects(){effectPlayers.forEach{$0.player.stop()};effectPlayers.removeAll()}
     var tapped = false
     var timeout: DispatchWorkItem?
     var screenDirection: String { UserDefaults.standard.string(forKey: "screenDirection") == "landscape" ? "landscape" : "portrait" }
@@ -99,9 +119,23 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
             web?.evaluateJavaScript("document.dispatchEvent(new Event('gulu-audio-ready'))")
         } catch { NSLog("Game audio restoration failed: %@", error.localizedDescription) }
     }
-    @objc func background() { cancel(restorePlayback: false); web.evaluateJavaScript("window.dispatchEvent(new Event('blur')); document.dispatchEvent(new Event('gulu-background'))") }
+    @objc func background() { stopEffects();cancel(restorePlayback: false); web.evaluateJavaScript("window.dispatchEvent(new Event('blur')); document.dispatchEvent(new Event('gulu-background'))") }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--sound-output-qa") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                self.web.evaluateJavaScript("soundscape.play('laser');void 0;")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    self.web.evaluateJavaScript("JSON.stringify({enabled:soundscape.enabled,volume:soundscape.volume,recording:soundscape.recording,state:soundscape.context?.state,error:soundscape.lastError,gain:soundscape.master?.gain.value,voices:soundscape.voices.size})") { result, error in
+                        let session = AVAudioSession.sharedInstance()
+                        let report: [String:Any] = ["web":result ?? String(describing:error), "nativeStarts":self.effectStarts,"nativeError":self.effectLastError,"nativeGain":self.effectGain,"systemVolume":session.outputVolume, "category":session.category.rawValue, "outputs":session.currentRoute.outputs.map { ["type":$0.portType.rawValue,"name":$0.portName] }]
+                        let path=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("sound-output-qa.json")
+                        if let data=try? JSONSerialization.data(withJSONObject:report) { try? data.write(to:path) }
+                    }
+                }
+            }
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--orientation-qa") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                 self.web.evaluateJavaScript("window.orientationQA=[];(async()=>{for(const value of ['landscape','portrait','landscape']){const select=document.querySelector('#screenDirection');select.value=value;await select.onchange();await new Promise(r=>setTimeout(r,200));orientationQA.push({requested:value,selected:select.value,width:innerWidth,height:innerHeight,locked:await GuluNative.getScreenDirection()});}})().catch(e=>orientationQA.push({error:e.message}));void 0;")
@@ -247,6 +281,10 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
               let data = message.body as? [String: Any], let command = data["command"] as? String else { return }
         let id = data["id"] as? Int ?? 0
         switch command {
+        case "playEffect": playEffect(data)
+        case "setEffectGain":
+            if let gain=(data["gain"] as? NSNumber)?.floatValue,gain.isFinite { effectGain=max(0,min(1,gain));effectPlayers.forEach{$0.player.volume=$0.level*effectGain};if effectGain==0{stopEffects()} }
+        case "stopEffects": stopEffects()
         case "getScreenDirection": send(["type":"nativeReply", "id":id, "ok":true, "result":screenDirection])
         case "setScreenDirection":
             guard let direction = data["direction"] as? String, ["portrait", "landscape"].contains(direction), let scene = view.window?.windowScene else {

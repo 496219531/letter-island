@@ -13,7 +13,7 @@ document.addEventListener('keydown',resumeGameAudio);
 document.addEventListener('gulu-audio-ready',resumeGameAudio);
 try{const volume=localStorage.getItem('gulu-sfx-volume-v2');if(volume!==null)soundscape.setVolume(Number(volume));}catch{}
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-let soundOn = true, best = 0, lastTime = 0, lastHud = '', hudClock = 0;
+let best = 0, lastTime = 0, lastHud = '', hudClock = 0;
 let toastTimer, bannerTimer, recoil = 0, shake = 0, dialogResume = false;
 const localSpeech=GuluSystemSpeech.createLocalSpeech(window.speechSynthesis,window.SpeechSynthesisUtterance);
 const reviewStore=GuluSpeechReview.repository(localStorage);
@@ -50,7 +50,7 @@ async function enableSpeech(){
 try { best = Math.max(0, Number(localStorage.getItem('gulu-shooter-best')) || 0); } catch {}
 $('#bestScore').textContent = best;
 
-function tone(...args){if(soundOn)soundscape.tone(...args);}
+function tone(...args){soundscape.tone(...args);}
 function toast(text, time = 2200) {
   clearTimeout(toastTimer); $('#battleToast').textContent = text; $('#battleToast').classList.add('visible');
   toastTimer = setTimeout(() => $('#battleToast').classList.remove('visible'), time);
@@ -715,7 +715,8 @@ document.addEventListener('keyup',event=>{if(event.key===' ')game.shooting=false
 $('#homeButton').onclick=returnHome;$('#saveButton').onclick=saveMenu;$('#continueButton').onclick=continueRun;$('#buildButton').onclick=showBuild;$('#startButton').onclick=begin;$('#pauseButton').onclick=pauseScreen;$('#helpButton').onclick=help;
 $('#soundVolume').value=Math.round(soundscape.volume*100);$('#soundVolumeValue').textContent=Math.round(soundscape.volume*100)+'%';
 $('#soundVolume').addEventListener('input',event=>{const value=Number(event.target.value);soundscape.setVolume(value/100);$('#soundVolumeValue').textContent=value+'%';try{localStorage.setItem('gulu-sfx-volume-v2',String(value/100));}catch{}});
-$('#soundButton').onclick=()=>{soundOn=!soundOn;soundscape.setEnabled(soundOn);$('#soundButton').setAttribute('aria-pressed',String(soundOn));$('#soundButton').setAttribute('aria-label',soundOn?'关闭音效':'开启音效');tone(700,.12);};
+$('#soundButton').remove();
+$('#soundVolume').addEventListener('change',()=>{soundscape.setEnabled(true);resumeGameAudio();soundscape.play('laser');});
 $('#autoButton').onclick=()=>{game.auto=!game.auto;$('#autoButton').setAttribute('aria-pressed',String(game.auto));updateFireControl();if(game.status==='playing')canvas.focus({preventScroll:true});};
 $('#keyboardButton').onclick=()=>{const expanded=$('#touchKeyboard').hidden;$('#touchKeyboard').hidden=!expanded;$('#keyboardButton').setAttribute('aria-expanded',String(expanded));};
 $('#difficulty').onchange=()=>{game.learningMode=['english','sentences','speaking'].includes($('#difficulty').value)?$('#difficulty').value:'letters';game.adaptive=true;speechFeedback='';if(['english','sentences','speaking'].includes($('#difficulty').value))$('#settingsPanel').open=true;updateTypingControls();updateHud(true);if(game.learningMode==='speaking'&&!speechAuthorized)enableSpeech();};
