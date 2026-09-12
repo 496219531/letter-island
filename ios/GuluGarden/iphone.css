@@ -112,6 +112,22 @@ body.native-iphone .skill-card .skill-info,body.native-iphone .skill-card .skill
 .native-iphone .landscape-settings{display:none}
 .native-iphone .landscape-choice{display:flex;flex-direction:column;gap:8px;color:var(--app-ink)}
 .native-iphone .landscape-choice select{min-height:44px;width:100%;font-size:16px}
+/* Opaque settings surfaces need their own text palette, not battlefield colors. */
+body.native-iphone #mobileSettingsDialog{color:#173629;background:#f7f5ec;color-scheme:light}
+body.native-iphone #mobileSettingsDialog .difficulty-controls{background:#f7f5ec;color:#173629}
+body.native-iphone #mobileSettingsDialog label,body.native-iphone #mobileSettingsDialog label>span{color:#173629;font-weight:600}
+body.native-iphone #mobileSettingsDialog output{color:#245b38;font-weight:800}
+body.native-iphone #mobileSettingsDialog small,body.native-iphone #mobileSettingsDialog .fire-control>span,body.native-iphone #mobileSettingsDialog .spell-control>span,body.native-iphone #mobileSettingsDialog .fire-slider>span{color:#465747;font-weight:400}
+body.native-iphone #mobileSettingsDialog a{color:#245b38;text-decoration:underline}
+body.native-iphone #mobileSettingsDialog select{background:#fff;color:#173629;border:1px solid #71806a;color-scheme:light}
+body.native-iphone #mobileSettingsDialog input[type=range]{accent-color:#245b38;color-scheme:light}
+body.native-iphone #mobileSettingsDialog button{background:#214831;color:#fff;border:1px solid #214831;opacity:1}
+body.native-iphone #mobileSettingsDialog button span,body.native-iphone #mobileSettingsDialog button b{color:inherit}
+body.native-iphone #mobileSettingsDialog button:disabled{background:#e2e5dc;color:#536051;border-color:#bdc5b6}
+body.native-iphone #mobileSettingsDialog .mobile-settings-header button{background:#efc968;color:#173629;border-color:#b78b25}
+body.native-iphone .library-dialog p,body.native-iphone .library-dialog label,body.native-iphone .library-dialog h3{color:#173629}
+body.native-iphone #gameDialog h2{color:#173629}
+body.native-iphone #gameDialog p{color:#465747}
 @media(orientation:landscape){
  body.native-iphone{overflow:hidden!important}
  body.native-iphone:not([data-game-state=ready]) .topbar{display:none!important}
