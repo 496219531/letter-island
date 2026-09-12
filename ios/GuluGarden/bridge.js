@@ -6,6 +6,7 @@
   function audioCommand(command,ids=[]){return new Promise((resolve,reject)=>{const id=++serial;waiting.set(id,{resolve,reject});window.webkit.messageHandlers.gulu.postMessage({command,id,ids});});}
   Object.assign(window.GuluNative,{retainAudio:ids=>audioCommand('retainAudio',ids),playAudio:id=>audioCommand('playAudio',[id]),deleteAudio:ids=>audioCommand('deleteAudio',ids).catch(()=>{}),stopAudio:()=>audioCommand('stopAudio').catch(()=>{})});
   function libraryCommand(command,payload={}){return new Promise((resolve,reject)=>{const id=++serial;waiting.set(id,{resolve,reject});window.webkit.messageHandlers.gulu.postMessage({command,id,...payload});});}
+  Object.assign(window.GuluNative,{getScreenDirection:()=>libraryCommand('getScreenDirection'),setScreenDirection:direction=>libraryCommand('setScreenDirection',{direction})});
   Object.assign(window.GuluNative,{configureQwen:()=>libraryCommand('configureQwen'),importImage:(image,kind)=>libraryCommand('importImage',{image,kind}),translateTexts:texts=>libraryCommand('translateTexts',{texts}),exportLibrary:text=>libraryCommand('exportLibrary',{text})});
   class NativeRecognition {
     start(){this.id=++serial;sessions.set(this.id,this);post('start',this.id);}
@@ -57,7 +58,12 @@
     const layoutSelect=document.createElement('select');layoutSelect.id='landscapeLayout';layoutSelect.setAttribute('aria-label','横屏布局');
     layoutSelect.add(new Option('右侧操作台','sidebar'));layoutSelect.add(new Option('双拇指分体键盘','split'));
     try{layoutSelect.value=localStorage.getItem('gulu-landscape-layout')==='split'?'split':'sidebar';}catch{}
-    const note=document.createElement('small');note.textContent='横拿手机时生效；单词提示看板与键盘均为半透明。';label.append(layoutSelect,note);document.querySelector('.difficulty-controls').append(label);
+    const directionLabel=document.createElement('label');directionLabel.className='landscape-choice';directionLabel.textContent='屏幕方向';
+    const directionSelect=document.createElement('select');directionSelect.id='screenDirection';directionSelect.setAttribute('aria-label','屏幕方向');directionSelect.add(new Option('竖屏（锁定）','portrait'));directionSelect.add(new Option('横屏（锁定）','landscape'));
+    const directionNote=document.createElement('small');directionNote.textContent='手动选择后立即切换，转动手机不会自动改变方向。';directionLabel.append(directionSelect,directionNote);
+    GuluNative.getScreenDirection().then(value=>{directionSelect.value=value;}).catch(error=>{directionNote.textContent=error.message;});
+    directionSelect.onchange=async()=>{directionSelect.disabled=true;try{directionSelect.value=await GuluNative.setScreenDirection(directionSelect.value);directionNote.textContent='已锁定方向，下次打开会保留。';}catch(error){directionNote.textContent='切换失败：'+error.message;directionSelect.value=await GuluNative.getScreenDirection();}finally{directionSelect.disabled=false;}};
+    const note=document.createElement('small');note.textContent='选择横屏方向后使用；单词提示看板与键盘均为半透明。';label.append(layoutSelect,note);document.querySelector('.difficulty-controls').append(directionLabel,label);
     const landscape=matchMedia('(orientation: landscape)');let keyboardLayout='portrait';
     function restoreKeys(){
       keyboard.replaceChildren();

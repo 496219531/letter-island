@@ -42,7 +42,14 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     var player: AVAudioPlayer?
     var tapped = false
     var timeout: DispatchWorkItem?
-    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .allButUpsideDown }
+    var screenDirection: String { UserDefaults.standard.string(forKey: "screenDirection") == "landscape" ? "landscape" : "portrait" }
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { screenDirection == "landscape" ? .landscapeLeft : .portrait }
+    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { screenDirection == "landscape" ? .landscapeLeft : .portrait }
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        setNeedsUpdateOfSupportedInterfaceOrientations()
+        view.window?.windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: supportedInterfaceOrientations))
+    }
     override func viewDidLoad() {
         super.viewDidLoad()
         if !UserDefaults.standard.bool(forKey:"qwen37ModelDefault") {
@@ -95,11 +102,25 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     @objc func background() { cancel(restorePlayback: false); web.evaluateJavaScript("window.dispatchEvent(new Event('blur')); document.dispatchEvent(new Event('gulu-background'))") }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--orientation-qa") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                self.web.evaluateJavaScript("window.orientationQA=[];(async()=>{for(const value of ['landscape','portrait','landscape']){const select=document.querySelector('#screenDirection');select.value=value;await select.onchange();await new Promise(r=>setTimeout(r,200));orientationQA.push({requested:value,selected:select.value,width:innerWidth,height:innerHeight,locked:await GuluNative.getScreenDirection()});}})().catch(e=>orientationQA.push({error:e.message}));void 0;")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                    self.web.evaluateJavaScript("JSON.stringify(window.orientationQA)") { result, error in
+                        let path = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("orientation-qa.json")
+                        try? String(describing: result ?? error as Any).write(to: path, atomically: true, encoding: .utf8)
+                    }
+                }
+            }
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--keyboard-qa") {
             if ProcessInfo.processInfo.arguments.contains("--landscape-qa") {
+                UserDefaults.standard.set("landscape", forKey:"screenDirection")
                 setNeedsUpdateOfSupportedInterfaceOrientations()
                 view.window?.windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeLeft))
             } else {
+                UserDefaults.standard.set("portrait", forKey:"screenDirection")
                 setNeedsUpdateOfSupportedInterfaceOrientations()
                 view.window?.windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
             }
@@ -226,6 +247,25 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
               let data = message.body as? [String: Any], let command = data["command"] as? String else { return }
         let id = data["id"] as? Int ?? 0
         switch command {
+        case "getScreenDirection": send(["type":"nativeReply", "id":id, "ok":true, "result":screenDirection])
+        case "setScreenDirection":
+            guard let direction = data["direction"] as? String, ["portrait", "landscape"].contains(direction), let scene = view.window?.windowScene else {
+                send(["type":"nativeReply", "id":id, "ok":false, "error":"无法切换屏幕方向"]); return
+            }
+            let previous = screenDirection
+            UserDefaults.standard.set(direction, forKey:"screenDirection")
+            setNeedsUpdateOfSupportedInterfaceOrientations()
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: supportedInterfaceOrientations)) { [weak self] error in
+                UserDefaults.standard.set(previous, forKey:"screenDirection")
+                self?.setNeedsUpdateOfSupportedInterfaceOrientations()
+                self?.send(["type":"nativeReply", "id":id, "ok":false, "error":error.localizedDescription])
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
+                guard let self = self else { return }
+                let ok = (direction == "landscape" && scene.interfaceOrientation.isLandscape) || (direction == "portrait" && scene.interfaceOrientation == .portrait)
+                if !ok { UserDefaults.standard.set(previous, forKey:"screenDirection"); self.setNeedsUpdateOfSupportedInterfaceOrientations() }
+                self.send(["type":"nativeReply", "id":id, "ok":ok, "result":self.screenDirection, "error":"屏幕方向尚未切换，请重试"])
+            }
         case "configureQwen": configureQwen(id)
         case "importImage": importLibraryImage(data,id:id)
         case "translateTexts": translateLibrary(data,id:id)
