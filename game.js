@@ -27,6 +27,7 @@ const reviewStore=GuluSpeechReview.repository(localStorage);
 const speechAttempts=new Map();
 let listening=false,speechHeld=false,speechFeedback='',nativeSpeechReady=false,speechAuthorized=false,permissionPhase='idle';
 const phoneSpeech=Boolean(window.GuluMobile?.active);
+const nativeSpeech=Boolean(window.GuluNative);
 const microphone=(phoneSpeech?GuluMobile.createSpeech:GuluPressToTalk.createPressToTalk)({
   authorize:async()=>{if(!speechAuthorized)throw new Error('请先点击启用语音权限');},
   onState(phase){listening=phase==='recording';speechHeld=microphone.held;soundscape.setRecording(speechHeld&&['preparing','recording'].includes(phase));updateSpeechControl();},
@@ -38,10 +39,12 @@ const microphone=(phoneSpeech?GuluMobile.createSpeech:GuluPressToTalk.createPres
 });
 const voicePermissions=GuluPressToTalk.createVoicePermissions({
   requestMicrophone(){
+    if(nativeSpeech)return {getTracks:()=>[]};
     if(!navigator.mediaDevices?.getUserMedia)throw new Error('当前地址不能申请录音权限。手机需使用受信任的 HTTPS 地址连接游戏；普通局域网 HTTP 可玩单词和句子模式。');
     return navigator.mediaDevices.getUserMedia({audio:true});
   },
   async authorizeNative(){
+    if(nativeSpeech){await GuluNative.authorize();return;}
     if(phoneSpeech){if(!(window.SpeechRecognition||window.webkitSpeechRecognition))throw new Error('此手机浏览器不支持语音识别；请使用支持该功能的系统浏览器。');return;}
     const response=await fetch('api/speech/authorize',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     const result=await response.json();if(!response.ok||!result.ok)throw new Error(result.error||'系统识别授权尚未完成');
@@ -50,8 +53,8 @@ const voicePermissions=GuluPressToTalk.createVoicePermissions({
 });
 async function enableSpeech(){
   speechFeedback='';
-  try{await voicePermissions.enable();nativeSpeechReady=true;speechFeedback=phoneSpeech?'麦克风已授权。按住朗读；手机语音服务可能需要联网。':'麦克风和系统识别已授权。选一句，按住麦克风录音。';}
-  catch(error){speechFeedback=error.name==='NotAllowedError'?'麦克风权限被拒绝。请在设备与浏览器的隐私设置中允许麦克风，再点重新申请。':error.message;}
+  try{await voicePermissions.enable();nativeSpeechReady=true;speechFeedback=nativeSpeech?'本 App 的麦克风和语音识别已授权。按住朗读。':phoneSpeech?'麦克风已授权。按住朗读；手机语音服务可能需要联网。':'麦克风和系统识别已授权。选一句，按住麦克风录音。';}
+  catch(error){speechFeedback=error.name==='NotAllowedError'?(nativeSpeech?'麦克风权限被拒绝。请在 iPhone“设置”中允许“豌豆突突队”使用麦克风和语音识别，再点重新申请。':'麦克风权限被拒绝。请在设备与浏览器的隐私设置中允许麦克风，再点重新申请。'):error.message;}
   updateSpeechControl();
 }
 try { best = Math.max(0, Number(localStorage.getItem('gulu-shooter-best')) || 0); } catch {}
@@ -257,12 +260,12 @@ function updateSpeechControl(){
   const granting=['microphone','system'].includes(permissionPhase);
   $('#speechSkip').disabled=!ready||phase!=='idle';
   $('#speechEnable').hidden=speechAuthorized;$('#speechEnable').disabled=granting;
-  $('#speechEnable').textContent=permissionPhase==='microphone'?'请允许浏览器使用麦克风…':permissionPhase==='system'?'正在授权／准备英文语音资源…':permissionPhase==='error'?'重新申请语音权限':'启用语音权限';
+  $('#speechEnable').textContent=permissionPhase==='microphone'?(nativeSpeech?'请允许本 App 使用麦克风…':'请允许浏览器使用麦克风…'):permissionPhase==='system'?'正在授权／准备英文语音资源…':permissionPhase==='error'?'重新申请语音权限':'启用语音权限';
   $('#speechButton').disabled=!ready||!nativeSpeechReady||!speechAuthorized||phase==='recognizing';
   $('#speechButton').classList.toggle('listening',phase==='recording');$('#speechButton').setAttribute('aria-pressed',String(microphone.held));
   $('#speechExample').disabled=!ready||granting||phase!=='idle'||!localSpeech.available();
   $('#speechButtonLabel').textContent=phase==='preparing'?'正在准备／等待系统授权…':phase==='recording'?'正在录音 · 松开识别':phase==='recognizing'?'录音已停止 · 正在识别':!speechAuthorized?'先启用语音权限':!ready?(phoneSpeech&&selected?'当前大招充能中':'先选择一张大招卡'):'按住麦克风说话';
-  $('#speechTranscript').textContent=permissionPhase==='microphone'?'正在申请麦克风权限。此步骤不录制、不上传语音。':permissionPhase==='system'?'麦克风权限已通过。请允许系统识别；首次可能需要下载 Apple 英文识别资源，请保持页面打开。':phase==='recording'?'麦克风已开启，松开后立即停止录音，最多30秒。':phase==='recognizing'?(phoneSpeech?'正在用手机语音服务识别，匹配成功后自动放招。':'正在用 Mac 系统识别，匹配成功后自动放招。'):phase==='preparing'?'首次使用请允许系统语音识别和麦克风权限；授权后重新按住按钮。':speechFeedback||(phoneSpeech?'朗读当前卡片 → 按住录音 → 松开识别；点上方技能可切换。':'选一句 → 按住录音 → 松开停止并自动识别。');
+  $('#speechTranscript').textContent=permissionPhase==='microphone'?(nativeSpeech?'正在申请本 App 的麦克风权限。此步骤不录制、不上传语音。':'正在申请麦克风权限。此步骤不录制、不上传语音。'):permissionPhase==='system'?(nativeSpeech?'麦克风权限已通过。请允许本 App 使用系统英语语音识别；首次可能需要下载 Apple 英文识别资源，请保持页面打开。':'麦克风权限已通过。请允许系统识别；首次可能需要下载 Apple 英文识别资源，请保持页面打开。'):phase==='recording'?'麦克风已开启，松开后立即停止录音，最多30秒。':phase==='recognizing'?(nativeSpeech?'正在用本 App 的系统语音识别，匹配成功后自动放招。':phoneSpeech?'正在用手机语音服务识别，匹配成功后自动放招。':'正在用 Mac 系统识别，匹配成功后自动放招。'):phase==='preparing'?(nativeSpeech?'首次使用请允许本 App 使用麦克风和系统语音识别；授权后重新按住按钮。':'首次使用请允许系统语音识别和麦克风权限；授权后重新按住按钮。'):speechFeedback||(nativeSpeech?'朗读当前卡片 → 按住录音 → 松开识别；点上方技能可切换。':phoneSpeech?'朗读当前卡片 → 按住录音 → 松开识别；点上方技能可切换。':'选一句 → 按住录音 → 松开停止并自动识别。');
   const last=selected?(speechAttempts.get(selected.code)||[]).at(-1):null;
   const diffs=last?.text?GuluSpeechReview.compare(selected.code,last.text).filter(p=>p.type!=='same'):[];
   const diffBox=$('#speechDiff');diffBox.hidden=!diffs.length;
