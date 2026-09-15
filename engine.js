@@ -3,20 +3,44 @@
   'use strict';
   const CUSTOM=typeof module!=='undefined'&&module.exports?require('./custom-library.js'):root.GuluCustomLibrary;
   const clamp = (n, low, high) => Math.max(low, Math.min(high, n));
+  const CHINESE_NAME_TEXT={王:'WANG',张:'ZHANG',李:'LI',刘:'LIU',陈:'CHEN',赵:'ZHAO',黄:'HUANG',吴:'WU',周:'ZHOU',徐:'XU',孙:'SUN',马:'MA',胡:'HU',朱:'ZHU',高:'GAO',林:'LIN',何:'HE',郭:'GUO',梁:'LIANG',宋:'SONG',郑:'ZHENG',谢:'XIE',韩:'HAN',唐:'TANG',冯:'FENG',于:'YU',董:'DONG',萧:'XIAO'};
+  const CHINESE_SURNAME_ALIASES={WANG:['WONG','ONE','WAN'],ZHANG:['JANG','CHANG','JUNG'],LI:['LEE','LEA'],LIU:['LEO','LOU'],CHEN:['CHIN','CHAN'],ZHAO:['JOW','CHAO'],HUANG:['WONG','HWANG'],WU:['WOO'],ZHOU:['JOE','JOU'],XU:['SHU','SUE'],SUN:['SUNG'],MA:['MARG'],HU:['WHO'],ZHU:['JOO'],GAO:['GOW'],LIN:['LYNN'],HE:['HER'],GUO:['GWOO'],LIANG:['LEONG'],SONG:['SUNG'],ZHENG:['JENG'],XIE:['SHEE'],HAN:['HUN'],TANG:['TONG'],FENG:['FUNG'],YU:['YOU'],DONG:['DUNG'],XIAO:['SHIAO']};
+  const NAME_TITLES=new Set(['MISS','MS','MRS','MR']);
+  // Speech never asks a learner to say punctuation. It uses the same separator
+  // rule as typing; the compact fallback below also accepts recognizers that
+  // omit the apostrophe in contractions such as “don't”.
+  function normalizeSpeech(text){return String(text||'').replace(/[王张李刘陈赵黄吴周徐孙马胡朱高林何郭梁宋郑谢韩唐冯于董萧]/g,ch=>' '+CHINESE_NAME_TEXT[ch]+' ').replace(/[’‘]/g,"'").toUpperCase().replace(/[^A-Z0-9]+/g,' ').replace(/\s+/g,' ').trim();}
+  function isChineseNameSlot(words,index){const token=words[index];return Boolean(CHINESE_SURNAME_ALIASES[token])&&(NAME_TITLES.has(words[index-1])||words.slice(Math.max(0,index-3),index).join(' ')==='MY NAME IS');}
+  function speechMatch(expectedText,heardText){const expected=normalizeSpeech(expectedText),heard=normalizeSpeech(heardText),a=expected.split(' ').filter(Boolean),b=heard.split(' ').filter(Boolean),joinedWord=/[A-Za-z][’'-][A-Za-z]/.test(String(expectedText||''));if(!expected||!heard)return {expected,heard,matched:false,nameTolerated:false};if(joinedWord&&expected.replaceAll(' ','')===heard.replaceAll(' ',''))return {expected,heard,matched:true,nameTolerated:false};if(a.length!==b.length)return {expected,heard,matched:false,nameTolerated:false};let nameTolerated=false;for(let i=0;i<a.length;i++){if(a[i]===b[i])continue;const titleAlias=i+1<a.length&&NAME_TITLES.has(a[i])&&NAME_TITLES.has(b[i])&&isChineseNameSlot(a,i+1),surnameAlias=isChineseNameSlot(a,i)&&CHINESE_SURNAME_ALIASES[a[i]].includes(b[i]);if(!titleAlias&&!surnameAlias)return {expected,heard,matched:false,nameTolerated:false};nameTolerated=true;}return {expected,heard,matched:true,nameTolerated};}
   const CARDS = [
     ['power','大颗豌豆','💪','火力','子弹伤害 +25%'],['rapid','疯狂扳机','⚡','火力','射速 +18%'],
-    ['multishot','分身豌豆','🌱','火力','每轮额外发射 1 颗子弹'],['pierce','穿透弹头','🏹','火力','每颗子弹额外穿透 1 个目标'],
-    ['ricochet','弹弹豌豆','🔀','火力','命中后额外弹射 1 次'],['crit','幸运四叶草','🍀','火力','暴击率 +10%，最高 90%'],
+    ['multishot','分身豌豆','🌱','火力','每轮额外发射 1 颗子弹'],['pierce','穿透弹头','🏹','火力','首层命中2个目标，之后每层+1；后续伤害递减30%'],
+    ['ricochet','弹弹豌豆','🔀','火力','命中后额外弹射 1 次，后续命中伤害逐次降低30%'],['crit','幸运四叶草','🍀','火力','暴击率 +10%，最高 90%'],
     ['critPower','超级暴击','💥','火力','暴击伤害倍率 +0.5'],['splash','爆米花弹','🍿','火力','命中产生 35% 伤害爆炸，每层扩大范围'],
     ['poison','毒蘑菇','🍄','元素','每秒造成 8 点毒伤，持续 4 秒；伤害叠加'],['frost','冰薄荷','🧊','元素','子弹使目标减速 15%，叠加至 70%'],
     ['knockback','大风车','🌪️','生存','子弹击退距离 +4'],['leech','生命果汁','🧃','生存','每击退 18 只恢复 1 护盾；叠加缩短间隔，最低 2 只'],
     ['fortify','加固小院','🏡','生存','护盾上限 +2，并恢复 2 护盾'],['repair','修理小精灵','🛠️','生存','现在恢复 2 护盾，以后每波额外恢复 1'],
     ['thorns','仙人掌围墙','🌵','生存','僵尸靠近小院时，每秒受到 25 点伤害'],['magic','魔法放大镜','🔮','大招','激光、西瓜与冰冻冲击伤害 +25%'],
     ['recharge','充能电池','🔋','大招','大招充能速度 +20%'],['beam','彩虹扩音器','🌈','大招','激光攻击宽度 +35'],
-    ['permafrost','漫长冬天','❄️','大招','全场冰冻持续时间 +1.5 秒'],['shatter','碎冰糖','🍬','大招','攻击冰冻目标额外伤害倍率 +0.5'],
+    ['permafrost','漫长冬天','❄️','大招','全场冰霜减速持续时间 +1.5 秒'],['shatter','碎冰糖','🍬','大招','攻击冰霜减速目标额外伤害倍率 +0.5'],
     ['blast','巨无霸西瓜','🍉','大招','西瓜爆炸半径 +45'],['twinmelon','西瓜连连看','🎯','大招','每次西瓜大招多落下 1 枚西瓜'],
     ['barrier','魔法护盾','🛡️','生存','每释放 3 次大招恢复 1 护盾；每层增加恢复量'],['berserk','背水一战','🔥','火力','护盾不超过一半时，子弹伤害 +40%']
   ].map(([id,name,icon,category,description])=>({id,name,icon,category,description}));
+  const SKILLS={
+    laser:{name:'彩虹激光',icon:'🌈',duration:6,description:'一道强力激光扫过前方'},
+    freeze:{name:'冰冻派对',icon:'❄️',duration:14,description:'全场减速50%，豌豆伤害提升'},
+    melon:{name:'西瓜轰轰',icon:'🍉',duration:11,description:'西瓜打击大范围敌人'},
+    charm:{name:'魅惑之吻',icon:'💗',duration:13,description:'每条路线最前方的僵尸变为友军，包含Boss'},
+    rage:{name:'狂暴巨化',icon:'🔥',duration:12,description:'变大5秒，射速为当前普通射速×2，每轮10发，伤害×3'},
+    lightning:{name:'连锁闪电',icon:'⚡',duration:9,description:'自动连击最多10个敌人，伤害逐跳递增'},
+    blackhole:{name:'黑洞吞噬',icon:'🌀',duration:13,description:'自动聚怪3秒，持续伤害后爆发'},
+    clones:{name:'豌豆分身',icon:'🌱',duration:12,description:'复制2个队长持续8秒，按普通射速射击，不额外加速'},
+    deathchain:{name:'死亡连锁',icon:'💥',duration:12,description:'标记全场8秒，击杀触发范围爆炸，可连锁引爆'},
+    judgment:{name:'末日审判',icon:'☄️',duration:13,description:'锁定血量最高的前6个敌人：普通敌人斩杀，Boss损失55%最大生命'}
+  };
+  for(const [skill,definition] of Object.entries(SKILLS))CARDS.push({id:'skill-'+skill,skill,...definition,category:'大招',description:definition.description+'；限用5次，用完恢复基础大招'});
+  CARDS.push({id:'rageDuration',name:'持久狂暴',icon:'⏳',category:'大招',description:'狂暴持续时间 +1 秒，可叠加'});
+  CARDS.push({id:'judgmentTargets',name:'审判扩散',icon:'🎯',category:'大招',description:'末日审判额外锁定1个目标，可叠加'});
   const TYPES = {
     walker:{name:'捣蛋鬼',icon:'',hp:1,speed:1},runner:{name:'闪电跑跑',icon:'⚡',hp:.7,speed:2.1},
     armor:{name:'铁桶卫士',icon:'🪣',hp:2,speed:.7},shield:{name:'盾牌兵',icon:'🛡️',hp:1.4,speed:.85},
@@ -119,22 +143,23 @@
   function sentenceEntry(code){return SENTENCE_LOOKUP.get(code);}
   class GardenGame {
     constructor({ random = Math.random, emit = () => {} } = {}) {
-      this.random = random; this.emit = emit; this.status = 'ready'; this.adaptive = true; this.auto = false; this.fireStrength = .3; this.maxSpellLength = 60; this.maxLearningLoad=3; this.magicSlow = false;this.learningMode='letters';this.englishLevel=0;this.customBank=null;
+      this.random = random; this.emit = emit; this.status = 'ready'; this.adaptive = true; this.auto = false; this.fireStrength = .3; this.maxSpellLength = 10; this.maxLearningLoad=1; this.magicSlow = false;this.learningMode='letters';this.englishLevel=0;this.customBank=null;
       this.aim = { x: 690, y: 280 }; this.hero = { x: 100, y: 282 }; this.serial = 0;
       this.reset(); this.status = 'ready';
     }
     reset() {
       this.promptHistory=this.promptHistory||{};
-      this.stacks = {}; this.offers = []; this.maxHealth = 8; this.healKills=0;
-      this.flowerHealth=[];this.breachElapsed=0;this.health = 8; this.score = 0; this.kills = 0; this.casts = 0; this.correct = 0;
+      this.stacks = {}; this.offers = [];this.skillAuto=true;this.skillAimLeft=0;this.skillAim={x:690,y:280};this.rage=0;this.clones=0;this.cloneShot=0;this.deathQueue=[];this.processingDeath=false; this.maxHealth = 8; this.healKills=0;
+      this.flowerHealth=[];this.breachElapsed=0;this.health = 8; this.score = 0; this.practiceScore=0; this.kills = 0; this.casts = 0; this.correct = 0;
       this.wave = 1; this.spawned = 0; this.quota = 9; this.spawnIn = 2; this.waveBreak = 0;
       this.enemies = []; this.bullets = []; this.effects = []; this.dead = [];
+      this.collisionGrid=null;this.collisionStamp=0;this.collisionCandidates=0;
       this.shooting = false; this.shotIn = 0; this.shotKick=0; this.time = 0; this.freeze = 0; this.combo = 0;
       this.typing = -1; this.activeTime = 0;
       this.skills = [
-        { name:'彩虹激光', code:'A', typed:0, repeatsDone:0, cd:0, duration:8, uses:0, icon:'🌈' },
-        { name:'冰冻派对', code:'S', typed:0, repeatsDone:0, cd:0, duration:12, uses:0, icon:'❄️' },
-        { name:'西瓜轰轰', code:'D', typed:0, repeatsDone:0, cd:0, duration:11, uses:0, icon:'🍉' }
+        { kind:'laser',name:'彩虹激光', code:'A', typed:0, repeatsDone:0, cd:0, duration:6, uses:0, icon:'🌈' },
+        { kind:'freeze',name:'冰冻派对', code:'S', typed:0, repeatsDone:0, cd:0, duration:14, uses:0, icon:'❄️' },
+        { kind:'melon',name:'西瓜轰轰', code:'D', typed:0, repeatsDone:0, cd:0, duration:11, uses:0, icon:'🍉' }
       ];
     }
     get health(){return this.flowerHealth?.reduce((sum,h)=>sum+h,0)||0;}
@@ -166,11 +191,33 @@
     pause() { if(this.status === 'playing') { this.status='paused'; this.shooting=false; this.emit('pause'); } }
     resume() { if(this.status === 'paused') { this.status='playing'; this.emit('resume'); } }
     setAim(x,y) { this.aim={x:clamp(x,160,980),y:clamp(y,100,455)}; }
+    setSkillAim(x,y){this.skillAim={x:clamp(x,160,980),y:clamp(y,100,455)};this.skillAuto=false;this.skillAimLeft=5;}
+    skillTarget(kind){
+      if(!this.skillAuto)return this.skillAim;
+      if(kind==='blackhole'||kind==='melon')return this.clusterTarget(kind==='blackhole'?210:225);
+      let nearest=null;for(const z of this.enemies)if(z.hp>0&&!z.charmed&&(!nearest||z.x<nearest.x))nearest=z;
+      return nearest?{x:nearest.x,y:nearest.y}:this.aim;
+    }
     target() {
-      if(this.auto && this.enemies.length) {
-        const z=this.enemies.reduce((a,b)=>a.x<b.x?a:b); return {x:z.x,y:z.y};
-      }
+      if(this.rage>0&&!this.skillAuto)return this.skillAim;
+      if(this.auto||this.rage>0){let nearest=null;for(const z of this.enemies)if(z.hp>0&&!z.charmed&&(!nearest||z.x<nearest.x))nearest=z;if(nearest)return {x:nearest.x,y:nearest.y};}
       return this.aim;
+    }
+    clusterTarget(radius,ordinary=false){
+      const targets=this.enemies.filter(z=>z.hp>0&&!z.charmed&&(!ordinary||!z.boss));
+      if(!targets.length)return this.target();
+      let best=targets[0],count=-1;
+      for(const candidate of targets){let n=0;for(const z of targets)if(Math.hypot(z.x-candidate.x,z.y-candidate.y)<=radius)n++;if(n>count||(n===count&&candidate.x<best.x)){best=candidate;count=n;}}
+      return {x:best.x,y:best.y};
+    }
+    charmFrontlines(){
+      const lanes=new Map();
+      for(const z of this.enemies){
+        if(z.hp<=0||z.charmed)continue;
+        const lane=clamp(Math.round((z.y-140)/75),0,4),front=lanes.get(lane);
+        if(!front||z.x<front.x)lanes.set(lane,z);
+      }
+      return [...lanes.values()];
     }
     stack(id) { return this.stacks[id]||0; }
     get power() { return 1+.25*this.stack('power')+(this.health<=this.maxHealth/2?.4*this.stack('berserk'):0); }
@@ -196,22 +243,24 @@
     }
     muzzle(){
       const target=this.target(),angle=Math.atan2(target.y-this.hero.y,target.x-this.hero.x);
-      const tilt=clamp(angle*.15,-.10,.10),x=47.55,y=-22.02;
+      const tilt=clamp(angle*.15,-.10,.10),scale=this.rage>0?1.85:1,x=47.55*scale,y=-22.02*scale;
       return {x:this.hero.x+(this.shotKick>0?-3:0)+x*Math.cos(tilt)-y*Math.sin(tilt),y:this.hero.y+x*Math.sin(tilt)+y*Math.cos(tilt),tilt};
     }
-    shoot() {
-      if(this.fireStrength<=0)return;
-      this.shotKick=.1;const target=this.target(),muzzle=this.muzzle(),angle=Math.atan2(target.y-muzzle.y,target.x-muzzle.x);
-      const count=1+this.stack('multishot'),renderCount=Math.min(15,count);
+    get ordinaryShotInterval(){return Math.max(.025,.15/((this.fireStrength||.3)*(1+.18*this.stack('rapid'))));}
+    get rageShotInterval(){return this.ordinaryShotInterval/2;}
+    shoot(origin=null) {
+      if(!origin&&this.fireStrength<=0&&!(this.rage>0))return;
+      if(!origin)this.shotKick=.1;const target=origin?.target||this.target(),muzzle=origin||this.muzzle(),angle=Math.atan2(target.y-muzzle.y,target.x-muzzle.x);
+      const count=!origin&&this.rage>0?10:1+this.stack('multishot'),renderCount=Math.min(15,count);
       for(let i=0;i<renderCount;i++){
         const a=angle+(i-(renderCount-1)/2)*.06;
         this.bullets.push({x:muzzle.x,y:muzzle.y,px:muzzle.x,py:muzzle.y,vx:Math.cos(a)*720,vy:Math.sin(a)*720,life:2.5,
-          damage:24*this.power*(count/renderCount),pierce:this.stack('pierce'),bounces:this.stack('ricochet'),hitIds:new Set()});
+          damage:24*this.power*(!origin&&this.rage>0?3:1)*(count/renderCount),rageShot:!origin&&this.rage>0,pierce:this.stack('pierce'),bounces:this.stack('ricochet'),hitIds:new Set()});
       }
       this.emit('shot',{angle});
     }
     damage(z,amount,kind='pea') {
-      if(z.hp<=0)return;
+      if(z.hp<=0||(z.charmed&&kind!=='zombieBite'))return;
       const surface=this.freeze>0?'iceHit':z.shield>0?'shield':z.type==='armor'?'metal':'flesh';
       if(kind==='pea'&&z.type==='armor')amount*=.5;
       if(z.shield>0){const blocked=Math.min(z.shield,amount);z.shield-=blocked;amount-=blocked;}
@@ -219,33 +268,72 @@
       if(kind==='pea')z.x=Math.min(1070,z.x+3+4*this.stack('knockback'));
       this.emit('hit',{x:z.x,y:z.y,kind,surface});
       if(z.hp<=0){
+        if(z.charmed){this.dead.push({...z,life:.7,fullLife:.7});return;}
         this.kills++;const score=z.boss?250:z.type==='walker'?10:25;this.score+=score;this.combo++;
         this.dead.push({...z,life:.7,fullLife:.7});this.emit('kill',{x:z.x,y:z.y,boss:z.boss,score});
         if(this.stack('leech')&&++this.healKills>=Math.max(2,20-this.stack('leech')*2)){this.healKills=0;this.health=Math.min(this.maxHealth,this.health+1);}
         if(z.type==='splitter'){this.spawn(z.x+12,clamp(z.y-25,100,455),'mini',false);this.spawn(z.x+22,clamp(z.y+25,100,455),'mini',false);}
+        if(z.deathMark>0){this.deathQueue.push({x:z.x,y:z.y,damage:Math.max(360*this.magicPower,z.maxHp*.5)});this.drainDeathChain();}
       }
     }
+    drainDeathChain(){
+      if(this.processingDeath)return;this.processingDeath=true;
+      try{while(this.deathQueue.length){const blast=this.deathQueue.shift();this.effects.push({kind:'explosion',x:blast.x,y:blast.y,life:.45,fullLife:.45});this.emit('explosion',blast);for(const z of [...this.enemies])if(z.hp>0&&!z.charmed&&Math.hypot(z.x-blast.x,z.y-blast.y)<=170)this.damage(z,blast.damage,'deathchain');}}finally{this.processingDeath=false;}
+    }
+    buildCollisionGrid(){
+      if(this.enemies.length<24||this.bullets.length<4){this.collisionGrid=null;return null;}
+      const size=96,grid=new Map();
+      for(let index=0;index<this.enemies.length;index++){
+        const z=this.enemies[index];if(z.hp<=0||z.charmed)continue;z._collisionOrder=index;
+        const left=Math.floor((z.x-z.radius)/size),right=Math.floor((z.x+z.radius)/size),top=Math.floor((z.y-z.radius)/size),bottom=Math.floor((z.y+z.radius)/size);
+        for(let cx=left;cx<=right;cx++)for(let cy=top;cy<=bottom;cy++){const key=cx+','+cy,bucket=grid.get(key);if(bucket)bucket.push(z);else grid.set(key,[z]);}
+      }
+      this.collisionGrid={grid,size};return this.collisionGrid;
+    }
+    findBulletCollision(b,minX,maxX,minY,maxY,dx,dy,len){
+      const spatial=this.collisionGrid;if(!spatial)return null;let stamp=++this.collisionStamp;if(stamp>2000000000){stamp=this.collisionStamp=1;for(const z of this.enemies)z._collisionStamp=0;}
+      const {grid,size}=spatial,left=Math.floor(minX/size),right=Math.floor(maxX/size),top=Math.floor(minY/size),bottom=Math.floor(maxY/size);let hit=null;
+      for(let cx=left;cx<=right;cx++)for(let cy=top;cy<=bottom;cy++){const bucket=grid.get(cx+','+cy);if(!bucket)continue;for(const z of bucket){
+        if(z._collisionStamp===stamp){continue;}z._collisionStamp=stamp;this.collisionCandidates++;
+        if(z.hp<=0||z.charmed||z.x<minX-z.radius||z.x>maxX+z.radius||z.y<minY-z.radius||z.y>maxY+z.radius||b.hitIds.has(z.id))continue;
+        const t=len?clamp(((z.x-b.px)*dx+(z.y-b.py)*dy)/len,0,1):0,ex=z.x-(b.px+t*dx),ey=z.y-(b.py+t*dy);
+        if(ex*ex+ey*ey<z.radius*z.radius&&(!hit||z._collisionOrder<hit._collisionOrder))hit=z;
+      }}
+      return hit;
+    }
     hitBullet(b,z){
+      if(b.life<=0||z.hp<=0||z.charmed||b.hitIds.has(z.id))return;
+      // Keep damage as the original base value so saved in-flight bullets also
+      // resume with the correct attenuation from their already-hit target IDs.
+      const baseAmount=b.damage*Math.pow(.7,b.hitIds.size);
+      if(baseAmount<.5){b.life=0;return;}
       b.hitIds.add(z.id);
-      let amount=b.damage;if(this.freeze>0)amount*=2+.5*this.stack('shatter');
+      let amount=baseAmount;if(this.freeze>0)amount*=2+.5*this.stack('shatter');
       if(this.random()<Math.min(.9,.1*this.stack('crit'))){amount*=2+.5*this.stack('critPower');this.emit('critical',{x:z.x,y:z.y});}
       this.damage(z,amount);
       if(this.stack('poison')){z.poison=8*this.stack('poison');z.poisonTime=4;}
       if(this.stack('frost')){z.chill=Math.min(.7,.15*this.stack('frost'));z.slowTime=2;}
       if(this.stack('splash'))for(const other of [...this.enemies])if(other.id!==z.id&&Math.hypot(other.x-z.x,other.y-z.y)<55+20*this.stack('splash'))this.damage(other,amount*.35,'splash');
+      // Every continuation loses energy, including the ricochet branch below.
+      if(baseAmount*.7<.5){b.life=0;return;}
       if(b.bounces>0){let next=null,distance=Infinity;
-        for(const enemy of this.enemies){if(enemy.hp<=0||b.hitIds.has(enemy.id))continue;const d=Math.hypot(enemy.x-z.x,enemy.y-z.y);if(d<distance){distance=d;next=enemy;}}
+        for(const enemy of this.enemies){if(enemy.hp<=0||enemy.charmed||b.hitIds.has(enemy.id))continue;const d=Math.hypot(enemy.x-z.x,enemy.y-z.y);if(d<distance){distance=d;next=enemy;}}
         if(next){b.bounces--;b.x=z.x;b.y=z.y;const a=Math.atan2(next.y-z.y,next.x-z.x);b.vx=Math.cos(a)*720;b.vy=Math.sin(a)*720;return;}}
       if(b.pierce>0)b.pierce--;else b.life=0;
     }
     offerCards(){
       this.status='upgrade';this.shooting=false;this.cancelTyping();this.bullets=[];this.effects=[];
-      const pool=[...CARDS];for(let i=pool.length-1;i>0;i--){const j=Math.floor(this.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
-      this.offers=pool.slice(0,3);this.emit('upgrade',{wave:this.wave,offers:this.offers});
+      const pool=CARDS.filter(c=>c.skill?!['laser','freeze','melon'].includes(c.skill)&&!this.skills.some(s=>s.kind===c.skill):c.id!=='rageDuration'||this.skills.some(s=>s.kind==='rage'));
+      const attributes=pool.filter(card=>!card.skill),skills=pool.filter(card=>card.skill),take=items=>items.splice(Math.floor(this.random()*items.length),1)[0];
+      this.offers=[];
+      for(let i=0;i<3;i++){const skillSlot=!this.offers.some(card=>card.skill)&&skills.length&&this.random()<.05;this.offers.push(take(skillSlot?skills:attributes.length?attributes:skills));}
+      this.emit('upgrade',{wave:this.wave,offers:this.offers});
     }
-    chooseCard(id){
+    chooseCard(id,slot){
       if(this.status!=='upgrade'||!this.offers.some(c=>c.id===id))return false;
-      this.stacks[id]=(this.stacks[id]||0)+1;
+      const card=this.offers.find(c=>c.id===id);
+      if(card.skill){if(!Number.isInteger(slot)||slot<0||slot>2||this.skills.some(s=>s.kind===card.skill))return false;const previous=this.skills[slot],baseKind=previous.baseKind||(['laser','freeze','melon'].includes(previous.kind)?previous.kind:['laser','freeze','melon'][slot]);Object.assign(previous,SKILLS[card.skill],{kind:card.skill,baseKind,remainingUses:5,typed:0,repeatsDone:0,cd:0});this.skills[slot].code=this.nextCode(slot);}
+      else this.stacks[id]=(this.stacks[id]||0)+1;
       if(id==='fortify'){this.maxHealth+=2;this.health+=2;}
       if(id==='repair')this.health=Math.min(this.maxHealth,this.health+2);
       this.health=Math.min(this.maxHealth,this.health+1+this.stack('repair'));
@@ -278,6 +366,7 @@
     learningEntry(code){return this.customBank?.entries.find(e=>e.word===code)||(['sentences','speaking'].includes(this.learningMode)?sentenceEntry(code):findWordEntry(code));}
     setCustomBank(group){if(group&&!CUSTOM.validate(group))throw Error('自定义分组无效');if(group&&((this.learningMode==='english')!==(group.kind==='word')||this.learningMode==='letters'))throw Error('分组类型与练习模式不匹配');this.customBank=group?JSON.parse(JSON.stringify(group)):null;delete this.promptHistory.custom;}
     nextCode(index) {
+      this.skills[index].practiceLevel=this.learningMode==='letters'||this.customBank?0:this.englishLevel;
       if(this.customBank&&this.learningMode!=='letters')return this.pickLearningCode(this.customBank.entries,index,'custom');
       if(['english','sentences','speaking'].includes(this.learningMode)){
         if(['sentences','speaking'].includes(this.learningMode)){
@@ -303,7 +392,8 @@
     }
     input(key) {
       if(this.learningMode==='speaking')return false;
-      if(this.status!=='playing'||!((/^[a-z]$/i).test(key)||(key===' '&&this.learningMode==='sentences')||(['english','sentences'].includes(this.learningMode)&&/^[ .'-]$/.test(key))))return false;
+      const learning=['english','sentences'].includes(this.learningMode);
+      if(this.status!=='playing'||!((/^[a-z]$/i).test(key)||(key===' '&&learning)||(learning&&/^[.'-]$/.test(key))))return false;
       key=key.toUpperCase();
       let index=this.typing;
       if(index<0)index=this.skills.findIndex(s=>s.cd<=0&&s.code[0]===key);
@@ -314,9 +404,10 @@
       if(skill.code[skill.typed]!==key){this.emit('wrong',{expected:skill.code[skill.typed]});return false;}
       skill.typed++;this.correct++;this.emit('letter',{index});
       if(skill.typed===skill.code.length){
+        if(['english','sentences'].includes(this.learningMode)){const entry=this.learningEntry(skill.code);this.emit('practice-complete',{index,code:skill.code,text:entry?.text||skill.code.toLowerCase(),meaning:entry?.meaning||'',repeat:skill.repeatsDone+1});}
         if(this.learningMode==='english'&&skill.repeatsDone+1<this.learningLoad){skill.repeatsDone++;skill.typed=0;this.emit('repeat',{index,done:skill.repeatsDone,total:this.learningLoad});return true;}
-        if(!this.enemies.some(z=>z.hp>0)){skill.typed=0;this.typing=-1;this.emit('empty');return true;}
-        this.cast(index);
+        if(!this.enemies.some(z=>z.hp>0&&!z.charmed)){skill.typed=0;this.typing=-1;this.emit('empty');return true;}
+        this.cast(index,true);
       }
       return true;
     }
@@ -332,52 +423,96 @@
       if(this.status!=='playing'||this.learningMode!=='speaking'||!Number.isInteger(index)||index<0||index>2)return false;
       const skill=this.skills[index];
       if(skill.cd>0){this.emit('cooldown',{index});return false;}
-      const normalize=text=>String(text||'').replace(/[’‘]/g,"'").toUpperCase().replace(/[^A-Z0-9' ]/g,' ').replace(/\s+/g,' ').trim();
-      const heard=normalize(transcript),expected=normalize(skill.code);
-      this.typing=index;this.emit('speech',{index,heard,expected,matched:heard===expected});
-      if(!heard||heard!==expected)return false;
-      if(!this.enemies.some(z=>z.hp>0)){this.typing=-1;this.emit('empty');return true;}
-      this.correct+=expected.replace(/ /g,'').length;this.cast(index);return true;
+      const match=speechMatch(this.learningEntry(skill.code)?.text||skill.code,transcript),{heard,expected}=match;
+      this.typing=index;this.emit('speech',{index,heard,expected,matched:match.matched,nameTolerated:match.nameTolerated});
+      if(!match.matched)return false;
+      if(!this.enemies.some(z=>z.hp>0&&!z.charmed)){this.typing=-1;this.emit('empty');return true;}
+      this.correct+=expected.replace(/ /g,'').length;this.cast(index,true);return true;
     }
     backspace() { if(this.typing>=0){const s=this.skills[this.typing];s.typed=Math.max(0,s.typed-1);} }
     cancelTyping(){if(this.typing>=0)this.skills[this.typing].typed=0;this.typing=-1;}
-    cast(index) {
-      const skill=this.skills[index]; const target=this.target();
+    cast(index,completedPractice=false) {
+      const skill=this.skills[index],kind=skill.kind||['laser','freeze','melon'][index],target=this.skillTarget(kind);
+      let reward=null;
+      if(completedPractice){
+        const letters=(skill.code.match(/[A-Z]/gi)||[]).length;
+        const level=Number.isInteger(skill.practiceLevel)&&skill.practiceLevel>=0&&skill.practiceLevel<=4?skill.practiceLevel:0;
+        const repeats=this.learningMode==='english'?(skill.repeatsDone||0)+1:1;
+        const points=letters*2*(level+1)*repeats;
+        this.score+=points;this.practiceScore=(this.practiceScore||0)+points;
+        reward={points,letters,level,repeats};
+      }
       this.typing=-1;skill.typed=0;skill.repeatsDone=0;skill.cd=skill.duration;skill.uses++;this.casts++;
       if(this.stack('barrier')&&this.casts%3===0)this.health=Math.min(this.maxHealth,this.health+this.stack('barrier'));
-      if(index===0){
+      if(kind==='laser'){
         const angle=Math.atan2(target.y-this.hero.y,target.x-this.hero.x);
         this.effects.push({kind:'laser',angle,width:85+35*this.stack('beam'),life:.65,fullLife:.65});
-        for(const z of this.enemies){const dx=z.x-this.hero.x,dy=z.y-this.hero.y;const d=Math.abs(dx*Math.sin(angle)-dy*Math.cos(angle));if(d<85+35*this.stack('beam')+z.radius)this.damage(z,210*this.magicPower,'laser');}
+        for(const z of this.enemies){const dx=z.x-this.hero.x,dy=z.y-this.hero.y;const d=Math.abs(dx*Math.sin(angle)-dy*Math.cos(angle));if(d<85+35*this.stack('beam')+z.radius)this.damage(z,250*this.magicPower,'laser');}
       }
-      if(index===1){this.freeze=6+1.5*this.stack('permafrost');if(this.stack('magic'))for(const z of [...this.enemies])this.damage(z,30*this.stack('magic'),'ice');this.effects.push({kind:'freeze',life:1,fullLife:1});}
-      if(index===2){for(let i=0;i<1+Math.min(10,this.stack('twinmelon'));i++)this.effects.push({kind:'melon',x:clamp(target.x+(i?((i%2?1:-1)*60*Math.ceil(i/2)):0),160,1000),y:target.y,life:.75+i*.2,fullLife:.75+i*.2,damage:380*this.magicPower*Math.max(1,(1+this.stack('twinmelon'))/11),radius:225+45*this.stack('blast')});}
+      if(kind==='freeze'){this.freeze=6+1.5*this.stack('permafrost');if(this.stack('magic'))for(const z of [...this.enemies])this.damage(z,30*this.stack('magic'),'ice');this.effects.push({kind:'freeze',life:1,fullLife:1});}
+      if(kind==='melon'){for(let i=0;i<1+Math.min(10,this.stack('twinmelon'));i++)this.effects.push({kind:'melon',x:clamp(target.x+(i?((i%2?1:-1)*60*Math.ceil(i/2)):0),160,1000),y:target.y,life:.75+i*.2,fullLife:.75+i*.2,damage:380*this.magicPower*Math.max(1,(1+this.stack('twinmelon'))/11),radius:225+45*this.stack('blast')});}
       this.enemies=this.enemies.filter(z=>z.hp>0);
-      this.emit('cast',{index,name:skill.name});
+      if(kind==='charm'){const targets=this.charmFrontlines();for(const z of targets){z.charmed=true;z.deathMark=0;z.eating=false;z.engaged=false;z.poisonTime=0;z.slowTime=0;z.biteIn=.6;}this.effects.push({kind:'charm',targets:targets.map(z=>({x:z.x,y:z.y})),life:.8,fullLife:.8});}
+      if(kind==='rage'){this.rage=5+this.stack('rageDuration');this.shotIn=0;}
+      if(kind==='lightning'){
+        const remaining=this.enemies.filter(z=>z.hp>0&&!z.charmed),points=[];let from={x:this.hero.x,y:this.hero.y};
+        for(let i=0;i<10&&remaining.length;i++){remaining.sort((a,b)=>i===0?(this.skillAuto?a.x-b.x:Math.hypot(a.x-target.x,a.y-target.y)-Math.hypot(b.x-target.x,b.y-target.y)):Math.hypot(a.x-from.x,a.y-from.y)-Math.hypot(b.x-from.x,b.y-from.y));const z=remaining.shift();points.push({x:z.x,y:z.y});this.damage(z,Math.max(300,z.maxHp*.25)*(1+i*.22)*this.magicPower,'lightning');from=z;}
+        this.effects.push({kind:'lightning',points,life:.65,fullLife:.65});
+      }
+      if(kind==='blackhole')this.effects.push({kind:'blackhole',x:target.x,y:target.y,radius:210,tick:0,life:3,fullLife:3});
+      if(kind==='clones'){this.clones=8;this.cloneShot=0;}
+      if(kind==='deathchain'){for(const z of this.enemies)if(z.hp>0&&!z.charmed)z.deathMark=8;this.effects.push({kind:'mark',life:.65,fullLife:.65});}
+      if(kind==='judgment'){const targets=this.enemies.filter(z=>z.hp>0&&!z.charmed).sort((a,b)=>this.skillAuto?(b.hp+b.shield)-(a.hp+a.shield):Math.hypot(a.x-target.x,a.y-target.y)-Math.hypot(b.x-target.x,b.y-target.y));const count=6+this.stack('judgmentTargets');for(const z of targets.slice(0,count))this.damage(z,z.boss?z.maxHp*.55+z.shield:z.hp+z.shield+1,'judgment');if(targets.length)this.effects.push({kind:'judgment',x:target.x,y:target.y,targets:targets.slice(0,count).map(z=>({x:z.x,y:z.y})),life:1,fullLife:1});}
+      this.enemies=this.enemies.filter(z=>z.hp>0);
+      this.emit('cast',{index,kind,name:skill.name});
+      if(!['laser','freeze','melon'].includes(kind)){
+        skill.remainingUses=(skill.remainingUses??5)-1;
+        if(skill.remainingUses===0){const baseKind=skill.baseKind||['laser','freeze','melon'][index],base=SKILLS[baseKind];Object.assign(skill,base,{kind:baseKind,cd:Math.min(skill.cd,base.duration)});delete skill.remainingUses;delete skill.baseKind;this.emit('skill-expired',{index,name:base.name});}
+      }
+      if(reward)this.emit('practice-score',reward);
     }
     finish(win) {if(this.status!=='playing')return;this.status=win?'won':'lost';this.shooting=false;this.cancelTyping();this.emit('finish',{win});}
     update(rawDt) {
       const dt=clamp(rawDt,0,.05);
       if(this.status!=='playing')return;
       this.time+=dt;this.activeTime+=dt;
+      if(!this.skillAuto&&this.skillAimLeft>0){this.skillAimLeft=Math.max(0,this.skillAimLeft-dt);if(this.skillAimLeft<1e-8){this.skillAimLeft=0;this.skillAuto=true;this.emit('aim-auto');}}
       const worldDt=dt*(this.typingSlow?.22:1);
       for(let i=0;i<this.skills.length;i++){
         const s=this.skills[i];if(s.cd>0){s.cd=Math.max(0,s.cd-dt*this.rechargeRate);if(s.cd===0){s.code=this.nextCode(i);this.emit('ready',{index:i});}}
       }
-      this.freeze=Math.max(0,this.freeze-worldDt);
+      this.freeze=Math.max(0,this.freeze-worldDt);const wasRage=this.rage>0;this.rage=Math.max(0,this.rage-dt);if(wasRage&&this.rage===0)this.bullets=this.bullets.filter(b=>!b.rageShot);this.clones=Math.max(0,this.clones-dt);
+      if(this.clones>0){this.cloneShot-=dt;if(this.cloneShot<=0){this.cloneShot=this.ordinaryShotInterval;const targets=this.enemies.filter(z=>z.hp>0&&!z.charmed).sort((a,b)=>a.x-b.x);if(targets.length){this.shoot({x:this.hero.x+35,y:this.hero.y-90,target:this.skillAuto?targets[0]:this.skillAim});this.shoot({x:this.hero.x+35,y:this.hero.y+90,target:this.skillAuto?(targets[1]||targets[0]):this.skillAim});}}}
       this.shotKick=Math.max(0,(this.shotKick||0)-dt);this.shotIn-=dt;
-      if(this.fireStrength>0&&(this.shooting||this.auto)&&this.shotIn<=0){this.shoot();this.shotIn=Math.max(.025,.15/(this.fireStrength*(1+.18*this.stack('rapid'))));}
-      for(const e of this.effects){e.life-=dt;if(e.kind==='melon'&&e.life<=0&&!e.exploded){e.exploded=true;for(const z of [...this.enemies])if(Math.hypot(z.x-e.x,z.y-e.y)<e.radius+z.radius)this.damage(z,e.damage,'melon');this.effects.push({kind:'explosion',x:e.x,y:e.y,life:.7,fullLife:.7});this.emit('explosion',{x:e.x,y:e.y});}}
+      if(((this.fireStrength>0&&(this.shooting||this.auto))||this.rage>0)&&this.shotIn<=0){this.shoot();this.shotIn=this.rage>0?this.rageShotInterval:this.ordinaryShotInterval;}
+      for(const e of this.effects){e.life-=dt;
+        if(e.kind==='blackhole'){
+          e.tick=(e.tick??0)-dt;const pulse=e.tick<=0;if(pulse)e.tick=.25;
+          for(const z of this.enemies)if(z.hp>0&&!z.charmed){const d=Math.hypot(z.x-e.x,z.y-e.y);if(d<=e.radius){if(d>12){const step=Math.min(d-12,(z.boss?25:100)*dt);z.x+=(e.x-z.x)/d*step;z.y+=(e.y-z.y)/d*step;}if(pulse)this.damage(z,Math.max(35,z.maxHp*.02)*this.magicPower,'blackhole');}}
+          if(e.life<=0){for(const z of [...this.enemies])if(z.hp>0&&!z.charmed&&Math.hypot(z.x-e.x,z.y-e.y)<=e.radius)this.damage(z,Math.max(450,z.maxHp*.25)*this.magicPower,'blackhole');this.effects.push({kind:'explosion',x:e.x,y:e.y,life:.6,fullLife:.6});this.emit('explosion',{x:e.x,y:e.y});}
+        }
+        if(e.kind==='melon'&&e.life<=0&&!e.exploded){e.exploded=true;for(const z of [...this.enemies])if(Math.hypot(z.x-e.x,z.y-e.y)<e.radius+z.radius)this.damage(z,e.damage,'melon');this.effects.push({kind:'explosion',x:e.x,y:e.y,life:.7,fullLife:.7});this.emit('explosion',{x:e.x,y:e.y});}}
       this.effects=this.effects.filter(e=>e.life>0);
+      const allies=this.enemies.filter(z=>z.charmed&&z.hp>0),hostiles=allies.length?this.enemies.filter(z=>!z.charmed&&z.hp>0):[];
       for(const z of [...this.enemies]){
         if(z.hp<=0)continue;
-        z.hit=Math.max(0,z.hit-dt);
+        z.hit=Math.max(0,z.hit-dt);z.deathMark=Math.max(0,(z.deathMark||0)-dt);
+        if(!z.charmed){
         z.poisonTime=Math.max(0,z.poisonTime-worldDt);if(z.poisonTime>0)this.damage(z,z.poison*worldDt,'poison');
         z.slowTime=Math.max(0,z.slowTime-worldDt);
         if(this.stack('thorns')&&z.x<260)this.damage(z,25*this.stack('thorns')*worldDt,'thorns');
         if(z.hp<=0)continue;
-        if(this.freeze===0){
-          const movementDt=worldDt*(z.slowTime>0?1-z.chill:1);
+        }
+        const opponent=(z.charmed?hostiles:allies).find(other=>other.hp>0&&Math.abs(other.y-z.y)<45&&Math.abs(other.x-z.x)<z.radius+other.radius+10);
+        z.charmEngaged=Boolean(opponent);
+        if(opponent){z.eating=false;z.biteIn=(z.biteIn??.6)-worldDt;if(z.biteIn<=0){z.biteIn=.6;this.damage(opponent,z.maxHp*.18,'zombieBite');this.emit('nibble',{x:z.x,y:z.y});}continue;}
+        if(z.charmed){z.eating=false;z.gait+=worldDt*3.35;z.x+=z.speed*worldDt*(1+.2*Math.sin(z.gait));if(z.x>1100)z.hp=0;continue;}
+
+        {
+          // Ice slows movement, never attacks/abilities. Slow effects use the
+          // strongest individual rate rather than multiplying toward zero.
+          const movementRate=Math.min(this.freeze>0?.5:1,z.slowTime>0?Math.max(.3,1-z.chill):1);
+          const movementDt=worldDt*movementRate;
           const cadence=z.type==='runner'||z.type==='mini'?6.3:z.boss?2.25:3.35;
           z.eating=this.canBiteDefense(z)&&z.x<=195&&this.health>0;
           if(z.eating){
@@ -385,19 +520,22 @@
             if(z.biteIn<=0){z.biteIn=.3;this.damageDefense(z.boss?.75:.25,z.y);}
           }else{z.gait+=movementDt*cadence;z.x-=z.speed*movementDt*(1+.38*Math.sin(z.gait));}
           z.ability-=worldDt;
-          if(z.type==='healer'&&z.ability<=0){z.ability=3;for(const other of this.enemies)if(other.hp>0&&other.id!==z.id&&Math.hypot(other.x-z.x,other.y-z.y)<190)other.hp=Math.min(other.maxHp,other.hp+other.maxHp*.1);this.emit('heal',{x:z.x,y:z.y});}
+          if(z.type==='healer'&&z.ability<=0){z.ability=3;for(const other of this.enemies)if(other.hp>0&&!other.charmed&&other.id!==z.id&&Math.hypot(other.x-z.x,other.y-z.y)<190)other.hp=Math.min(other.maxHp,other.hp+other.maxHp*.1);this.emit('heal',{x:z.x,y:z.y});}
           if(z.boss&&z.ability<=0&&this.enemies.length<80){z.ability=9;this.spawn(z.x+40,clamp(z.y+45,100,455),'runner',false);}
           if(z.type==='bomber'&&z.x<=195&&this.canBiteDefense(z)){z.hp=0;this.damageDefense(2,z.y);this.emit('explosion',{x:z.x,y:z.y});this.emit('breach',{health:this.health});continue;}
         }
         if(z.x<75)z.x=75;
       }
+      this.collisionCandidates=0;this.buildCollisionGrid();
       for(const b of this.bullets){
         b.px=b.x;b.py=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
-        for(const z of this.enemies){
-          if(z.hp<=0||b.life<=0||b.hitIds.has(z.id))continue;
-          const dx=b.x-b.px,dy=b.y-b.py;const len=dx*dx+dy*dy;
-          const t=len?clamp(((z.x-b.px)*dx+(z.y-b.py)*dy)/len,0,1):0;
-          if(Math.hypot(z.x-(b.px+t*dx),z.y-(b.py+t*dy))<z.radius){this.hitBullet(b,z);break;}
+        if(b.life<=0)continue;
+        const dx=b.x-b.px,dy=b.y-b.py,len=dx*dx+dy*dy,minX=Math.min(b.x,b.px),maxX=Math.max(b.x,b.px),minY=Math.min(b.y,b.py),maxY=Math.max(b.y,b.py);
+        const spatialHit=this.findBulletCollision(b,minX,maxX,minY,maxY,dx,dy,len);if(spatialHit){this.hitBullet(b,spatialHit);continue;}
+        if(!this.collisionGrid)for(const z of this.enemies){
+          this.collisionCandidates++;if(z.hp<=0||z.charmed||z.x<minX-z.radius||z.x>maxX+z.radius||z.y<minY-z.radius||z.y>maxY+z.radius||b.hitIds.has(z.id))continue;
+          const t=len?clamp(((z.x-b.px)*dx+(z.y-b.py)*dy)/len,0,1):0,ex=z.x-(b.px+t*dx),ey=z.y-(b.py+t*dy);
+          if(ex*ex+ey*ey<z.radius*z.radius){this.hitBullet(b,z);break;}
         }
       }
       this.enemies=this.enemies.filter(z=>z.hp>0);
@@ -406,11 +544,11 @@
       if(this.health<=0){this.breachElapsed+=worldDt;if(this.breachElapsed>=3){this.finish(false);return;}}else this.breachElapsed=0;
       if(this.spawned<this.quota){
         this.spawnIn-=worldDt;if(this.spawnIn<=0&&this.enemies.length<100){this.spawn();this.spawnIn=Math.max(.28,2.1*Math.pow(.88,this.wave-1));}
-      } else if(this.enemies.length===0){
+      } else if(!this.enemies.some(z=>z.hp>0&&!z.charmed)){
         this.offerCards();
       }
     }
   }
-  root.DIALOGUE_STAGES=DIALOGUES.stages;root.ENGLISH_STAGES=VOCABULARY.stages;root.findWordEntry=findWordEntry;root.ENGLISH_SENTENCES=ENGLISH_SENTENCES;root.ENGLISH_CONTEXTS=ENGLISH_CONTEXTS;root.findSentenceEntry=sentenceEntry;root.ENGLISH_WORDS=ENGLISH_WORDS;root.GardenGame=GardenGame;root.GARDEN_CARDS=CARDS;root.ZOMBIE_TYPES=TYPES;
-  if(typeof module!=='undefined'&&module.exports)module.exports={DIALOGUE_STAGES:DIALOGUES.stages,GardenGame,CARDS,TYPES,ENGLISH_WORDS,ENGLISH_STAGES:VOCABULARY.stages,findWordEntry,ENGLISH_SENTENCES,ENGLISH_CONTEXTS,findSentenceEntry:sentenceEntry};
+  root.GARDEN_SKILLS=SKILLS;root.GuluSpeechMatch={normalize:normalizeSpeech,match:speechMatch};root.DIALOGUE_STAGES=DIALOGUES.stages;root.ENGLISH_STAGES=VOCABULARY.stages;root.findWordEntry=findWordEntry;root.ENGLISH_SENTENCES=ENGLISH_SENTENCES;root.ENGLISH_CONTEXTS=ENGLISH_CONTEXTS;root.findSentenceEntry=sentenceEntry;root.ENGLISH_WORDS=ENGLISH_WORDS;root.GardenGame=GardenGame;root.GARDEN_CARDS=CARDS;root.ZOMBIE_TYPES=TYPES;
+  if(typeof module!=='undefined'&&module.exports)module.exports={SKILLS,DIALOGUE_STAGES:DIALOGUES.stages,GardenGame,CARDS,TYPES,ENGLISH_WORDS,ENGLISH_STAGES:VOCABULARY.stages,findWordEntry,ENGLISH_SENTENCES,ENGLISH_CONTEXTS,findSentenceEntry:sentenceEntry,speechMatch};
 })(typeof globalThis!=='undefined'?globalThis:this);

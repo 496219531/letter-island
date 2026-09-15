@@ -30,7 +30,7 @@ body.native-iphone{height:100dvh;min-height:0;overflow:hidden!important;display:
 .native-iphone .start-screen{inset:0;display:flex;align-items:flex-end;justify-content:stretch;padding:0;background:linear-gradient(180deg,#163b2455 0%,#17362910 44%,#173629aa 100%)}
 .native-iphone .start-screen:before{content:'✳';position:absolute;display:grid;place-items:center;left:20px;top:28px;width:56px;height:56px;border-radius:20px;background:var(--app-gold);color:#5a481b;font-size:30px;font-weight:900;box-shadow:0 6px 18px #17362935}
 .native-iphone .start-screen:after{content:'今天，也来守住小院';position:absolute;left:20px;top:102px;color:#fff;font-size:16px;font-weight:800;letter-spacing:.2px}
-.native-iphone .start-panel{position:relative;width:100%;max-height:none;margin:0;padding:22px 20px 20px;rotate:0;text-align:left;border:0;border-radius:24px 24px 0 0;background:var(--app-paper);box-shadow:none;overflow:auto}
+.native-iphone .start-panel{position:relative;width:100%;max-height:none;margin:0;padding:22px 20px 20px;rotate:none;text-align:left;border:0;border-radius:24px 24px 0 0;background:var(--app-paper);box-shadow:none;overflow:auto}
 .native-iphone .start-stamp{font-size:11px;letter-spacing:.8px;color:var(--app-leaf)}
 .native-iphone .start-panel h2{font-size:28px;line-height:1.18;letter-spacing:-.5px;color:var(--app-ink);margin:7px 0}
 .native-iphone .start-panel>p{font-size:13px;line-height:1.55;color:var(--app-muted);margin:0}
@@ -51,8 +51,8 @@ body.native-iphone{height:100dvh;min-height:0;overflow:hidden!important;display:
 .native-iphone .start-panel>small{display:block;margin-top:10px;font-size:10px;color:var(--app-muted);text-align:center}
 
 /* Battle: one readable status strip, a full scene, then one skill surface. */
-.native-iphone[data-game-state=playing] .topbar{display:none}
-.native-iphone[data-game-state=playing] .game-shell{padding-top:6px}
+.native-iphone:not([data-game-state=ready]) .topbar{display:none}
+.native-iphone:not([data-game-state=ready]) .game-shell{padding-top:6px}
 .native-iphone .game-toolbar{height:48px;min-height:48px;padding:0 12px;gap:9px;background:var(--app-ink);color:#f5f7ec}
 .native-iphone .level-badge{width:30px;height:30px;border-radius:10px;background:#f4dda0;color:#6b5320;font-size:13px}
 .native-iphone .wave-info{gap:8px;min-width:0}
@@ -109,7 +109,32 @@ body.native-iphone:not([data-game-state=ready]) .game-frame{grid-template-rows:a
 body.native-iphone:not([data-game-state=ready]) .battlefield{min-height:0;height:auto}
 body.native-iphone .skill-card .skill-info,body.native-iphone .skill-card .skill-keys{overflow-wrap:anywhere}
 .native-iphone .landscape-center{display:contents}
-.native-iphone .landscape-settings{display:none}
+body.native-iphone.browser-phone{height:var(--browser-app-height,100dvh);box-sizing:border-box;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.native-iphone .landscape-settings{display:block;width:34px;height:34px;min-height:34px;border:1px solid #ffffff35;border-radius:10px;background:#ffffff14;color:#fff}
+.native-iphone .orientation-button{display:block;width:100%;min-height:44px;margin-top:8px;border:1px solid var(--app-line);border-radius:12px;background:#edf3e8;color:var(--app-leaf);font-size:14px;font-weight:700}
+.native-iphone .orientation-note{font-size:12px;line-height:1.5;color:var(--app-leaf);margin:8px 0}
+body.native-iphone #touchKeyboard .utility-row .sentence-space{flex:3;min-width:0;width:auto}
+body.native-iphone #touchKeyboard .utility-row .touch-key{flex:1;width:0;min-width:0;height:36px;min-height:36px}
+body.native-iphone #touchKeyboard .utility-row .sentence-space{flex:3}
+body.native-iphone .skill-card .word-ipa{color:#d4dfc6}
+body.native-iphone .skill-card .skill-status{color:#d4dfc6}
+body.native-iphone .start-panel{transform:none;rotate:none;box-shadow:none}
+body.native-iphone .start-panel *{text-shadow:none}
+body.native-iphone #battleToast{position:absolute;top:40px;bottom:auto;left:10px;right:10px;z-index:5;transform:none;display:none;width:auto;max-width:calc(100% - 20px);margin:0;padding:6px 10px;max-height:44px;overflow:hidden;font-size:11px;line-height:16px;pointer-events:none}
+body.native-iphone #battleToast.visible{display:block}
+body.native-iphone[data-learning-mode=english] .skill-card .skill-info>strong{display:none}
+body.native-iphone .skill-card .skill-info>.word-ipa:not([hidden]){color:#d4dfc6}
+body.native-iphone .game-toolbar{flex-wrap:nowrap;gap:7px}
+body.native-iphone .wave-info{flex:0 1 auto;overflow:hidden}
+body.native-iphone .wave-info strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.native-iphone .hearts-wrap{flex:none;margin-left:auto}
+body.native-iphone #hearts{max-width:none;display:flex;align-items:center;gap:3px}
+body.native-iphone #hearts .heart:not(:first-child){display:none}
+body.native-iphone #hearts .health-number{display:inline;font-size:12px;color:#fff1bd}
+body.native-iphone .battle-score{min-width:18px;flex:none}
+body.native-iphone .game-toolbar>button{flex:none}
+body.native-iphone #gameDialog .help-row{color:#465747}
+body.native-iphone #gameDialog .help-row strong{color:#173629}
 .native-iphone .landscape-choice{display:flex;flex-direction:column;gap:8px;color:var(--app-ink)}
 .native-iphone .landscape-choice select{min-height:44px;width:100%;font-size:16px}
 /* Opaque settings surfaces need their own text palette, not battlefield colors. */
@@ -159,7 +184,7 @@ body.native-iphone #gameDialog p{color:#465747}
  body.native-iphone #speechButton{min-height:38px;font-size:12px}
  body.native-iphone #speechEnable,body.native-iphone #speechSkip,body.native-iphone #speechReview,body.native-iphone #speechExample{min-height:28px;font-size:10px}
  body.native-iphone #speechTranscript{font-size:10px;max-height:26px}
- body.native-iphone #battleToast{max-height:24px;overflow:auto;font-size:10px;position:static;transform:none;flex:none}
+ body.native-iphone #battleToast{top:36px;max-height:40px;font-size:11px}
  body.native-iphone[data-landscape-layout=split]:not([data-game-state=ready]) .game-frame{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);grid-template-rows:36px minmax(75px,1fr) minmax(140px,43%);gap:5px}
  body.native-iphone[data-landscape-layout=split]:not([data-game-state=ready]) .battlefield{position:absolute;inset:0;z-index:0;width:100%;height:100%;grid-column:auto;grid-row:auto}
  body.native-iphone[data-landscape-layout=split] .game-toolbar{position:relative;z-index:3;background:#17362980}
@@ -178,7 +203,7 @@ body.native-iphone #gameDialog p{color:#465747}
  body.native-iphone[data-landscape-layout=split] .right-bank{grid-column:3;grid-row:3;padding:0 5px 4px 0}
  body.native-iphone[data-landscape-layout=split] .landscape-key-row{flex:1;min-height:0}
  body.native-iphone[data-landscape-layout=split] #touchKeyboard .touch-key{height:100%;min-height:28px}
- body.native-iphone[data-landscape-layout=split] #battleToast{position:absolute;top:40px;left:10px;right:10px;z-index:5;width:auto;max-height:24px;pointer-events:none}
+ body.native-iphone[data-landscape-layout=split] #battleToast{position:absolute;top:40px;left:10px;right:10px;z-index:5;width:auto;max-height:44px;pointer-events:none}
  body.native-iphone[data-landscape-layout=split][data-learning-mode=speaking] .landscape-center{grid-column:1/-1;flex-direction:row;padding:4px;align-items:stretch}
  body.native-iphone[data-landscape-layout=split][data-learning-mode=speaking] .iphone-skill-tabs{flex-direction:column;flex:0 0 85px}
  body.native-iphone[data-landscape-layout=split][data-learning-mode=speaking] #skillGrid{height:auto;flex:1}
@@ -189,3 +214,13 @@ body.native-iphone #gameDialog p{color:#465747}
  body.native-iphone[data-game-state=ready] .start-panel{margin-left:auto;width:55%;min-height:100%;transform:none}
  body.native-iphone[data-game-state=ready] .arsenal{display:none}
 }
+/* Phone home: sibling selectors, followed by three equally weighted actions. */
+.native-iphone .start-panel{max-height:100%}
+.native-iphone .native-home-options{display:grid;grid-template-columns:1fr;gap:10px;margin:16px 0 10px}
+.native-iphone .native-home-options .native-home-option{margin:0;padding:12px;border:1px solid var(--app-line);border-radius:14px;background:#fff}
+.native-iphone .start-panel .native-home-options .custom-source{margin:0;padding:0;gap:0;font-size:0}
+.native-iphone .start-panel .native-home-options select{width:100%;min-height:40px;padding:6px 0;margin:0;border:0;border-radius:0;background:transparent;color:var(--app-ink);font:800 16px/1.35 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+.native-iphone .native-home-library{display:block;width:100%;min-height:44px;margin:0 0 16px;padding:8px;border:1px solid var(--app-line);border-radius:12px;background:#edf3e8;color:var(--app-leaf);font:600 14px/1.4 system-ui}
+.native-iphone .native-home-actions{display:grid;grid-template-columns:1fr;gap:10px;margin:0}
+.native-iphone .start-panel .native-home-actions .native-home-action{display:flex!important;align-items:center;justify-content:center;width:100%;min-height:50px;margin:0!important;padding:12px 16px;border:1px solid var(--app-line);border-radius:14px;background:#fff;color:var(--app-ink);font:800 16px/1.4 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;text-decoration:none;box-shadow:none}
+.native-iphone .native-home-actions .native-home-action:disabled{opacity:.45;cursor:default}

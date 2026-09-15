@@ -3,13 +3,17 @@
   const source=document.createElement('label');source.className='custom-source';source.textContent='练习题库';
   const select=document.createElement('select');select.id='customGroup';select.setAttribute('aria-label','练习题库');select.onchange=()=>updateTypingControls();source.append(select);
   const manage=document.createElement('button');manage.type='button';manage.textContent='我的词句库 · 添加 / 编辑';manage.onclick=()=>openLibrary();source.append(manage);$('#startButton').before(source);
-  const settingsButton=document.createElement('button');settingsButton.type='button';settingsButton.textContent='我的词句库 · 添加 / 编辑';settingsButton.onclick=()=>openLibrary();$('.difficulty-controls').append(settingsButton);
   let savedSnapshot=null;
   function groups(){return repo.list();}
+  const familyKey=group=>group.familyId||group.id;
+  const familyName=group=>group.name.replace(/ · (单词词组|句子)$/,'');
+  const hasSpeechSpecial=entry=>/(?:\.{3}|…|[\\/|「」『』《》〈〉])/u.test(String(entry?.text||''));
+  const speechReadyGroup=group=>({...group,entries:group.entries.filter(entry=>!hasSpeechSpecial(entry))});
+  function families(rows=groups()){const map=new Map();for(const group of rows){const key=familyKey(group),family=map.get(key)||{key,name:familyName(group),groups:[]};family.groups.push(group);map.set(key,family);}return [...map.values()];}
   function refresh(){
     const mode=$('#difficulty').value,kind=mode==='english'?'word':'sentence',value=select.value;source.hidden=!['english','sentences','speaking'].includes(mode);
     select.replaceChildren(new Option('系统标准词句库',''));
-    try{for(const group of groups().filter(g=>g.kind===kind))select.add(new Option(group.name+' · '+group.entries.length+'条',group.id));}catch(e){toast(e.message);}
+    try{for(const original of groups().filter(g=>g.kind===kind)){const group=mode==='speaking'?speechReadyGroup(original):original;if(group.entries.length)select.add(new Option(group.name+' · '+group.entries.length+'条',group.id));}}catch(e){toast(e.message);}
     if(savedSnapshot&&savedSnapshot.kind===kind&&!Array.from(select.options).some(o=>o.value===savedSnapshot.id))select.add(new Option(savedSnapshot.name+' · 当前存档内容','__saved'));
     if(Array.from(select.options).some(o=>o.value===value))select.value=value;
   }
@@ -24,18 +28,30 @@
   }
   function button(parent,label,action){const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=action;parent.append(b);return b;}
   function note(parent,text){const p=document.createElement('p');p.textContent=text;parent.append(p);return p;}
+  function info(parent,text){const details=document.createElement('details');details.className='library-info';const summary=document.createElement('summary');summary.textContent='ⓘ';summary.setAttribute('aria-label','查看说明');details.append(summary);note(details,text);parent.append(details);return details;}
   function input(parent,label,value='',tag='input'){const l=document.createElement('label');l.textContent=label;const el=document.createElement(tag);if(tag==='input')el.type='text';el.value=value;l.append(el);parent.append(l);return el;}
+  async function libraryRequest(path,data){
+    if(window.GuluNative?.communityRequest){const {status,result}=await GuluNative.communityRequest(path,data);if(status>=400)throw Error(result.error||'临时分享服务暂时不可用。');return result;}
+    const response=await fetch('api/'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),signal:AbortSignal.timeout(15000)}),result=await response.json();if(!response.ok)throw Error(result.error||'临时分享服务暂时不可用。');return result;
+  }
+  function shareFamily(family){
+    const {body}=modal('发送本地词句');info(body,'会把当前词库中已确认的英文、中文和音标上传到临时中转，接收方领取后保存到自己的本机。图片不会上传，不会重新图片识别，也不会调用 AI。发送码在24小时内可重复领取，不会成为长期云端词库。');
+    const code=input(body,'临时发送码');code.readOnly=true;code.placeholder='生成后复制发送';const status=note(body,'');status.setAttribute('role','status');
+    const create=button(body,'上传并生成发送码',async()=>{create.disabled=true;try{const result=await libraryRequest('library/share',{payload:JSON.stringify({version:1,groups:family.groups})});code.value=result.code;status.textContent='本地词句已暂存，有效期至 '+new Date(result.expiresAt).toLocaleString()+'；期间可重复领取。';}catch(error){status.textContent=error.message;}finally{create.disabled=false;}});
+    button(body,'复制发送码',async()=>{if(!code.value){status.textContent='请先上传并生成发送码。';return;}try{await navigator.clipboard.writeText(code.value);status.textContent='已复制，可以发送给对方。';}catch{code.focus();code.select();status.textContent='请长按或复制选中的发送码后发送。';}});
+  }
   function openLibrary(){
     const {d,body}=modal('我的词句库');
-    note(body,'单词组用于单词练习，句子组用于句子和口语。保存后可在主页“练习题库”直接选中。每组最多300条，最多30组。');
-    button(body,'＋ 新建分组',()=>editor(null,render));
+    info(body,'每个词库统一维护单词、词组和句子；开始练习时会按当前练习方式自动筛选。保存后可在主页“练习题库”直接选中。每个分类最多2000条，最多100个分类。');
+    button(body,'＋ 录入词句／图片',()=>editor(null,render));
+    const pipelineLabel=document.createElement('label');pipelineLabel.textContent='整理方式';const pipeline=document.createElement('select');pipeline.id='libraryPipeline';pipeline.add(new Option('分步补全（推荐：Qwen→词库→苹果翻译）','staged'));pipeline.add(new Option('一步到位（实验阶段）','one-shot'));try{pipeline.value=localStorage.getItem('gulu-library-pipeline')==='one-shot'?'one-shot':'staged';}catch{}pipeline.onchange=()=>{try{localStorage.setItem('gulu-library-pipeline',pipeline.value);}catch{}};pipelineLabel.append(pipeline);body.append(pipelineLabel);info(body,'分步补全会由 Qwen 先整理分类，再用标准词库和苹果翻译补空缺；一步到位仍在实验阶段，结果可能不完整。两种方式都会进入人工确认。智能整理由小院统一提供，无需填写 API Key；使用前请先加入小院账号。每个账号每天可整理20次。');
     const list=document.createElement('div');body.append(list);
     function render(){list.replaceChildren();let rows;try{rows=groups();}catch(e){note(list,e.message);return;}
       if(!rows.length)note(list,'还没有自定义分组，可以先粘贴老师发来的词句。');
-      for(const group of rows){const row=document.createElement('section');row.className='library-group';const h=document.createElement('h3');h.textContent=group.name;row.append(h);note(row,(group.kind==='word'?'单词组':'句子组')+' · '+group.entries.length+'条');
-        button(row,'编辑',()=>editor(group,render));
-        button(row,'选用此组',()=>{if(game.status!=='ready'){returnHome();if(game.status!=='ready')return;}if(group.kind==='word')$('#difficulty').value='english';else if(!['sentences','speaking'].includes($('#difficulty').value))$('#difficulty').value='sentences';refresh();select.value=group.id;updateTypingControls();d.close();});
-        const del=button(row,'删除分组',()=>{if(del.dataset.confirm!=='yes'){del.dataset.confirm='yes';del.textContent='再次点击确认删除';return;}try{repo.remove(group.id);render();refresh();}catch(e){note(row,e.message);}});list.append(row);
+      for(const family of families(rows)){const row=document.createElement('section');row.className='library-group';const h=document.createElement('h3');h.textContent=family.name;row.append(h);const words=family.groups.find(group=>group.kind==='word')?.entries.length||0,sentences=family.groups.find(group=>group.kind==='sentence')?.entries.length||0;note(row,'单词／词组 '+words+' 条 · 句子／口语 '+sentences+' 条');
+        button(row,'查看词句',()=>viewFamily(family.key,render));
+        button(row,'发送给他人',()=>shareFamily(family));
+        const del=button(row,'删除词库',()=>{if(del.dataset.confirm!=='yes'){del.dataset.confirm='yes';del.textContent='再次点击确认删除';return;}try{for(const group of family.groups)repo.remove(group.id);render();refresh();}catch(e){note(row,e.message);}});list.append(row);
       }
     }render();
     button(body,'导出全部分组',()=>{
@@ -43,36 +59,75 @@
       if(window.GuluNative?.exportLibrary){GuluNative.exportLibrary(json).catch(e=>toast(e.message));return;}
       const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='我的词句库.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     });
-    const file=input(body,'从分组文件导入','','input');file.type='file';file.accept='.json,application/json';file.onchange=async()=>{try{if(file.files[0].size>2000000)throw Error('文件过大');const data=JSON.parse(await file.files[0].text());const items=data.groups;if(!Array.isArray(items)||items.some(g=>!C.validate(g)))throw Error('不是有效的词句库文件');const current=groups();if(current.length+items.length>30)throw Error('导入后超过30组');repo.importGroups(items);render();refresh();}catch(e){note(body,'导入失败：'+e.message);}};
+    const file=input(body,'恢复词句库备份','','input');file.type='file';file.accept='.json,application/json';file.onchange=async()=>{try{if(file.files[0].size>8000000)throw Error('文件过大');const data=JSON.parse(await file.files[0].text());const items=data.groups;if(!Array.isArray(items)||items.some(g=>!C.validate(g)))throw Error('不是有效的词句库文件');const current=groups();if(current.length+items.length>100)throw Error('导入后超过100个分类');repo.importGroups(items);render();refresh();}catch(e){note(body,'导入失败：'+e.message);}};
+    const shareCode=input(body,'接收他人发来的临时发送码');shareCode.autocapitalize='none';shareCode.spellcheck=false;const receiveStatus=note(body,'领取后立刻保存到本机；发送码在24小时内可重复领取。');receiveStatus.setAttribute('role','status');const receive=button(body,'领取并保存到我的词句库',async()=>{receive.disabled=true;try{const result=await libraryRequest('library/share/claim',{code:shareCode.value}),data=JSON.parse(result.payload),items=data.groups;if(!Array.isArray(items)||!items.length||items.some(group=>!C.validate(group)))throw Error('分享内容无效，未写入本机。');if(groups().length+items.length>100)throw Error('导入后超过100个分类，请先整理已有词句库。');repo.importGroups(items);shareCode.value='';receiveStatus.textContent='已保存到本机词句库。';render();refresh();}catch(error){receiveStatus.textContent=error.message;}finally{receive.disabled=false;}});
+  }
+  function viewFamily(id,onSave){
+    const {d,body}=modal('查看词句');
+    function render(preserveScroll=false){
+      const scrollTop=preserveScroll?body.scrollTop:0;
+      const related=groups().filter(group=>familyKey(group)===id);if(!related.length){d.close();return;}const title=familyName(related[0]);
+      body.replaceChildren();d.querySelector('h2').textContent=title;
+      const words=related.find(group=>group.kind==='word')?.entries.length||0,sentences=related.find(group=>group.kind==='sentence')?.entries.length||0;note(body,'单词／词组 '+words+' 条 · 句子／口语 '+sentences+' 条');
+      button(body,'修改词库名称',()=>{const box=document.createElement('section');body.prepend(box);const field=input(box,'词库名称',title);button(box,'保存名称',()=>{try{const current=groups().filter(group=>familyKey(group)===id);for(const group of current)repo.save({...group,name:current.length>1?field.value+' · '+(group.kind==='word'?'单词词组':'句子'):field.value});render();onSave();}catch(error){note(box,error.message);}});button(box,'取消',()=>box.remove());});
+      button(body,'＋ 录入新词句 / 图片',()=>editor(related[0],()=>{render();onSave();}));
+      const filter=input(body,'搜索英文或中文'),list=document.createElement('div');body.append(list);
+      function rows(){list.replaceChildren();const query=filter.value.trim().toLowerCase(),items=related.flatMap(group=>group.entries.map(entry=>({group,entry}))).filter(({entry})=>(entry.text+' '+entry.meaning).toLowerCase().includes(query));for(const {group,entry:e} of items){
+        const row=document.createElement('section');row.className='library-entry';const entryTitle=document.createElement('strong');entryTitle.textContent=e.text;row.append(entryTitle);note(row,group.kind==='word'?'单词／词组':'句子／口语');if(e.meaning)note(row,e.meaning);if(e.ipa)note(row,'/'+e.ipa+'/');
+        button(row,'修改此条',()=>{row.replaceChildren();const en=input(row,'英文',e.text),zh=input(row,'中文（可空）',e.meaning),ipa=input(row,'音标（可空）',e.ipa),status=note(row,'空白保留已有值。');button(row,'保存修改',()=>{try{const latest=groups().find(item=>item.id===group.id),updated=C.entry({text:en.value,meaning:zh.value,ipa:ipa.value},latest.kind),entries=latest.entries.filter(old=>old.word!==e.word);entries.push(C.mergeFields(e,updated));repo.save({...latest,entries});render(true);onSave();}catch(error){status.textContent=error.message;}});button(row,'取消',rows);});
+        const remove=button(row,'删除此条',()=>{if(remove.dataset.confirm!=='yes'){remove.dataset.confirm='yes';remove.textContent='再次点击确认删除';return;}try{const latest=groups().find(item=>item.id===group.id),entries=latest.entries.filter(old=>old.word!==e.word);if(entries.length)repo.save({...latest,entries});else repo.remove(group.id);render(true);onSave();}catch(error){note(row,error.message);}});list.append(row);
+      }}filter.oninput=rows;rows();
+      if(preserveScroll)requestAnimationFrame(()=>body.scrollTop=Math.min(scrollTop,Math.max(0,body.scrollHeight-body.clientHeight)));
+    }render();
   }
   function editor(group=null,onSave=()=>{},seed=null){
-    const {d,body}=modal(group?'编辑分组':'新建分组');const name=input(body,'分组名称',group?.name||'');name.maxLength=50;
-    const kind=input(body,'分组类型','','select');kind.add(new Option('单词组','word'));kind.add(new Option('句子组（也用于口语）','sentence'));kind.value=group?.kind||seed?.kind||'word';if(group)kind.disabled=true;
-    const raw=input(body,'输入或粘贴内容（一行一条）',group?group.entries.map(e=>[e.text,e.meaning,e.ipa].join(' | ')).join('\n'):seed?.text||'','textarea');raw.rows=7;raw.placeholder='apple | 苹果\nbanana\n或一行一句英文';raw.autocapitalize='none';raw.spellcheck=false;
-    note(body,'格式：英文 | 中文 | 音标。中文、音标可留空。可直接在文本框修改、换行拆分或合并，之后预览。本地词库仅补空缺，不覆盖已填写内容。');
-    const imageInput=input(body,'从图片导入（Qwen整理后回填文本框）','','input');imageInput.type='file';imageInput.accept='image/*';
-    const previewImage=document.createElement('img');previewImage.className='library-image';previewImage.hidden=true;body.append(previewImage);let imageURL=null,imageData=null;
-    const status=note(body,'图片只在你点“用Qwen整理图片”后发送到 Qwen，需要联网与API额度；整理结果必须人工确认。');
-    imageInput.onchange=async()=>{const f=imageInput.files[0];if(!f)return;if(f.size>8*1024*1024){status.textContent='图片过大，请选8MB以内的图片。';return;}if(imageURL)URL.revokeObjectURL(imageURL);imageURL=URL.createObjectURL(f);previewImage.src=imageURL;previewImage.hidden=false;imageData=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(f);});status.textContent='图片已选择。点击下方按钮由Qwen整理，完成后仍可人工修改。';};
-    const analyze=button(body,'用Qwen整理图片',async()=>{
-      if(!imageData){status.textContent='请先选择图片。';return;}const selectedImage=imageData;analyze.disabled=true;status.textContent='Qwen正在结合原图整理分栏、词句与释义…';
-      try{let result;if(window.GuluNative?.importImage)result=await GuluNative.importImage(imageData,kind.value);else{const r=await fetch('/api/library/import-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:imageData,kind:kind.value})});const json=await r.json();if(!r.ok)throw Error(json.error||'整理失败');result=json;}
-        if(!d.isConnected)return;if(imageData!==selectedImage){status.textContent='图片已更换，旧图片的结果未填入，请重新整理。';return;}if(!Array.isArray(result.entries))throw Error('Qwen没有返回可编辑的条目，请重试');
-        const lines=result.entries.map(e=>[String(e.text||'').replace(/\n/g,' '),String(e.meaning||'').replace(/\n/g,' '),String(e.ipa||'')].join(' | '));raw.value+=(raw.value.trim()?'\n':'')+lines.join('\n');edits=[];rows.replaceChildren();
-        status.textContent='已回填'+lines.length+'条，请对照原图校正。'+(result.notes||[]).join('；')+' '+result.entries.filter(e=>e.uncertain).map(e=>'待确认：'+e.text).join('；');
-      }catch(e){status.textContent=e.message;}finally{analyze.disabled=false;}
+    const {d,body}=modal('录入词句'),form=document.createElement('div');body.append(form);
+    const name=input(form,'分组名称',group?.name||'');name.maxLength=50;
+    info(form,'AI会自动区分单词、词组和完整句子，无需选择类型。混合内容会自动分开保存，已有词句不会丢失。');
+    const raw=input(form,'输入或粘贴内容',seed?.text||'','textarea');raw.rows=7;raw.maxLength=30000;raw.placeholder='直接粘贴词语、句子或老师发来的内容，也可以选择图片';raw.autocapitalize='none';raw.spellcheck=false;
+    const imageInput=input(form,'或选择图片（最多4张，AI自动分类）','','input');imageInput.type='file';imageInput.accept='image/*';imageInput.multiple=true;
+    const previewImage=document.createElement('img');previewImage.className='library-image';previewImage.hidden=true;form.append(previewImage);
+    info(form,'点击保存后：按所选方式由 Qwen 先读取原始中文／音标，再补缺失字段，最后逐条人工确认。文字和所选图片会发送给Qwen；英文为主键；新非空中文、音标分别覆盖旧值，空白保留旧值。');
+    const status=note(form,'词组不查找或补全音标。中文或音标缺失不影响练习，不显示或朗读缺失内容。');status.setAttribute('role','status');
+    let imageURL=null,imageData=[],imageLoading=false,revision=0;
+    const submit=button(form,'保存',async()=>{
+      if(imageLoading)return;if(!name.value.trim()){status.textContent='请先填写分组名称。';name.focus();return;}if(!raw.value.trim()&&!imageData.length){status.textContent='请输入内容或选择图片。';return;}
+      const token=++revision,active=()=>d.isConnected&&token===revision,pipeline=(()=>{try{return localStorage.getItem('gulu-library-pipeline')==='one-shot'?'one-shot':'staged';}catch{return 'staged';}})(),payload={text:raw.value,images:imageData,kind:'auto',pipeline};
+      const controls=[...form.querySelectorAll('input,textarea,select,button')],disabled=controls.map(el=>el.disabled);controls.forEach(el=>el.disabled=true);
+      try{
+        const organize=async data=>{
+          if(window.GuluNative?.communityRequest){const {status,result}=await GuluNative.communityRequest('library/organize',data);if(status>=400)throw Error(result.error||'整理失败');return result;}
+          const response=await fetch('api/library/organize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),signal:AbortSignal.timeout(125000)});const result=await response.json();if(!response.ok)throw Error(result.error||'Qwen整理失败');return result;
+        };
+        const result=await C.prepare({...payload,existingEntries:group?groups().filter(g=>g.id===group.id||g.familyId===(group.familyId||group.id)).flatMap(g=>g.entries.map(e=>({...e,kind:g.kind}))):[],organize,translate:pipeline==='staged'&&window.GuluNative?.translateTexts?texts=>GuluNative.translateTexts(texts,progress=>{if(active())status.textContent='苹果翻译：本批已完成 '+progress.completed+' / '+progress.total+' 条…';}):null,vocabulary:GuluVocabulary,onProgress:text=>{if(active())status.textContent=text;},active});
+        if(active())review(result);
+      }catch(error){if(active())status.textContent=error.message+' 原始内容已保留，请重试。';}
+      finally{if(active())controls.forEach((el,i)=>el.disabled=disabled[i]);}
     });
-    if(window.GuluNative?.configureQwen)button(body,'设置Qwen API密钥',()=>GuluNative.configureQwen().then(()=>status.textContent='Qwen密钥已保存到本机钥匙串。').catch(e=>status.textContent=e.message));
-    const rows=document.createElement('div');rows.className='library-preview';let edits=[];
-    button(body,'预览并用标准词库补全',()=>{try{edits=C.enrich(C.parse(raw.value,kind.value),kind.value,GuluVocabulary);renderRows();status.textContent='共'+edits.length+'条。请检查英文、中文与音标，空白项可以稍后补；重复英文保存时合并，保留第一条。';}catch(e){status.textContent=e.message;}});body.append(rows);
-    function renderRows(){rows.replaceChildren();edits.forEach((e,i)=>{const row=document.createElement('section');row.className='library-entry';const en=input(row,'英文',e.text),zh=input(row,'中文',e.meaning),ipa=input(row,'音标（可空）',e.ipa);const origin=note(row,e.source==='local'?'已从标准词库补齐空缺':'人工 / 图片导入内容，待核对');
-      en.oninput=()=>{e.text=en.value;origin.textContent='英文已修改，请同时核对中文与音标。';};zh.oninput=()=>{e.meaning=zh.value;e.source='manual';};ipa.oninput=()=>{e.ipa=ipa.value;e.source='manual';};button(row,'删除此条',()=>{edits.splice(i,1);renderRows();});rows.append(row);});}
-    if(window.GuluNative?.translateTexts)button(body,'用苹果翻译补缺失中文',async()=>{const missing=edits.filter(e=>!e.meaning.trim());if(!missing.length){status.textContent='请先预览，已有中文不会被覆盖。';return;}status.textContent='正在调用苹果系统翻译…';try{const requested=missing.map(e=>e.text);const translated=await GuluNative.translateTexts(requested);if(!d.isConnected)return;missing.forEach((e,i)=>{if(e.text===requested[i]&&!e.meaning.trim()&&translated[i]){e.meaning=translated[i];e.source='translation';}});renderRows();status.textContent='已补翻译，请人工核对多义词和上下文。音标仍优先采用本地词库。';}catch(e){status.textContent=e.message;}});
-    button(body,'确认保存分组',()=>{try{if(!edits.length)throw Error('请先预览内容，再确认保存。');repo.save({id:group?.id,name:name.value,kind:kind.value,entries:edits});onSave();refresh();d.close();}catch(e){status.textContent=e.message;}});
-    // Changes to raw input invalidate the preview so old entries cannot be saved accidentally.
-    raw.oninput=()=>{edits=[];rows.replaceChildren();};kind.onchange=raw.oninput;
-    d.addEventListener('close',()=>{if(imageURL)URL.revokeObjectURL(imageURL);});
+    imageInput.onchange=async()=>{
+      const token=++revision;imageLoading=false;submit.disabled=false;imageData=[];previewImage.hidden=true;if(imageURL){URL.revokeObjectURL(imageURL);imageURL=null;}
+      const files=[...imageInput.files];if(!files.length)return;if(files.length>4){status.textContent='一次最多选择4张图片。';imageInput.value='';return;}if(files.some(file=>file.size>8*1024*1024)||files.reduce((sum,file)=>sum+file.size,0)>36*1024*1024){status.textContent='图片总大小不能超过36MB，单张不能超过8MB。';imageInput.value='';return;}
+      imageLoading=true;submit.disabled=true;
+      try{const data=await Promise.all(files.map(file=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('图片读取失败'));reader.readAsDataURL(file);})));if(token!==revision||!d.isConnected)return;imageData=data;imageURL=URL.createObjectURL(files[0]);previewImage.src=imageURL;previewImage.hidden=false;status.textContent='已选择 '+files.length+' 张图片，点击保存统一整理。';}
+      catch(error){status.textContent=error.message;}finally{if(token===revision){imageLoading=false;submit.disabled=false;}}
+    };
+    function review(result){
+      reviewing=true;form.hidden=true;d.querySelector('h2').textContent='确认本次录入';d.setAttribute('aria-label','确认本次录入');d.querySelector('header button').hidden=true;
+      const page=document.createElement('div');page.className='library-review';body.append(page);let entries=result.entries;
+      info(page,'请逐条检查并修改英文、中文和音标。新条目的中文或音标可留空；已有条目的空白字段保留原值。确认保存前不会写入词句库。');
+      if(result.notes.length)note(page,result.notes.join('；'));
+      const summary=note(page,''),rows=document.createElement('div');rows.className='library-preview';page.append(rows);const error=note(page,'');error.setAttribute('role','status');reviewError=error;
+      function render(preserveScroll=false){const scrollTop=preserveScroll?body.scrollTop:0;rows.replaceChildren();summary.textContent='AI已分好：单词／词组 '+entries.filter(e=>e.kind==='word').length+' 条，句子 '+entries.filter(e=>e.kind==='sentence').length+' 条';entries.forEach((e,i)=>{const row=document.createElement('section');row.className='library-entry';note(row,'第 '+(i+1)+' 条'+(e.uncertain?' · 原文不确定，请核对':''));const type=input(row,'练习类型','','select');type.add(new Option('单词','word'));type.add(new Option('词组','phrase'));type.add(new Option('句子／口语','sentence'));type.value=e.kind==='sentence'?'sentence':e.category==='phrase'?'phrase':'word';const en=input(row,'英文',e.text),zh=input(row,'中文（可空）',e.meaning),ipa=input(row,'音标（可空）',e.ipa);en.autocapitalize='none';en.spellcheck=false;type.onchange=()=>{e.category=type.value;e.kind=type.value==='sentence'?'sentence':'word';};en.oninput=()=>{e.text=en.value;};zh.oninput=()=>{e.meaning=zh.value;};ipa.oninput=()=>{e.ipa=ipa.value;};button(row,'删除此条',()=>{entries.splice(i,1);render(true);});rows.append(row);});if(preserveScroll)requestAnimationFrame(()=>body.scrollTop=Math.min(scrollTop,Math.max(0,body.scrollHeight-body.clientHeight)));}
+      render();
+      const actions=document.createElement('div');actions.className='library-review-actions';page.append(actions);
+      const cancel=button(actions,'取消录入',()=>{if(cancel.dataset.confirm!=='yes'){cancel.dataset.confirm='yes';cancel.textContent='再次点击确认取消';error.textContent='取消后本次 AI 整理结果不会保存。';return;}d.close();});
+      button(actions,'确认保存',()=>{try{const checked=entries.map((e,i)=>{try{return {...C.entry(e,e.kind),kind:e.kind};}catch(problem){throw Error('第'+(i+1)+'条：'+problem.message);}});repo.saveClassified({id:group?.id,name:name.value,entries:checked});onSave();refresh();d.close();}catch(problem){error.textContent=problem.message;}});
+      rows.querySelector('input')?.focus({preventScroll:true});
+    }
+    let reviewing=false,reviewError=null;
+    d.addEventListener('cancel',event=>{if(!reviewing)return;event.preventDefault();if(reviewError)reviewError.textContent='请在页面底部选择“确认保存”或“取消录入”。';});
+    d.addEventListener('close',()=>{revision++;if(imageURL)URL.revokeObjectURL(imageURL);});
   }
-  window.GuluLibraryUI={refresh,selected(){if(select.value==='__saved')return savedSnapshot;if(!select.value)return null;const group=groups().find(g=>g.id===select.value);if(!group)throw Error('分组已删除，请重新选择题库');return group;},restoreSelection(group){savedSnapshot=group;refresh();select.value=group?(Array.from(select.options).some(o=>o.value===group.id)?group.id:'__saved'):'';},addSentence(text,meaning){editor(null,()=>{}, {kind:'sentence',text:text.replaceAll(' / ',' ')+' | '+meaning});},open:openLibrary};
+  window.GuluLibraryUI={refresh,selected(){if(select.value==='__saved')return savedSnapshot;if(!select.value)return null;const group=groups().find(g=>g.id===select.value);if(!group)throw Error('分组已删除，请重新选择题库');const selected=$('#difficulty').value==='speaking'?speechReadyGroup(group):group;if(!selected.entries.length)throw Error('这个词库的句子含有特殊符号，已在口语模式中跳过，请选择其他词库。');return selected;},restoreSelection(group){savedSnapshot=group;refresh();select.value=group?(Array.from(select.options).some(o=>o.value===group.id)?group.id:'__saved'):'';},addSentence(text,meaning){editor(null,()=>{}, {kind:'sentence',text:text.replaceAll(' / ',' ')+' | '+meaning});},open:openLibrary};
   refresh();
 })();

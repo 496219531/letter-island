@@ -40,29 +40,66 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     var audioFile: AVAudioFile?
     var audioID: String?
     var player: AVAudioPlayer?
-    var effectPlayers: [(player:AVAudioPlayer,level:Float)] = []
-    var effectData: [String:Data] = [:]
-    var effectGain: Float = 0.39
-    var effectLastError = ""
-    var effectStarts = 0
+    final class EffectVoice {
+        let node=AVAudioPlayerNode()
+        var until:TimeInterval=0
+        var token=0
+        var kind=""
+    }
+    let effectEngine=AVAudioEngine()
+    var effectVoices:[EffectVoice]=[]
+    var effectBuffers:[String:AVAudioPCMBuffer]=[:]
+    let priorityEffects:Set<String>=["laser","freeze","melon","explosion","boss","horde","celebrate"]
+    let effectKinds:Set<String>=["shot","flesh","metal","shield","iceHit","kill","groan","boss","nibble","laser","freeze","melon","explosion","critical","warning","ui","step","horde","celebrate"]
+    var effectGain:Float=0.39
+    var effectLastError=""
+    var effectStarts=0
+    var effectActivity=0
     func playEffect(_ data:[String:Any]) {
-        let kinds:Set<String>=["shot","flesh","metal","shield","iceHit","kill","groan","boss","nibble","laser","freeze","melon","explosion","critical","warning","ui"]
-        guard let kind=data["kind"] as? String,kinds.contains(kind),let variant=data["variant"] as? Int,(0...2).contains(variant) else { return }
-        effectPlayers.removeAll { !$0.player.isPlaying }
-        guard effectPlayers.count<24 else { return }
+        guard let kind=data["kind"] as? String,effectKinds.contains(kind),let variant=data["variant"] as? Int,(0...2).contains(variant) else {return}
         do {
             let key="\(kind)-\(variant)"
-            if effectData[key] == nil { effectData[key]=try Data(contentsOf:Bundle.main.resourceURL!.appendingPathComponent("Web/sfx/\(key).wav")) }
-            let sound=try AVAudioPlayer(data:effectData[key]!)
-            let level=max(0,min(1,(data["volume"] as? NSNumber)?.floatValue ?? 0.2))
-            sound.volume=level*effectGain;sound.pan=max(-0.6,min(0.6,(data["pan"] as? NSNumber)?.floatValue ?? 0))
-            if sound.play(){effectStarts+=1;effectPlayers.append((sound,level))}else{effectLastError="AVAudioPlayer did not start"}
-        } catch { effectLastError=error.localizedDescription;NSLog("Effect playback failed: %@",effectLastError) }
+            if effectBuffers[key]==nil {
+                let file=try AVAudioFile(forReading:Bundle.main.resourceURL!.appendingPathComponent("Web/sfx/\(key).wav"))
+                guard let buffer=AVAudioPCMBuffer(pcmFormat:file.processingFormat,frameCapacity:AVAudioFrameCount(file.length)) else {return}
+                try file.read(into:buffer);effectBuffers[key]=buffer
+            }
+            guard let buffer=effectBuffers[key] else {return}
+            if effectVoices.isEmpty {
+                for _ in 0..<12 {let voice=EffectVoice();effectEngine.attach(voice.node);effectEngine.connect(voice.node,to:effectEngine.mainMixerNode,format:buffer.format);effectVoices.append(voice)}
+                effectEngine.mainMixerNode.outputVolume=effectGain;effectEngine.prepare()
+            }
+            let now=ProcessInfo.processInfo.systemUptime
+            guard let voice=effectVoices.first(where:{$0.until<=now}) ?? (priorityEffects.contains(kind) ? effectVoices.first(where:{!priorityEffects.contains($0.kind)}) : nil) else {return}
+            effectActivity+=1
+            voice.token+=1;let token=voice.token;voice.node.stop();voice.kind=kind
+            voice.until=now+Double(buffer.frameLength)/buffer.format.sampleRate
+            voice.node.volume=max(0,min(1,(data["volume"] as? NSNumber)?.floatValue ?? 0.2))
+            voice.node.pan=max(-0.6,min(0.6,(data["pan"] as? NSNumber)?.floatValue ?? 0))
+            if !effectEngine.isRunning {try effectEngine.start()}
+            voice.node.scheduleBuffer(buffer,completionCallbackType:.dataPlayedBack) { [weak self,weak voice] _ in
+                DispatchQueue.main.async {
+                    guard let self=self,let voice=voice,voice.token==token else {return}
+                    voice.until=0
+                    if self.effectVoices.allSatisfy({$0.until==0}) {
+                        let activity=self.effectActivity
+                        DispatchQueue.main.asyncAfter(deadline:.now()+1) { [weak self] in
+                            guard let self=self,self.effectActivity==activity,self.effectVoices.allSatisfy({$0.until==0}) else {return}
+                            self.effectEngine.pause()
+                        }
+                    }
+                }
+            }
+            voice.node.play();effectStarts+=1
+        }catch{effectLastError=error.localizedDescription;NSLog("Effect playback failed: %@",effectLastError)}
     }
-    func stopEffects(){effectPlayers.forEach{$0.player.stop()};effectPlayers.removeAll()}
+    func stopEffects(){effectActivity+=1;for voice in effectVoices {voice.token+=1;voice.until=0;voice.node.stop()};effectEngine.pause()}
     var tapped = false
     var timeout: DispatchWorkItem?
-    var screenDirection: String { UserDefaults.standard.string(forKey: "screenDirection") == "landscape" ? "landscape" : "portrait" }
+    var settingsPortrait = true
+    var settingsOrientationRevision = 0
+    var screenDirection: String { settingsPortrait ? "portrait" : preferredScreenDirection }
+    var preferredScreenDirection: String { UserDefaults.standard.string(forKey: "screenDirection") == "portrait" ? "portrait" : "landscape" }
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { screenDirection == "landscape" ? .landscapeLeft : .portrait }
     override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { screenDirection == "landscape" ? .landscapeLeft : .portrait }
     override func viewDidAppear(_ animated: Bool) {
@@ -120,7 +157,46 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         } catch { NSLog("Game audio restoration failed: %@", error.localizedDescription) }
     }
     @objc func background() { stopEffects();cancel(restorePlayback: false); web.evaluateJavaScript("window.dispatchEvent(new Event('blur')); document.dispatchEvent(new Event('gulu-background'))") }
+    var ranPerformanceQA = false
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if !ranPerformanceQA && ProcessInfo.processInfo.arguments.contains("--performance-qa") {
+            ranPerformanceQA = true
+            UIApplication.shared.isIdleTimerDisabled = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                let script = """
+                (async()=>{
+                 const report={mode:GuluPerformance.mode,stages:[]},originalRender=render,originalStep=simulateStep,originalPersist=persistRun,originalFrame=frame,originalEnabled=soundscape.enabled,originalRandom=game.random,originalFire=game.fireStrength,originalAuto=game.auto;
+                 let stage=null,paint=[],sim=[],gaps=[],last=0,raf=[],lastRAF=0;
+                 frame=function(time){if(stage){if(lastRAF)raf.push(time-lastRAF);lastRAF=time;}originalFrame(time);};
+                 persistRun=()=>true;
+                 render=function(dt){const t=performance.now();if(stage!=='no-drawing')originalRender(dt);if(stage){paint.push(performance.now()-t);if(last)gaps.push(t-last);last=t;}};
+                 simulateStep=function(dt){const t=performance.now();originalStep(dt);if(stage)sim.push(performance.now()-t);};
+                 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+                 const stats=values=>{values.sort((a,b)=>a-b);return {count:values.length,median:values[Math.floor(values.length*.5)]||0,p95:values[Math.floor(values.length*.95)]||0};};
+                 try{
+                  for(const variant of ['before','after','muted','no-drawing']){const baseline=variant==='before';soundscape.setEnabled(variant==='before'||variant==='after');
+                   window.__renderBaseline=baseline;game.reset();game.status='playing';game.auto=true;game.fireStrength=1;game.quota=10000;game.spawnIn=9999;game.rage=30;game.clones=30;game.stacks.multishot=4;game.stacks.pierce=2;game.random=()=>.4;
+                   for(let i=0;i<80;i++){const z=game.spawn(450+(i%16)*30,130+(i%5)*65,'walker',false);z.hp=z.maxHp=1000000000;z.speed=0;}
+                   for(let i=0;i<5;i++)game.effects.push({kind:'melon',x:500+i*80,y:280,life:10,fullLife:10,damage:0,radius:225});
+                   document.querySelector('#startScreen').hidden=true;updateHud(true);await sleep(2000);paint=[];sim=[];gaps=[];last=0;raf=[];lastRAF=0;stage=variant;await sleep(6000);
+                   report.stages.push({stage,paint:stats(paint),simulation:stats(sim),frameGaps:stats(gaps),rafGaps:stats(raf),bullets:game.bullets.length,enemies:game.enemies.length});stage=null;
+                  }
+                 }catch(e){report.error=e.message;}
+                 finally{game.reset();game.random=originalRandom;game.fireStrength=originalFire;game.auto=originalAuto;game.status='ready';render=originalRender;frame=originalFrame;simulateStep=originalStep;soundscape.setEnabled(originalEnabled);persistRun=originalPersist;window.__renderBaseline=false;soundscape.stop();document.querySelector('#startScreen').hidden=false;updateHud(true);window.__devicePerfReport=JSON.stringify(report);}
+                })();void 0;
+                """
+                self.web.evaluateJavaScript(script)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 43) {
+                    UIApplication.shared.isIdleTimerDisabled = false
+                    self.web.evaluateJavaScript("window.__devicePerfReport || JSON.stringify({error:'measurement incomplete'})") { value, error in
+                        let file=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("performance-qa.json")
+                        var json=(value as? String).flatMap { $0.data(using:.utf8) }.flatMap { try? JSONSerialization.jsonObject(with:$0) as? [String:Any] } ?? [:]
+                        json["lowPowerMode"]=ProcessInfo.processInfo.isLowPowerModeEnabled;json["thermalState"]=ProcessInfo.processInfo.thermalState.rawValue
+                        if let bytes=try? JSONSerialization.data(withJSONObject:json){try? bytes.write(to:file)}
+                    }
+                }
+            }
+        }
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--sound-output-qa") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -272,6 +348,33 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         }
         #endif
     }
+    // Fixed community host; credentials stay in URLSession's persistent cookie store.
+    func communityRequest(_ data: [String: Any], id: Int) {
+        guard let path = data["path"] as? String,
+              let parts = URLComponents(string: path), parts.scheme == nil, parts.host == nil,
+              ["account", "account/register", "account/restore", "account/recovery", "account/logout", "leaderboards", "solo/start", "solo/finish", "library/organize", "library/share", "library/share/claim"].contains(parts.path),
+              let url = URL(string: "http://101.132.227.80/letter-island/api/" + path) else {
+            send(["type":"nativeReply", "id":id, "ok":false, "error":"无效的小院请求"]); return
+        }
+        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: parts.path == "library/organize" ? 130 : 10)
+        if let body = data["data"] {
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            guard let json = try? JSONSerialization.data(withJSONObject: body) else {
+                send(["type":"nativeReply", "id":id, "ok":false, "error":"请求格式不正确"]); return
+            }
+            req.httpBody = json
+        }
+        URLSession.shared.dataTask(with: req) { [weak self] bytes, response, error in
+            DispatchQueue.main.async {
+                guard error == nil, let bytes = bytes, let response = response as? HTTPURLResponse,
+                      let result = try? JSONSerialization.jsonObject(with: bytes) as? [String:Any] else {
+                    self?.send(["type":"nativeReply", "id":id, "ok":false, "error":"无法连接小院，请检查网络后重试"]); return
+                }
+                self?.send(["type":"nativeReply", "id":id, "ok":true, "result":["status":response.statusCode, "result":result]])
+            }
+        }.resume()
+    }
     func send(_ value: [String: Any]) {
         guard let data = try? JSONSerialization.data(withJSONObject: value), let text = String(data: data, encoding: .utf8) else { return }
         web.evaluateJavaScript("window.GuluNativeReceive(\(text))")
@@ -281,16 +384,33 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
               let data = message.body as? [String: Any], let command = data["command"] as? String else { return }
         let id = data["id"] as? Int ?? 0
         switch command {
+        case "communityRequest": communityRequest(data, id: id)
         case "playEffect": playEffect(data)
         case "setEffectGain":
-            if let gain=(data["gain"] as? NSNumber)?.floatValue,gain.isFinite { effectGain=max(0,min(1,gain));effectPlayers.forEach{$0.player.volume=$0.level*effectGain};if effectGain==0{stopEffects()} }
+            if let gain=(data["gain"] as? NSNumber)?.floatValue,gain.isFinite { effectGain=max(0,min(1,gain));effectEngine.mainMixerNode.outputVolume=effectGain;if effectGain==0{stopEffects()} }
         case "stopEffects": stopEffects()
-        case "getScreenDirection": send(["type":"nativeReply", "id":id, "ok":true, "result":screenDirection])
+        case "getScreenDirection": send(["type":"nativeReply", "id":id, "ok":true, "result":preferredScreenDirection])
+        case "setSettingsPortrait":
+            guard let enabled = data["enabled"] as? Bool, let scene = view.window?.windowScene else { send(["type":"nativeReply", "id":id, "ok":false, "error":"无法切换设置方向"]); return }
+            let previous = settingsPortrait
+            settingsPortrait = enabled; settingsOrientationRevision += 1
+            let revision = settingsOrientationRevision
+            setNeedsUpdateOfSupportedInterfaceOrientations()
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: supportedInterfaceOrientations)) { [weak self] error in
+                guard let self = self, self.settingsOrientationRevision == revision else { return }
+                self.settingsPortrait = previous; self.setNeedsUpdateOfSupportedInterfaceOrientations()
+                self.send(["type":"nativeReply", "id":id, "ok":false, "error":error.localizedDescription])
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
+                guard let self = self else { return }
+                self.send(["type":"nativeReply", "id":id, "ok":true, "result":self.screenDirection])
+            }
         case "setScreenDirection":
             guard let direction = data["direction"] as? String, ["portrait", "landscape"].contains(direction), let scene = view.window?.windowScene else {
                 send(["type":"nativeReply", "id":id, "ok":false, "error":"无法切换屏幕方向"]); return
             }
-            let previous = screenDirection
+            if settingsPortrait { UserDefaults.standard.set(direction, forKey:"screenDirection"); send(["type":"nativeReply", "id":id, "ok":true, "result":direction]); return }
+            let previous = preferredScreenDirection
             UserDefaults.standard.set(direction, forKey:"screenDirection")
             setNeedsUpdateOfSupportedInterfaceOrientations()
             scene.requestGeometryUpdate(.iOS(interfaceOrientations: supportedInterfaceOrientations)) { [weak self] error in
@@ -305,7 +425,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
                 self.send(["type":"nativeReply", "id":id, "ok":ok, "result":self.screenDirection, "error":"屏幕方向尚未切换，请重试"])
             }
         case "configureQwen": configureQwen(id)
-        case "importImage": importLibraryImage(data,id:id)
+        case "importImage", "organizeLibrary": importLibraryImage(data,id:id)
         case "translateTexts": translateLibrary(data,id:id)
         case "exportLibrary": exportLibrary(data,id:id)
         case "authorize":

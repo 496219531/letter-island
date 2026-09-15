@@ -68,3 +68,14 @@
 .game-app .speech-review-dialog p{color:#e6dfc4;text-align:left}
 .game-app .speech-review-dialog h2{font-size:23px;margin:0 0 12px}
 .game-app .speech-review-dialog>.primary-button{position:sticky;top:0;z-index:1;background:#405839}
+.solo-app .skill-info>.word-ipa:not([hidden]){color:#c5d5b9}
+.solo-app .start-panel{transform:none;rotate:none}
+/* Two full letter rows need 64px; old sentence styles reserved only 35–40px. */
+.solo-app:not(.mobile-game) .skill-keys{height:68px;min-height:68px;margin:0;padding:4px;overflow:visible;flex-shrink:0}
+.solo-app:not(.mobile-game) .spell-row{flex-shrink:0;width:100%}
+.solo-app:not(.mobile-game) .spell-row kbd{flex:0 1 24px;min-width:0}
+.solo-app:not(.mobile-game) .skill-card.sentence-card{height:140px;min-height:140px;max-height:140px;grid-template-rows:minmax(0,1fr) 18px}
+.solo-app:not(.mobile-game) .sentence-card .skill-info{min-height:0;max-height:none;overflow:auto;align-self:stretch;overflow-wrap:anywhere}
+.solo-app:not(.mobile-game) .sentence-card .skill-info strong{display:block;-webkit-line-clamp:unset;overflow:visible;white-space:normal;line-height:1.5}
+.solo-app:not(.mobile-game) .sentence-card .word-meaning:not([hidden]){display:block;-webkit-line-clamp:unset;overflow:visible;white-space:normal;line-height:1.5}
+@media(max-width:1000px){.solo-app:not(.mobile-game) .skill-card.sentence-card{height:190px;min-height:190px;max-height:190px;grid-template-columns:minmax(0,1fr);grid-template-areas:'info' 'keys' 'status';grid-template-rows:minmax(0,1fr) 68px 18px}}

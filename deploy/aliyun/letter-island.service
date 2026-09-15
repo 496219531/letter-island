@@ -1,0 +1,30 @@
+[Unit]
+Description=Letter Island web game and rooms
+After=network.target
+
+[Service]
+User=letter-island
+Group=letter-island
+WorkingDirectory=/opt/letter-island/current
+ExecStart=/opt/letter-island/node/bin/node lan-server.mjs
+EnvironmentFile=-/etc/letter-island/qwen.env
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=4174
+Environment=WEB_ROOT=dist
+Environment=PUBLIC_URL=http://101.132.227.80/letter-island
+Environment=DATA_DIR=/var/lib/letter-island
+StateDirectory=letter-island
+StateDirectoryMode=0700
+ReadWritePaths=/var/lib/letter-island
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+MemoryMax=384M
+CPUQuota=80%
+
+[Install]
+WantedBy=multi-user.target

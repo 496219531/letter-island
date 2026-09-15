@@ -12,7 +12,7 @@ test('round trip preserves combat, upgrades, settings, typed progress and projec
 });
 test('upgrade offer saves without reroll and can only be chosen once on restore',()=>{
  const g=new GardenGame();g.start();g.enemies=[];g.spawned=g.quota;g.update(.01);const ids=g.offers.map(c=>c.id);const save=encode(g);assert.ok(validate(save));
- const loaded=new GardenGame();restore(loaded,save);assert.equal(loaded.status,'upgrade');assert.deepEqual(loaded.offers.map(c=>c.id),ids);assert.equal(loaded.chooseCard(ids[0]),true);assert.equal(loaded.chooseCard(ids[0]),false);assert.equal(loaded.wave,2);
+ const loaded=new GardenGame();restore(loaded,save);assert.equal(loaded.status,'upgrade');assert.deepEqual(loaded.offers.map(c=>c.id),ids);assert.equal(loaded.chooseCard(ids[0],0),true);assert.equal(loaded.chooseCard(ids[0],0),false);assert.equal(loaded.wave,2);
 });
 test('corrupt and incompatible saves are rejected without changing the current game',()=>{
  const g=new GardenGame();g.start();const save=encode(g),before=g.health;
@@ -25,7 +25,7 @@ test('finished or not-started games cannot replace an active save',()=>{
 });
 test('typing settings round trip and older saves retain compatible defaults',()=>{
  const g=new GardenGame();g.start();g.setMaxSpellLength(8);g.setMaxLearningLoad(5);g.magicSlow=true;const save=encode(g);const loaded=new GardenGame();assert.ok(restore(loaded,save));assert.equal(loaded.maxSpellLength,8);assert.equal(loaded.maxLearningLoad,5);assert.equal(loaded.magicSlow,true);
- delete save.state.maxSpellLength;delete save.state.maxLearningLoad;delete save.state.magicSlow;assert.ok(restore(loaded,save));assert.equal(loaded.maxSpellLength,60);assert.equal(loaded.maxLearningLoad,3);assert.equal(loaded.magicSlow,false);
+ delete save.state.maxSpellLength;delete save.state.maxLearningLoad;delete save.state.magicSlow;assert.ok(restore(loaded,save));assert.equal(loaded.maxSpellLength,10);assert.equal(loaded.maxLearningLoad,1);assert.equal(loaded.magicSlow,false);
  for(const values of [{maxSpellLength:0},{maxSpellLength:61},{maxSpellLength:1.5},{maxLearningLoad:0},{maxLearningLoad:6},{magicSlow:'true'}]){const bad=JSON.parse(JSON.stringify(save));Object.assign(bad.state,values);assert.equal(validate(bad),false);}
 });
 test('sunflower damage and rescue countdown survive saves; old saves grow a matching defense',()=>{

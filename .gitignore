@@ -12,3 +12,9 @@ node_modules/
 /native/*.app/
 **/xcuserdata/
 *.xcuserstate
+
+# Local community database
+/data/
+
+# Local browser automation traces
+/.playwright-cli/

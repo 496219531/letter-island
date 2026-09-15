@@ -15,3 +15,12 @@
 .game-app .library-image{display:block;width:100%;max-height:280px;object-fit:contain;background:#10291c}
 .game-app .library-entry,.game-app .library-group{padding:10px;border:1px solid #72895c;border-radius:10px;margin-top:12px}
 .game-app .library-dialog h3{font-size:16px;margin:3px 0}
+.game-app .library-review-actions{display:flex;gap:8px;margin-top:18px;padding-top:12px;border-top:1px solid #72895c}
+.game-app .library-review-actions button{flex:1;margin:0}
+.game-app .library-review-actions button:first-child{background:#29422f}
+.game-app .library-info{display:inline-block;position:relative;margin:3px 0;vertical-align:middle}
+.game-app .library-info summary{list-style:none;cursor:pointer;width:26px;height:26px;display:grid;place-items:center;border:1px solid #8a9d69;border-radius:50%;color:#ffebba;font-size:16px;line-height:1;background:#29452f}
+.game-app .library-info summary::-webkit-details-marker{display:none}
+.game-app .library-info[open]{display:block;padding:8px 10px;border:1px solid #72895c;border-radius:8px;background:#10291c}
+.game-app .library-info[open] summary{float:right;margin-left:8px}
+.game-app .library-info p{margin:0;padding-right:30px}

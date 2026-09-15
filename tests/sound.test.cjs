@@ -20,7 +20,7 @@ a.setEnabled(true);a.setVolume(.25);assert.equal(a.master.gain.value,.25*.65);a.
 fake.currentTime+=10;a.play('laser');a.play('shot');assert.equal(gains.at(-1).gain.value,LEVELS.shot*.5);a.stop();assert.equal(connections,2);
 const g={status:'playing',freeze:0,enemies:[{hp:1,x:400}]};for(let i=0;i<20;i++)a.update(10,g);assert.equal(a.voices.size,0,'ambient growls should not restart');
 a.setVolume(0);a.play('shot');a.tone(800);assert.equal(a.voices.size,0);a.setVolume(.6);fake.currentTime+=10;a.play('kill');sources.at(-1).onended();assert.equal(a.voices.size,0);assert.equal(connections,2);
-console.log('PASS 45 sound variants: no clipping, smooth edges, reduced bass, per-event limits, voice cleanup, volume, spell mix and quiet idle.');
+console.log('PASS '+Object.keys(SPECS).length*3+' sound variants: no clipping, smooth edges, reduced bass, per-event limits, voice cleanup, volume, spell mix and quiet idle.');
 
 // Recording gain is temporary and preserves volume changes and mute state.
 a.setVolume(.8);a.setRecording(true);assert.equal(a.volume,.8);assert.ok(Math.abs(a.master.gain.value-.8*.65*.15)<1e-9);
@@ -36,3 +36,18 @@ fake.state='suspended';cold.init();assert.equal(resumed,2);
 cold.setEnabled(false);cold.init();assert.equal(resumed,2,'muted audio must remain muted after an interruption');
 fake.state='running';
 console.log('PASS interrupted and suspended audio recovery respects mute');
+(async()=>{
+  const withoutPan=new GardenAudio(()=>({...fake,createStereoPanner:undefined}));
+  withoutPan.play('laser');assert.equal(withoutPan.voices.size,1,'mono fallback must play when StereoPanner is unavailable');withoutPan.stop();
+  let fail=true;
+  const recovering=new GardenAudio(()=>({...fake,createBufferSource(){const source=fake.createBufferSource();source.start=()=>{if(fail)throw Error('temporary output interruption');};return source;}}));
+  recovering.play('laser');assert.equal(recovering.failed,true);assert.equal(recovering.enabled,true,'playback errors must not change the mute preference');
+  fail=false;assert.equal(await recovering.unlock(),true);recovering.play('laser');assert.equal(recovering.voices.size,1);recovering.stop();
+  let made=0;const closed={...fake,state:'closed'};
+  const recreated=new GardenAudio(()=>{made++;return {...fake,state:'running'};});recreated.context=closed;
+  assert.equal(await recreated.unlock(),true);assert.equal(made,1);recreated.play('shot');assert.equal(recreated.voices.size,1);recreated.stop();
+  const suspended={...fake,state:'suspended',resume(){this.state='running';return Promise.resolve();}};
+  const gesture=new GardenAudio(()=>suspended);assert.equal(await gesture.unlock(),true);
+  gesture.setEnabled(false);assert.equal(await gesture.unlock(),false,'unlock must preserve an explicit mute');
+  console.log('PASS mono fallback, transient playback recovery, closed-context recreation and gesture unlock');
+})().catch(error=>{console.error(error);process.exitCode=1;});

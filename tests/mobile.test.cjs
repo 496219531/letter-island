@@ -38,3 +38,11 @@ test('skill hints appear only before selection and return after input ends',()=>
  skills[2].code='APRICOT';assert.deepEqual(keySkillHints(skills,-1,'english'),{A:0});
  assert.deepEqual(keySkillHints(skills,-1,'speaking'),{});
 });
+test('upgrade and slot replacement overlays keep battle orientation while settings stay portrait',()=>{
+ const {sceneNeedsPortrait}=require('../mobile.js');
+ assert.equal(sceneNeedsPortrait('playing'),false);
+ assert.equal(sceneNeedsPortrait('upgrade',[{gameOverlay:true}]),false);
+ assert.equal(sceneNeedsPortrait('upgrade',[{gameOverlay:true},{gameOverlay:false}]),true);
+ assert.equal(sceneNeedsPortrait('playing',[{gameOverlay:false}]),true);
+ for(const state of ['ready','paused','won','lost'])assert.equal(sceneNeedsPortrait(state),true);
+});

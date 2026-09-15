@@ -63,23 +63,38 @@
 .mobile-game .settings-panel>summary{min-height:44px;display:flex;align-items:center}
 .mobile-game .game-heading{display:none}
 /* A top-layer dialog keeps settings independent of the toolbar button width. */
-.mobile-game #mobileSettingsDialog{position:fixed;inset:0;width:calc(100vw - 24px);max-width:460px;height:auto;max-height:calc(100dvh - 32px);padding:0;margin:auto;border:1px solid #a4b077;border-radius:18px;background:#172f22;color:#fff1bd;overflow:hidden;box-sizing:border-box;box-shadow:0 16px 50px #0007}
-.mobile-game #mobileSettingsDialog[open]{display:flex;flex-direction:column}
-.mobile-game #mobileSettingsDialog::backdrop{background:#061b12b8;backdrop-filter:blur(4px)}
-.mobile-game .mobile-settings-header{display:flex;flex:none;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #a4b07744;gap:12px}
-.mobile-game .mobile-settings-header strong{font-size:18px}
-.mobile-game .mobile-settings-header button{min-height:44px;padding:8px 18px;background:#ffe3a0;color:#233820;border-radius:10px;font-size:15px;font-weight:700}
-.mobile-game #mobileSettingsDialog .difficulty-controls{position:static;inset:auto;display:flex;flex-direction:column;flex:1;min-height:0;width:100%;max-width:none;max-height:none;overflow-x:hidden;overflow-y:auto;padding:16px;gap:20px;border:0;background:transparent;box-sizing:border-box;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
-.mobile-game #mobileSettingsDialog .difficulty-controls>*{width:100%;min-width:0;flex:none;margin:0;box-sizing:border-box}
-.mobile-game #mobileSettingsDialog .fire-control,.mobile-game #mobileSettingsDialog .learning-load-control,.mobile-game #mobileSettingsDialog .english-control,.mobile-game #mobileSettingsDialog .spell-control{display:flex;flex-direction:column;align-items:stretch;gap:8px}
-.mobile-game #mobileSettingsDialog label{display:block;width:100%;font-size:15px;line-height:1.5;white-space:normal;color:#f6efd5}
-.mobile-game #mobileSettingsDialog output{float:right;color:#ffe3a0;font-weight:700}
-.mobile-game #mobileSettingsDialog input[type=range]{width:100%;height:36px;margin:0;accent-color:#edcf7d;flex:1;min-width:0}
-.mobile-game #mobileSettingsDialog .fire-slider{display:flex;align-items:center;gap:10px;width:100%}
-.mobile-game #mobileSettingsDialog select{width:100%;max-width:100%;min-height:46px;padding:8px;font-size:16px;white-space:normal;background:#294432;color:#fff1bd;border:1px solid #789365;border-radius:9px;box-sizing:border-box}
-.mobile-game #mobileSettingsDialog small,.mobile-game #mobileSettingsDialog .fire-control>span,.mobile-game #mobileSettingsDialog .spell-control>span{font-size:12px;line-height:1.5;color:#c4d4b4;white-space:normal}
-.mobile-game #mobileSettingsDialog .magic-slow-switch{min-height:48px;justify-content:flex-start;border:1px solid #789365;border-radius:10px;padding:10px;color:#fff1bd;background:#294432}
+.game-app #mobileSettingsDialog{position:fixed;inset:0;width:calc(100vw - 24px);max-width:460px;height:auto;max-height:calc(100dvh - 32px);padding:0;margin:auto;border:1px solid #a4b077;border-radius:18px;background:#172f22;color:#fff1bd;overflow:hidden;box-sizing:border-box;box-shadow:0 16px 50px #0007}
+.game-app #mobileSettingsDialog[open]{display:flex;flex-direction:column}
+.game-app #mobileSettingsDialog::backdrop{background:#061b12b8;backdrop-filter:blur(4px)}
+.game-app .mobile-settings-header{display:flex;flex:none;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #a4b07744;gap:12px}
+.game-app .mobile-settings-header strong{font-size:18px}
+.game-app .mobile-settings-header button{min-height:44px;padding:8px 18px;background:#ffe3a0;color:#233820;border-radius:10px;font-size:15px;font-weight:700}
+.game-app #mobileSettingsDialog .difficulty-controls{position:static;inset:auto;display:flex;flex-direction:column;flex:1;min-height:0;width:100%;max-width:none;max-height:none;overflow-x:hidden;overflow-y:auto;padding:16px;gap:20px;border:0;background:transparent;box-sizing:border-box;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.game-app #mobileSettingsDialog .difficulty-controls>*{width:100%;min-width:0;flex:none;margin:0;box-sizing:border-box}
+.game-app #mobileSettingsDialog .fire-control,.game-app #mobileSettingsDialog .learning-load-control,.game-app #mobileSettingsDialog .english-control,.game-app #mobileSettingsDialog .spell-control{display:flex;flex-direction:column;align-items:stretch;gap:8px}
+.game-app #mobileSettingsDialog label{display:block;width:100%;font-size:15px;line-height:1.5;white-space:normal;color:#f6efd5}
+.game-app #mobileSettingsDialog output{float:right;color:#ffe3a0;font-weight:700}
+.game-app #mobileSettingsDialog input[type=range]{width:100%;height:36px;margin:0;accent-color:#edcf7d;flex:1;min-width:0}
+.game-app #mobileSettingsDialog .fire-slider{display:flex;align-items:center;gap:10px;width:100%}
+.game-app #mobileSettingsDialog select{width:100%;max-width:100%;min-height:46px;padding:8px;font-size:16px;white-space:normal;background:#294432;color:#fff1bd;border:1px solid #789365;border-radius:9px;box-sizing:border-box}
+.game-app #mobileSettingsDialog small,.game-app #mobileSettingsDialog .fire-control>span,.game-app #mobileSettingsDialog .spell-control>span{font-size:12px;line-height:1.5;color:#c4d4b4;white-space:normal}
+.game-app #mobileSettingsDialog .magic-slow-switch{min-height:48px;justify-content:flex-start;border:1px solid #789365;border-radius:10px;padding:10px;color:#fff1bd;background:#294432}
 /* One skill color follows the tab, card and next keyboard key. */
+.game-app #mobileSettingsDialog{background:#f7f5ec;color:#173629;border:1px solid #d6dfce;color-scheme:light}
+.game-app #mobileSettingsDialog .mobile-settings-header{background:#fff;border-color:#d6dfce}
+.game-app #mobileSettingsDialog .mobile-settings-header strong{color:#173629}
+.game-app #mobileSettingsDialog .difficulty-controls{background:#f7f5ec;color:#173629}
+.game-app #mobileSettingsDialog label,.game-app #mobileSettingsDialog label>span{color:#173629;font-weight:600}
+.game-app #mobileSettingsDialog output{color:#245b38}
+.game-app #mobileSettingsDialog small,.game-app #mobileSettingsDialog .fire-control>span,.game-app #mobileSettingsDialog .spell-control>span,.game-app #mobileSettingsDialog .fire-slider>span{color:#465747}
+.game-app #mobileSettingsDialog a{color:#245b38;text-decoration:underline}
+.game-app #mobileSettingsDialog select{background:#fff;color:#173629;border:1px solid #71806a}
+.game-app #mobileSettingsDialog input[type=range]{accent-color:#245b38}
+.game-app #mobileSettingsDialog button{min-height:44px;padding:8px 12px;border-radius:12px;background:#214831;color:#fff;border:1px solid #214831;font-size:14px}
+.game-app #mobileSettingsDialog .magic-slow-switch{background:#214831;color:#fff}
+.game-app #mobileSettingsDialog button span,.game-app #mobileSettingsDialog button b{color:inherit}
+.game-app #mobileSettingsDialog .mobile-settings-header button{background:#efc968;color:#173629;border-color:#b78b25}
+.game-app #mobileSettingsDialog button:disabled{background:#e2e5dc;color:#536051;border-color:#bdc5b6}
 .mobile-game [data-skill="0"],.mobile-game [data-hint-skill="0"]{--skill-color:#ffd16a;--skill-wash:#504123}
 .mobile-game [data-skill="1"],.mobile-game [data-hint-skill="1"]{--skill-color:#72d8ff;--skill-wash:#193f51}
 .mobile-game [data-skill="2"],.mobile-game [data-hint-skill="2"]{--skill-color:#ff91b8;--skill-wash:#512b40}
@@ -115,7 +130,7 @@ body.phone-duel[data-duel-state=playing]{height:100dvh;min-height:0;overflow:hid
 .phone-duel[data-duel-state=playing] .scoreboard{flex:none;height:34px;min-height:34px;padding:2px 6px}
 .phone-duel[data-duel-state=playing] .timer b{font-size:20px}
 .phone-duel[data-duel-state=playing] .timer>span{display:none}
-.phone-duel[data-duel-state=playing] .yard{flex:0 0 27dvh;min-height:115px;height:27dvh}
+.phone-duel[data-duel-state=playing] .yard{flex:0 0 40dvh;min-height:115px;height:40dvh}
 .phone-duel[data-duel-state=playing] .yard-footer{min-height:22px;padding:1px 5px;font-size:10px}
 .phone-duel[data-duel-state=playing] .attack-panel{flex:none}
 .phone-duel[data-duel-state=playing] .dispatch{padding:3px 5px;display:flex;align-items:center;gap:5px}
@@ -138,6 +153,6 @@ body.phone-duel[data-duel-state=playing]{height:100dvh;min-height:0;overflow:hid
 .phone-duel[data-duel-state=playing] .touch-row{margin-bottom:3px}
 .phone-duel[data-duel-state=playing] .touch-key{height:39px;min-height:39px;max-width:none;font-size:16px}
 .phone-duel .duel-touch-keyboard .hint{background:var(--skill-color);color:#14271f;border-color:var(--skill-color);font-weight:900}
-@media(max-height:650px){.phone-duel[data-duel-state=playing] .yard{flex-basis:24dvh;min-height:85px}.phone-duel[data-duel-state=playing] .touch-key{height:30px;min-height:30px}.phone-duel[data-duel-state=playing] .duel-skill-tabs button{height:30px;min-height:30px}}
+@media(max-height:650px){.phone-duel[data-duel-state=playing] .yard{flex-basis:32dvh;min-height:85px}.phone-duel[data-duel-state=playing] .touch-key{height:30px;min-height:30px}.phone-duel[data-duel-state=playing] .duel-skill-tabs button{height:30px;min-height:30px}}
 @media(orientation:landscape) and (max-height:500px){body.phone-duel[data-duel-state=playing]{overflow:auto!important;height:auto;min-height:100dvh}.phone-duel[data-duel-state=playing] main{height:auto;min-height:600px}.phone-duel[data-duel-state=playing] #skills{min-height:100px}}
 .phone-duel[data-duel-state=playing] #skills .skill.phone-visible{width:100%;max-width:none;box-sizing:border-box}

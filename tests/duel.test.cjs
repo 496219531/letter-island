@@ -94,11 +94,11 @@ test('mutual bites are simultaneous, cannot hurt allies, and only connect on the
   m.games[1].spawn(531,140,'walker',false);m.tick(.05);
   assert.equal(c.hp,c.maxHp);assert.equal(d.hp,d.maxHp);assert.equal(c.engaged,false);
 });
-test('a frozen army cannot bite; survivors advance after winning and eventually damage the opposing yard',()=>{
+test('an ice-slowed army still bites; survivors advance after winning and damage the opposing yard',()=>{
   const m=match();m.waveIn=999;m.games.forEach(g=>g.auto=false);
   const friendly=m.games[1].spawn(530,290,'armor',false),enemy=m.games[0].spawn(530,290,'walker',false);
   m.games[0].freeze=2;enemy.hp=10;
-  m.tick(.05);assert.equal(m.games[0].enemies.length,0);assert.equal(friendly.hp,friendly.maxHp);
+  m.tick(.05);assert.equal(m.games[0].enemies.length,0);assert.ok(friendly.hp<friendly.maxHp);
   const before=friendly.x;m.tick(.05);assert.ok(friendly.x<before);
   friendly.x=195;ticks(m,1);assert.ok(m.games[1].health<8);assert.equal(m.games[0].health,8);
 });

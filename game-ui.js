@@ -34,12 +34,18 @@
   function fit(){
     const width=stage.clientWidth,height=stage.clientHeight;
     if(width<=0||height<=0)return;
-    const fillPhoneDuel=(!solo&&Boolean(window.GuluMobile?.active))||(document.body.classList.contains('native-iphone')&&window.matchMedia('(orientation: landscape)').matches);
+    const fillPhoneDuel=Boolean(window.GuluMobile?.active)||document.body.classList.contains('native-iphone');
     const scale=Math.min(width/1000,height/530);
     const w=fillPhoneDuel?width:1000*scale,h=fillPhoneDuel?height:530*scale;
-    stage.style.setProperty('--scene-width',w+'px');stage.style.setProperty('--scene-height',h+'px');
-    const dpr=Math.min(2,window.devicePixelRatio||1),pixelsW=Math.round(w*dpr),pixelsH=Math.round(h*dpr);
-    if(canvas.width!==pixelsW||canvas.height!==pixelsH){canvas.width=pixelsW;canvas.height=pixelsH;canvas.getContext('2d').setTransform(pixelsW/1000,0,0,pixelsH/530,0,0);}
+    if(stage.style.getPropertyValue('--scene-width')!==w+'px')stage.style.setProperty('--scene-width',w+'px');
+    if(stage.style.getPropertyValue('--scene-height')!==h+'px')stage.style.setProperty('--scene-height',h+'px');
+    // Positions use the full phone field; character art keeps its proportions.
+    const ratio=(h/530)/(w/1000),portrait=solo&&fillPhoneDuel&&height>width*.65;
+    canvas.characterScale=portrait?{x:Math.min(1.8,ratio),y:Math.min(1.8,ratio)/ratio}:{x:1,y:1};
+    const dpr=Math.min(window.GuluPerformance?.current.dpr||2,window.devicePixelRatio||1),pixelsW=Math.round(w*dpr),pixelsH=Math.round(h*dpr);
+    if(canvas.width!==pixelsW||canvas.height!==pixelsH){canvas.width=pixelsW;canvas.height=pixelsH;canvas.getContext('2d').setTransform(pixelsW/1000,0,0,pixelsH/530,0,0);document.dispatchEvent(new Event('gulu-scene-resized'));}
   }
-  new ResizeObserver(fit).observe(stage);window.addEventListener('resize',fit);document.addEventListener('fullscreenchange',fit);fit();
+  let fitFrame=0;
+  function scheduleFit(){if(!fitFrame)fitFrame=requestAnimationFrame(()=>{fitFrame=0;fit();});}
+  document.addEventListener('gulu-quality-change',scheduleFit);new ResizeObserver(scheduleFit).observe(stage);window.addEventListener('resize',scheduleFit);document.addEventListener('fullscreenchange',scheduleFit);fit();
 })();

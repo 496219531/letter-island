@@ -5,17 +5,24 @@ const ctx = canvas.getContext('2d');
 const sprite = new Image(); sprite.src = 'assets/zombie.png';
 const captainSprite=new Image();captainSprite.src='assets/pea-captain-v1.png';
 const particles = [];
-const MAX_PARTICLES=260;
+const quality=()=>window.GuluPerformance?.current||{fps:60,dpr:2,particles:260,glow:true,hudInterval:.07};
+document.addEventListener('gulu-quality-change',()=>{particles.splice(quality().particles);paintClock=.2;});
 const soundscape=new GardenAudio(()=>new (window.AudioContext||window.webkitAudioContext)());
-function resumeGameAudio(){try{soundscape.init();}catch{}}
+function resumeGameAudio(){return soundscape.unlock();}
 document.addEventListener('pointerdown',resumeGameAudio,{passive:true});
+document.addEventListener('pointerup',resumeGameAudio,{passive:true});
+document.addEventListener('touchend',resumeGameAudio,{passive:true});
 document.addEventListener('keydown',resumeGameAudio);
 document.addEventListener('gulu-audio-ready',resumeGameAudio);
 try{const volume=localStorage.getItem('gulu-sfx-volume-v2');if(volume!==null)soundscape.setVolume(Number(volume));}catch{}
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-let best = 0, lastTime = 0, lastHud = '', hudClock = 0;
-let toastTimer, bannerTimer, recoil = 0, shake = 0, dialogResume = false;
+let best = 0, lastTime = 0, lastHud = '', hudClock = 0, paintClock=.2;
+document.addEventListener('gulu-scene-resized',()=>{paintClock=.2;});
+let toastUntil=0,bannerUntil=0,recoil = 0, shake = 0, dialogResume = false;
+const pressedKeys=new Set();
 const localSpeech=GuluSystemSpeech.createLocalSpeech(window.speechSynthesis,window.SpeechSynthesisUtterance);
+let learningReadout='both';
+try{const saved=localStorage.getItem('gulu-learning-readout');if(['both','english','off'].includes(saved))learningReadout=saved;}catch{}
 const reviewStore=GuluSpeechReview.repository(localStorage);
 const speechAttempts=new Map();
 let listening=false,speechHeld=false,speechFeedback='',nativeSpeechReady=false,speechAuthorized=false,permissionPhase='idle';
@@ -36,7 +43,7 @@ const voicePermissions=GuluPressToTalk.createVoicePermissions({
   },
   async authorizeNative(){
     if(phoneSpeech){if(!(window.SpeechRecognition||window.webkitSpeechRecognition))throw new Error('此手机浏览器不支持语音识别；请使用支持该功能的系统浏览器。');return;}
-    const response=await fetch('/api/speech/authorize',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    const response=await fetch('api/speech/authorize',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     const result=await response.json();if(!response.ok||!result.ok)throw new Error(result.error||'系统识别授权尚未完成');
   },
   onState(phase){permissionPhase=phase;speechAuthorized=phase==='ready';updateSpeechControl();}
@@ -52,15 +59,16 @@ $('#bestScore').textContent = best;
 
 function tone(...args){soundscape.tone(...args);}
 function toast(text, time = 2200) {
-  clearTimeout(toastTimer); $('#battleToast').textContent = text; $('#battleToast').classList.add('visible');
-  toastTimer = setTimeout(() => $('#battleToast').classList.remove('visible'), time);
+  $('#battleToast').textContent = text; $('#battleToast').classList.add('visible');toastUntil=performance.now()+time;
 }
+function flashKey(button){button.classList.add('pressed');button._pressedUntil=performance.now()+130;pressedKeys.add(button);}
 function addParticle(particle) {
-  if(particles.length>=MAX_PARTICLES)particles.splice(0,particles.length-MAX_PARTICLES+1);
+  if(particles.length>=quality().particles)return;
   particles.push(particle);
 }
 function puff(x, y, color, count = 10, text = '') {
   for (let i = 0; i < count; i++) {
+    if(!quality().glow&&i>0&&i%3!==0)continue;
     const angle = Math.random() * Math.PI * 2, speed = 40 + Math.random() * 160;
     addParticle({ x, y, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed-50, color, life:.65+Math.random()*.3, max:1, size:3+Math.random()*5, text:i === 0 ? text : '' });
   }
@@ -69,18 +77,21 @@ function floatText(x,y,text,color='#fff9c2') {
   addParticle({x,y,vx:0,vy:-50,color,life:1.1,max:1.1,size:20,text});
 }
 const game = new GardenGame({ emit:onEvent });
-if(window.GuluMobile?.active){game.learningMode='english';game.auto=true;$('#autoButton').setAttribute('aria-pressed','true');}
+game.auto=true;$('#autoButton').setAttribute('aria-pressed','true');
+if(window.GuluMobile?.active)game.learningMode='english';
 function lookupSentence(code){return game.customBank?.entries.find(e=>e.word===code)||findSentenceEntry(code);}
 function lookupWord(code){return game.customBank?.entries.find(e=>e.word===code)||findWordEntry(code);}
 const SAVE_KEY='gulu-run-v1', WRITER_KEY='gulu-run-writer-v1';
 const writerId=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
-let availableSave=null,saveClock=0,saveProblem='';
+let availableSave=null,saveProblem='';
 function refreshSaveMenu(){
-  $('#continueButton').hidden=!availableSave;
+  const phoneHome=Boolean(window.GuluNative||window.GuluMobile?.active);
+  $('#continueButton').hidden=!phoneHome&&!availableSave;$('#continueButton').disabled=!availableSave;
+  if(phoneHome)$('#continueButton').textContent='继续上次冒险';
   $('#saveHint').hidden=!availableSave&&!saveProblem;
   $('#saveHint').textContent=availableSave?'第 '+availableSave.state.wave+' 波 · '+Object.values(availableSave.state.stacks).reduce((a,b)=>a+b,0)+' 张强化 · '+availableSave.state.score+' 分 · 保存在当前浏览器':saveProblem;
-  $('#startButton').classList.toggle('new-run-button',!!availableSave);
-  $('#startButton').textContent=availableSave?'重新开始一局':'出发！保卫小院 →';
+  $('#startButton').classList.toggle('new-run-button',!!availableSave&&!phoneHome);
+  $('#startButton').textContent=availableSave?'重新开始一局':phoneHome?'新开一局':'出发！保卫小院 →';
 }
 function readSavedRun(){
   try{
@@ -93,15 +104,15 @@ function readSavedRun(){
 }
 function claimSave(){
   try{localStorage.setItem(WRITER_KEY,writerId);return true;}
-  catch{saveProblem='浏览器未允许保存，当前进度无法自动存档。';toast(saveProblem,4000);return false;}
+  catch{saveProblem='浏览器未允许保存，当前进度无法保存。';toast(saveProblem,4000);return false;}
 }
 function persistRun(manual=false){
   if(!['playing','paused','upgrade'].includes(game.status))return false;
   try{
     if(localStorage.getItem(WRITER_KEY)!==writerId){if(manual)toast('这局已在另一个页面继续，请在那里存档。');return false;}
     const run=GuluSave.encode(game);if(!run)return false;
-    localStorage.setItem(SAVE_KEY,JSON.stringify({writer:writerId,run}));availableSave=run;saveProblem='';saveClock=0;
-    $('#saveButton').title='已自动保存 · 第 '+game.wave+' 波';refreshSaveMenu();
+    localStorage.setItem(SAVE_KEY,JSON.stringify({writer:writerId,run}));availableSave=run;saveProblem='';
+    $('#saveButton').title='已保存 · 第 '+game.wave+' 波';refreshSaveMenu();
     if(manual)toast('已保存！下次点「继续上次冒险」就能接着玩。',2500);
     return true;
   }catch{saveProblem='保存失败：浏览器存储不可用或空间不足。';$('#saveButton').title=saveProblem;if(manual)toast(saveProblem,4000);return false;}
@@ -117,7 +128,7 @@ function continueRun(){
   $('#difficulty').value=game.learningMode!=='letters'?game.learningMode:'adaptive';$('#autoButton').setAttribute('aria-pressed',String(game.auto));updateFireControl();updateTypingControls();
   window.GuluLibraryUI?.restoreSelection(game.customBank);
   if(game.status==='upgrade')upgradeScreen();else game.resume();
-  persistRun();updateHud(true);canvas.focus({preventScroll:true});toast('欢迎回来！继续守住第 '+game.wave+' 波。');
+  updateHud(true);canvas.focus({preventScroll:true});toast('欢迎回来！继续守住第 '+game.wave+' 波。');
 }
 function returnHome(){
   if(['playing','paused','upgrade'].includes(game.status)&&!persistRun()){toast(saveProblem||'未能保存，请稍后重试。');return;}
@@ -141,7 +152,7 @@ async function skipSpeechPrompt(){
     if(game.status!=='paused'||skill.code!==code)throw new Error('游戏状态已改变，请回到当前句子后重试。');
     reviewStore.add({id:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),at:new Date().toISOString(),code,text:entry?.text||code,meaning:entry?.meaning||'',scene:entry?.scene||game.customBank?.name||'',level:game.englishLevel,wave:game.wave,attempts});
     game.resume();if(!game.skipSpeech(index)){speechFeedback='已记录到口语复盘；当前分组没有其他句子可换。';updateHud(true);return;}
-    speechAttempts.delete(code);speechFeedback='已跳过并存入「口语复盘」，请朗读新句子。';persistRun();updateHud(true);
+    speechAttempts.delete(code);speechFeedback='已跳过并存入「口语复盘」，请朗读新句子。';updateHud(true);
   }catch(error){if(game.status==='paused')game.resume();toast('未完成跳过：'+error.message,4500);updateHud(true);}
 }
 function openSpeechReview(){
@@ -176,14 +187,14 @@ function openSpeechReview(){
 function saveMenu(){
   if(game.status==='upgrade'){persistRun(true);return;}
   if(!['playing','paused'].includes(game.status)){
-    readSavedRun();toast(availableSave?'已有第 '+availableSave.state.wave+' 波存档，点击「继续上次冒险」。':'开始冒险后会每 2 秒自动保存。');return;
+    readSavedRun();toast(availableSave?'已有第 '+availableSave.state.wave+' 波存档，点击「继续上次冒险」。':'可手动保存；暂停、过关或返回主页时也会保存。');return;
   }
-  showDialog('<div class="dialog-icon">💾</div><h2>把冒险装进口袋</h2><p>自动保存波次、卡牌、护盾、敌人位置和施法进度。<br>存档保存在当前浏览器，刷新或关闭后可继续。</p><button class="primary-button" id="saveAndContinue">保存并继续 →</button><button class="secondary-button" id="saveAndExit">保存并返回开始画面</button>',true);
+  showDialog('<div class="dialog-icon">💾</div><h2>把冒险装进口袋</h2><p>保存波次、卡牌、护盾、敌人位置和施法进度。<br>存档保存在当前浏览器，刷新或关闭后可继续。</p><button class="primary-button" id="saveAndContinue">保存并继续 →</button><button class="secondary-button" id="saveAndExit">保存并返回开始画面</button>',true);
   $('#saveAndContinue').onclick=()=>{if(persistRun(true))closeDialog();};
   $('#saveAndExit').onclick=returnHome;
 }
 readSavedRun();
-window.addEventListener('pagehide',()=>{persistRun();stopListening();soundscape.stop();});
+window.addEventListener('pagehide',()=>{stopListening();soundscape.stop();});
 window.addEventListener('storage',event=>{
   if(event.key===WRITER_KEY&&event.newValue!==writerId&&['playing','paused','upgrade'].includes(game.status)){
     game.shooting=false;game.status='ready';soundscape.stop();dialogResume=false;
@@ -240,6 +251,7 @@ function syncMobileSpeechTarget(){
 }
 document.addEventListener('gulu-visible-skill',()=>{syncMobileSpeechTarget();updateHud(true);});
 function updateSpeechControl(){
+  if(game.learningMode!=='speaking')return;
   const selected=game.learningMode==='speaking'&&game.typing>=0?game.skills[game.typing]:null;
   const ready=game.status==='playing'&&selected&&selected.cd<=0,phase=microphone.phase;
   const granting=['microphone','system'].includes(permissionPhase);
@@ -257,7 +269,7 @@ function updateSpeechControl(){
   const signature=JSON.stringify(diffs);if(diffBox.dataset.signature!==signature){diffBox.dataset.signature=signature;diffBox.replaceChildren();for(const part of diffs){const item=document.createElement('span');item.textContent=part.type==='missing'?'未识别到：'+part.expected:part.type==='extra'?'多识别：'+part.heard:part.expected+' → 识别成 '+part.heard;diffBox.append(item);}}
   $('#speechExample').title=localSpeech.available()?'使用本地英文声音示范':'请在系统语音设置中添加英文声音';
 }
-function stopListening(){localSpeech.cancel();microphone.cancel();listening=false;speechHeld=false;}
+function stopListening(cancelSpeech=true){if(cancelSpeech)localSpeech.cancel();microphone.cancel();listening=false;speechHeld=false;}
 function startListening(event){
   syncMobileSpeechTarget();
   if(event?.button!==undefined&&event.button!==0)return;
@@ -267,7 +279,7 @@ function startListening(event){
 }
 function saveTypingSettings(){
   try{localStorage.setItem('gulu-typing-settings',JSON.stringify({maxSpellLength:game.maxSpellLength,maxLearningLoad:game.maxLearningLoad,magicSlow:game.magicSlow,englishLevel:game.englishLevel}));}catch{}
-  persistRun();updateTypingControls();updateHud(true);
+  updateTypingControls();updateHud(true);
 }
 $('#maxLearningLoad').addEventListener('input',event=>{game.setMaxLearningLoad(event.target.value);saveTypingSettings();});
 $('#maxSpellLength').addEventListener('input',event=>{game.setMaxSpellLength(event.target.value);saveTypingSettings();});
@@ -275,11 +287,11 @@ $('#englishLevel').onchange=()=>{game.englishLevel=Number($('#englishLevel').val
 $('#magicSlowButton').onclick=()=>{game.magicSlow=!game.magicSlow;saveTypingSettings();};
 updateTypingControls();
 function onEvent(type, data = {}) {
-  if(['start','pause','upgrade','finish'].includes(type)){soundscape.stop();stopListening();}
+  if(['start','pause','upgrade','finish'].includes(type)){soundscape.stop({preserveSkills:type==='upgrade'||type==='finish'});stopListening(type!=='upgrade'&&type!=='finish');}
   if(type==='nibble')soundscape.play('nibble',data);
   if(type==='critical')soundscape.play('critical',data);
-  if(['start','wave','upgrade','pause'].includes(type))persistRun();
-  if (type === 'upgrade') { upgradeScreen(); }
+  if((type==='upgrade'||type==='pause'||(type==='wave'&&data.wave>1)))persistRun();
+  if (type === 'upgrade') { upgradeScreen();soundscape.play('celebrate'); }
   if(type==='nibble')puff(data.x,data.y,'#ffd945',data.removed?18:6,data.removed?'':'咔嚓');
   if (type === 'critical') { floatText(data.x,data.y-28,'暴击！','#ffdd8a'); }
   if (type === 'heal') { puff(data.x,data.y,'#b9ffa0',8,'+'); }
@@ -300,26 +312,37 @@ function onEvent(type, data = {}) {
     if(card){card.classList.remove('wrong');void card.offsetWidth;card.classList.add('wrong');}
   }
   if (type === 'typing') { toast(GuluModeCopy.practiceCopy(game.learningMode,{mobile:phoneSpeech}).action,2200); }
+  if(type==='practice-complete'&&learningReadout!=='off'&&soundscape.enabled&&soundscape.volume>0&&!document.hidden){
+    const report=error=>{const el=$('#learningReadoutStatus');if(el)el.textContent=error==='missing-chinese'?'系统缺少本地中文声音，当前只读英文。':'朗读未成功，请在设置中试听，并检查系统英文声音。';};
+    if(!localSpeech.enqueueLearning(data.text,data.meaning,{chinese:learningReadout==='both',volume:soundscape.volume,onError:report}))report('unavailable');
+  }
   if(type==='repeat'){toast('很好！再输入 '+(data.total-data.done)+' 遍就能释放大招 ✦',1800);}
+  if(type==='practice-score'){toast('完成'+data.repeats+'遍练习 · +'+data.points+'分（学段 ×'+(data.level+1)+'）',2200);}
   if(type==='speech'){
-    if(data.matched){speechFeedback='朗读内容匹配成功！';$('#speechTranscript').textContent=speechFeedback;tone(720,.16,'sine',.04,980);}
+    if(data.matched){speechFeedback=data.nameTolerated?'姓名发音已按中国姓名宽容匹配成功！':'朗读内容匹配成功！';$('#speechTranscript').textContent=speechFeedback;tone(720,.16,'sine',.04,980);}
     else{const heard=data.heard?data.heard.toLowerCase():'没有听清';speechFeedback='识别成：'+heard+' · 请再试一次';$('#speechTranscript').textContent=speechFeedback;toast('识别文字没有匹配当前句子，可以再朗读一次。',3000);tone(270,.09,'sine',.025,350);}
   }
+  if(type==='skill-expired')toast('本次大招已用完5次，恢复为'+data.name,2500);
   if (type === 'cooldown') { toast('还要 '+Math.ceil(game.skills[data.index].cd/game.rechargeRate)+' 秒，先用豌豆突突突',1400); }
   if (type === 'empty') { toast('僵尸还没到，不浪费你的大招～'); }
   if (type === 'cast') {
-    const icons = ['🌈','❄️','🍉'];
+    const icons = game.skills.map(s=>s.icon);const kind=data.kind||game.skills[data.index].kind;
     const banner = $('#castBanner'); banner.textContent = icons[data.index]+' '+data.name+'！';
     banner.classList.remove('show');void banner.offsetWidth;banner.classList.add('show');
-    clearTimeout(bannerTimer);bannerTimer=setTimeout(()=>banner.classList.remove('show'),1000);
-    if(data.index===0){soundscape.play('laser',{x:game.hero.x});shake=.35;}
-    if(data.index===1){soundscape.play('freeze');toast('冻住啦！'+(6+1.5*game.stack('permafrost'))+' 秒内豌豆伤害提升 ❄',2400);}
-    if(data.index===2)soundscape.play('melon');
+    bannerUntil=performance.now()+1000;
+    if(kind==='laser'){soundscape.playSkill('laser',{x:game.hero.x});shake=.35;}
+    if(kind==='freeze'){soundscape.playSkill('freeze');toast('冰霜减速50%！'+(6+1.5*game.stack('permafrost'))+' 秒内豌豆伤害提升 ❄',2400);}
+    if(kind==='melon')soundscape.playSkill('melon');
+    if(kind==='charm'){soundscape.playSkill('freeze');toast('💗 魅惑之吻：每条路线最前方的僵尸转为友军，Boss也可魅惑');}
+    if(['lightning','judgment'].includes(kind))soundscape.playSkill('laser');
+    if(['blackhole','deathchain'].includes(kind))soundscape.playSkill('boss');
+    if(kind==='clones')soundscape.playSkill('celebrate');
+    if(kind==='rage'){soundscape.playSkill('horde');toast('🔥 狂暴巨化 '+(5+game.stack('rageDuration'))+' 秒！每轮10发，射速×2，伤害×3');}
   }
   if (type === 'explosion') { puff(data.x,data.y,'#ffd98a',45,'BOOM!');soundscape.play('explosion',data);shake=.55; }
   if (type === 'breach') { shake=.3;soundscape.play('warning');toast(game.health<=0?'向日葵全倒了！3 秒内修复防线或清场！':'向日葵正在被啃食！快保护它们！'); }
-  if (type === 'wave') { toast(data.wave===1?GuluModeCopy.practiceCopy(game.learningMode,{mobile:phoneSpeech}).action:'第 '+data.wave+' 波来啦！强化生效，僵尸也变强了！',2800); }
-  if (type === 'clear') { toast('这波守住啦！歇一口气，下一波马上来 ✦',2700);tone(660,.25,'sine',.04,880); }
+  if (type === 'wave') { if(data.wave>1)soundscape.play('horde',{variant:Math.min(2,Math.floor((data.wave-1)/2))});toast(data.wave===1?GuluModeCopy.practiceCopy(game.learningMode,{mobile:phoneSpeech}).action:'第 '+data.wave+' 波来啦！强化生效，僵尸也变强了！',2800); }
+  if (type === 'clear') { toast('这波守住啦！歇一口气，下一波马上来 ✦',2700);soundscape.play('celebrate'); }
   if (type === 'boss') { soundscape.play('boss',{x:950});toast('大个子来串门！用冰冻和西瓜招呼它！',3500); }
   if (type === 'finish') { finishSavedRun();finishScreen(data.win); }
 }
@@ -336,65 +359,77 @@ function spellKeysMarkup(skill,active){
   }
   return rows.join('');
 }
+function setHudText(node,value){value=String(value);if(node.textContent!==value)node.textContent=value;}
 function updateHud(force=false) {
   syncMobileSpeechTarget();
-  document.body.dataset.gameState=game.status;document.body.dataset.learningMode=game.learningMode;
+  if(document.body.dataset.gameState!==game.status)document.body.dataset.gameState=game.status;
+  if(document.body.dataset.learningMode!==game.learningMode)document.body.dataset.learningMode=game.learningMode;
   const values = JSON.stringify([game.health,game.maxHealth,game.learningMode,game.englishLevel,game.stacks,game.wave,game.kills,game.score,game.status,game.spawned,game.typing,game.freeze>0,Math.ceil((3-game.breachElapsed)*10),game.magicSlow,game.maxSpellLength,game.maxLearningLoad,listening,game.skills.map(s=>[s.code,s.typed,Math.ceil(s.cd*10)])]);
   if(!force && values===lastHud)return;lastHud=values;
   document.body.classList.toggle('in-run',game.status!=='ready');
-  $('#score').textContent=game.score;
-  $('#upgradeCount').textContent=Object.values(game.stacks).reduce((a,b)=>a+b,0);
-  $('#runDifficulty').textContent='第 '+game.wave+' 波 · '+game.quota+' 只来袭 · 敌人生命 ×'+Math.pow(1.19,game.wave-1).toFixed(1);
+  setHudText($('#score'),game.score);
+  setHudText($('#upgradeCount'),Object.values(game.stacks).reduce((a,b)=>a+b,0));
+  setHudText($('#runDifficulty'),'第 '+game.wave+' 波 · '+game.quota+' 只来袭 · 敌人生命 ×'+Math.pow(1.19,game.wave-1).toFixed(1));
   const owned=GARDEN_CARDS.filter(c=>game.stack(c.id));
-  $('#runBuild').textContent=owned.length?owned.slice(-4).map(c=>c.icon+' ×'+game.stack(c.id)).join('  '):'击退整波，选择一张强化卡';
-  $('#waveTitle').textContent=game.wave%5===0?'首领来袭':game.wave>=4?'无尽捣蛋军团':'阳光小院';
-  $('#waveSubtitle').textContent=game.status==='ready'?'准备迎接第 1 波':'第 '+game.wave+' 波 · 已击退 '+game.kills+' 只';
-  $('.level-badge').textContent=String(game.wave).padStart(2,'0');
-  $('#hearts').innerHTML=Array.from({length:Math.min(12,game.maxHealth)},(_,i)=>'<span class="heart '+(i<game.health?'':'empty')+'" aria-hidden="true">♥</span>').join('')+'<small class="health-number">'+Number(game.health.toFixed(1))+'/'+game.maxHealth+'</small>';
+  setHudText($('#runBuild'),owned.length?owned.slice(-4).map(c=>c.icon+' ×'+game.stack(c.id)).join('  '):'击退整波，选择一张强化卡');
+  setHudText($('#waveTitle'),game.wave%5===0?'首领来袭':game.wave>=4?'无尽捣蛋军团':'阳光小院');
+  setHudText($('#waveSubtitle'),game.status==='ready'?'准备迎接第 1 波':'第 '+game.wave+' 波 · 已击退 '+game.kills+' 只');
+  setHudText($('.level-badge'),String(game.wave).padStart(2,'0'));
+  const heartMarkup=Array.from({length:Math.min(12,game.maxHealth)},(_,i)=>'<span class="heart '+(i<game.health?'':'empty')+'" aria-hidden="true">♥</span>').join('')+'<small class="health-number">'+Number(game.health.toFixed(1))+'/'+game.maxHealth+'</small>';
+  const hearts=$('#hearts');if(hearts._markup!==heartMarkup){hearts.innerHTML=heartMarkup;hearts._markup=heartMarkup;}
   $('#hearts').setAttribute('aria-label','向日葵防御 '+Number(game.health.toFixed(1))+' / '+game.maxHealth);
-  $('#waveProgressText').textContent='第 '+game.wave+' 波 · ∞';
+  setHudText($('#waveProgressText'),'第 '+game.wave+' 波 · ∞');
   $('#waveFill').style.width=Math.min(100,(game.spawned-game.enemies.length)/game.quota*100)+'%';
   $('#pauseButton').disabled=game.status!=='playing';$('#homeButton').hidden=game.status==='ready';
   $('#difficulty').disabled=['playing','paused','upgrade'].includes(game.status);
-  $('#fieldStatus').textContent=game.status==='ready'?'小院准备就绪':game.status==='lost'?'向日葵防线已突破':game.health<=0?'防线告急 · '+Math.max(0,3-game.breachElapsed).toFixed(1)+' 秒':game.freeze>0?'全场冰冻中 · 伤害翻倍':game.waveBreak>0?'这波守住啦':'小院保卫战进行中';
-  $('#arsenalNote').textContent=game.learningMode==='speaking'?(game.typing>=0?'按住录音，松开识别':'选择大招，再按住麦克风'):game.typing>=0?(game.typingSlow?'慢动作中 · ':'自动换行 · ')+'已完成 '+game.skills[game.typing].typed+' / '+game.skills[game.typing].code.length+' 字母'+(game.learningMode==='english'?' · 第 '+(game.skills[game.typing].repeatsDone+1)+'/'+game.learningLoad+' 遍':''):'回蓝速度 ×'+game.rechargeRate.toFixed(2);
-  $('#progressHint').textContent=game.learningMode==='sentences'?'输入英文句子 · ␣ 代表空格 · 不区分大小写，无需标点 · 下组生效':game.learningMode==='english'?(game.customBank?game.customBank.name+' · '+game.customBank.entries.length+'条自定义词句':ENGLISH_STAGES[game.englishLevel].name+' · '+ENGLISH_STAGES[game.englishLevel].count+'词')+' · 按显示输入空格和标点':game.learningMode==='speaking'?'朗读 '+Math.min(3,game.learningLoad)+' 句连贯对话后释放大招':game.adaptive?'本波新提示 '+game.spellLength+' 个字母 · 只显示当前两行，自动跟随输入':'';
+  setHudText($('#fieldStatus'),game.status==='ready'?'小院准备就绪':game.status==='lost'?'向日葵防线已突破':game.health<=0?'防线告急 · '+Math.max(0,3-game.breachElapsed).toFixed(1)+' 秒':game.freeze>0?'冰霜减速50% · 伤害翻倍':game.waveBreak>0?'这波守住啦':'小院保卫战进行中');
+  setHudText($('#arsenalNote'),game.learningMode==='speaking'?(game.typing>=0?'按住录音，松开识别':'选择大招，再按住麦克风'):game.typing>=0?(game.typingSlow?'慢动作中 · ':'自动换行 · ')+'已完成 '+game.skills[game.typing].typed+' / '+game.skills[game.typing].code.length+' 字母'+(game.learningMode==='english'?' · 第 '+(game.skills[game.typing].repeatsDone+1)+'/'+game.learningLoad+' 遍':''):'回蓝速度 ×'+game.rechargeRate.toFixed(2));
+  setHudText($('#progressHint'),game.learningMode==='sentences'?'输入英文句子 · ␣ 代表空格 · 不区分大小写，特殊符号按空格，省略号略过 · 下组生效':game.learningMode==='english'?(game.customBank?game.customBank.name+' · '+game.customBank.entries.length+'条自定义词句 · 特殊符号按空格，省略号略过':ENGLISH_STAGES[game.englishLevel].name+' · '+ENGLISH_STAGES[game.englishLevel].count+'词 · 按显示输入空格和标点'):game.learningMode==='speaking'?'朗读显示的英文；省略号和斜杠不发音':game.adaptive?'本波新提示 '+game.spellLength+' 个字母 · 只显示当前两行，自动跟随输入':'');
   document.querySelectorAll('.skill-card').forEach((card,index)=>{
     const s=game.skills[index],sentence=['sentences','speaking'].includes(game.learningMode),speaking=game.learningMode==='speaking',learning=game.learningMode!=='letters';
     const entry=sentence?lookupSentence(s.code):game.learningMode==='english'?lookupWord(s.code):null;
     let contextLabel=card.querySelector('.dialogue-context');if(!contextLabel){contextLabel=document.createElement('span');contextLabel.className='dialogue-context';card.querySelector('.skill-info').prepend(contextLabel);}
-    contextLabel.hidden=!sentence||!entry?.scene;contextLabel.textContent=entry?.scene||'';
+    contextLabel.hidden=!sentence||!entry?.scene;setHudText(contextLabel,entry?.scene||'');
     contextLabel.title=entry?.scene?[entry.reference,entry.goal,entry.grammar].join(' · '):'';
+    const definition=GARDEN_SKILLS[s.kind||['laser','freeze','melon'][index]];setHudText(card.querySelector('.skill-art'),definition.icon);const description=card.querySelector('.skill-info > span:not([id]):not(.dialogue-context)');if(description)setHudText(description,definition.description);
+    document.querySelectorAll('.iphone-skill-tabs [data-skill="'+index+'"]').forEach(b=>setHudText(b,definition.icon+' '+definition.name));
     card.classList.toggle('learning-card',learning);card.classList.toggle('sentence-card',sentence);card.classList.toggle('speaking-card',speaking);
-    card.querySelector('.skill-info strong').textContent=sentence?(entry?.text||s.code):s.name;
-    $('#wordMeaning'+index).hidden=!learning;$('#wordMeaning'+index).textContent=learning?(entry?.meaning||''):'';
-    $('#wordIpa'+index).hidden=game.learningMode!=='english';$('#wordIpa'+index).textContent=entry?.ipa?'音标 /'+entry.ipa+'/':'';
+    setHudText(card.querySelector('.skill-info strong'),sentence?(entry?.text||s.code):s.name);
+    $('#wordMeaning'+index).hidden=!learning||!entry?.meaning;setHudText($('#wordMeaning'+index),learning?(entry?.meaning||''):'');
+    $('#wordIpa'+index).hidden=game.learningMode!=='english'||!entry?.ipa;setHudText($('#wordIpa'+index),entry?.ipa?'音标 /'+entry.ipa+'/':'');
     card.querySelector('.skill-info').title=learning?[entry?.text||s.code,entry?.meaning,entry?.ipa?'音标 /'+entry.ipa+'/':'',entry?.goal,entry?.grammar].filter(Boolean).join(' · '):s.name;
     card.classList.toggle('selected',game.typing===index);card.classList.toggle('cooling',s.cd>0);
     card.setAttribute('aria-label',s.name+'，'+(entry?.meaning?entry.meaning+'，':'')+(s.cd>0?'回蓝中 '+Math.ceil(s.cd/game.rechargeRate)+' 秒':speaking?'选择并朗读 '+s.code:'依次输入 '+s.code));
     const keys=$('#skillKeys'+index),markup=speaking?'':spellKeysMarkup(s,game.typing===index);
     keys.hidden=speaking;if(keys._markup!==markup){keys.innerHTML=markup;keys._markup=markup;}
     card.classList.toggle('long-spell',s.code.length>6);
-    $('#skillStatus'+index).textContent=s.cd>0?Math.ceil(s.cd/game.rechargeRate)+' 秒回蓝':speaking?(phoneSpeech&&game.typing===index?'当前朗读目标 · 按住录音':game.typing===index?'已选择 · 按住录音':'点击选择这句'):game.typing===index?'第 '+(Math.floor(s.typed/6)+1)+' / '+Math.ceil(s.code.length/6)+' 行 · '+s.typed+'/'+s.code.length:'准备好啦 · '+s.code.length+' 字母';
+    let skillStatus=s.cd>0?Math.ceil(s.cd/game.rechargeRate)+' 秒回蓝':speaking?(phoneSpeech&&game.typing===index?'当前朗读目标 · 按住录音':game.typing===index?'已选择 · 按住录音':'点击选择这句'):game.typing===index?'第 '+(Math.floor(s.typed/6)+1)+' / '+Math.ceil(s.code.length/6)+' 行 · '+s.typed+'/'+s.code.length:'准备好啦 · '+s.code.length+' 字母';
+    if(!['laser','freeze','melon'].includes(s.kind))skillStatus+=' · 剩余 '+(s.remainingUses??5)+' 次';
+    setHudText($('#skillStatus'+index),skillStatus);
     $('#cooldown'+index).style.width=(1-s.cd/s.duration)*100+'%';
   });
   updateSpeechControl();
   const hints=GuluMobile.keySkillHints(game.skills,game.typing,game.learningMode);
-  const names=['激光','冰冻','西瓜'];
+  const names=game.skills.map(s=>s.name);
   document.querySelectorAll('.touch-key').forEach(button=>{
     const index=hints[button.dataset.key],hint=index!==undefined;
     button.classList.toggle('hint',hint);
     if(hint){button.dataset.hintSkill=String(index);button.dataset.skillLabel=names[index];}
     else{delete button.dataset.hintSkill;delete button.dataset.skillLabel;}
-    button.setAttribute('aria-label',(button.dataset.key===' '?'空格':button.dataset.key)+(hint?'，'+names[index]+'的下一个字母':''));
+    button.setAttribute('aria-label',(button.dataset.key===' '?'空格':button.dataset.key==='Backspace'?'退格':button.dataset.key)+(hint?'，'+names[index]+'的下一个字母':''));
   });
 }
 
+const emojiCache=new Map();
 function drawEmoji(text,x,y,size,angle=0) {
+  if(!quality().glow&&!window.__renderBaseline){
+    let tile=emojiCache.get(text);if(!tile){if(emojiCache.size>=48)emojiCache.delete(emojiCache.keys().next().value);tile=document.createElement('canvas');tile.width=tile.height=128;const p=tile.getContext('2d');p.font='96px "Apple Color Emoji","Segoe UI Emoji",sans-serif';p.textAlign='center';p.textBaseline='middle';p.fillText(text,64,64);emojiCache.set(text,tile);}
+    ctx.save();ctx.translate(x,y);ctx.rotate(angle);const width=size*128/96;ctx.drawImage(tile,-width/2,-width/2,width,width);ctx.restore();return;
+  }
   ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.fillStyle='#ffffff';ctx.font=size+'px "Apple Color Emoji","Segoe UI Emoji",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,0,0);ctx.restore();
 }
 // Articulated rendering of the existing transparent sprite. All joints move
-// with each enemy's simulation clock, so pause and freeze agree.
+// with each enemy's simulation clock, so animation follows movement and pause.
 // Separate the two original legs along their actual silhouettes, then animate
 // hip and knee joints. The old vertical image split cut across both legs.
 function drawWalkingSpriteMesh(pen,z,size){
@@ -422,40 +457,47 @@ function drawWalkingSpriteMesh(pen,z,size){
   const width=sprite.naturalWidth,height=sprite.naturalHeight||width;
   pen.drawImage(sprite,0,0,width,height*.674,0,0,1,.674);pen.restore();pen.restore();
 }
-let walkAtlas = null;
-const WALK_FRAMES=32, WALK_CELL=128;
+let walkAtlas = null, walkFrames=0;
+const WALK_CELL=128;
 function drawWalkingSprite(z,size,dead){
   if(dead){ctx.drawImage(sprite,-size/2,-size*.59,size,size);return;}
-  if(!walkAtlas){
-    walkAtlas=document.createElement('canvas');walkAtlas.width=WALK_CELL*WALK_FRAMES;walkAtlas.height=WALK_CELL;
+  const frames=quality().glow?32:12;
+  if(!walkAtlas||walkFrames!==frames){
+    if(walkAtlas)walkAtlas.width=walkAtlas.height=0;walkFrames=frames;
+    walkAtlas=document.createElement('canvas');walkAtlas.width=WALK_CELL*frames;walkAtlas.height=WALK_CELL;
     const pen=walkAtlas.getContext('2d');
-    for(let frame=0;frame<WALK_FRAMES;frame++){
+    for(let frame=0;frame<frames;frame++){
       pen.save();pen.translate(frame*WALK_CELL+64,76);
-      drawWalkingSpriteMesh(pen,{gait:frame/WALK_FRAMES*Math.PI*2},96);pen.restore();
+      drawWalkingSpriteMesh(pen,{gait:frame/frames*Math.PI*2},96);pen.restore();
     }
   }
   const phase=((z.gait??z.phase)%(Math.PI*2)+Math.PI*2)%(Math.PI*2);
-  const frame=Math.floor(phase/(Math.PI*2)*WALK_FRAMES);
+  const frame=Math.floor(phase/(Math.PI*2)*frames);
   const scale=size/96;
   ctx.drawImage(walkAtlas,frame*WALK_CELL,0,WALK_CELL,WALK_CELL,-64*scale,-76*scale,WALK_CELL*scale,WALK_CELL*scale);
 }
 function drawZombie(z,dead=false) {
   const size=z.boss?145:z.type==='mini'?55:z.tough?102:88;
   const gait=z.gait??z.phase,amplitude=reducedMotion?.3:1;
-  const bob=dead?0:z.eating&&game.freeze<=0?Math.sin(game.time*12)*2:(Math.cos(gait*2)*1.5+Math.sin(gait)*.8)*amplitude;
+  const bob=dead?0:z.eating?Math.sin(game.time*12)*2:(Math.cos(gait*2)*1.5+Math.sin(gait)*.8)*amplitude;
   // The shadow stays on the ground while feet alternately lift and drag.
   ctx.save();ctx.translate(z.x,z.y);
+  if(canvas.characterScale)ctx.scale(canvas.characterScale.x,canvas.characterScale.y);
   ctx.fillStyle='#334c2529';ctx.beginPath();ctx.ellipse(0,size*.39,size*.3,8,0,0,Math.PI*2);ctx.fill();
   ctx.translate(0,bob*size/88);
   if(dead){const elapsed=1-z.life/z.fullLife;ctx.globalAlpha=1-elapsed;ctx.rotate(elapsed*1.6);ctx.translate(elapsed*65,-Math.sin(elapsed*Math.PI)*65);ctx.scale(1-elapsed*.45,1-elapsed*.45);}
   else {
     ctx.translate(0,size*.28);ctx.rotate((-.035+Math.sin(gait-.35)*.055)*amplitude);ctx.translate(0,-size*.28);
   }
-  if(z.hit>0)ctx.filter='brightness(1.5)';
-  else if(game.freeze>0)ctx.filter='hue-rotate(100deg) saturate(.7) brightness(1.1)';
+  if(!quality().glow)ctx.filter='none';
+  else if(z.hit>0)ctx.filter='brightness(1.5)';
+  else if(game.freeze>0&&!z.charmed)ctx.filter='hue-rotate(100deg) saturate(.7) brightness(1.1)';
   else ctx.filter={armor:'saturate(.45)',runner:'hue-rotate(300deg)',shield:'hue-rotate(60deg)',healer:'hue-rotate(330deg)',splitter:'hue-rotate(120deg)',bomber:'hue-rotate(240deg)',boss:'hue-rotate(310deg) saturate(1.5)',mini:'hue-rotate(110deg)'}[z.type]||'none';
+  ctx.save();if(z.charmed)ctx.scale(-1,1);
   if(sprite.complete&&sprite.naturalWidth)drawWalkingSprite(z,size,dead);
-  else drawEmoji('🧟',0,0,size*.75);
+  else drawEmoji('🧟',0,0,size*.75);ctx.restore();
+  if(z.charmed&&!dead)drawEmoji('💗',0,-size*.75,24);
+  if(z.deathMark>0&&!dead)drawEmoji('💥',size*.4,-size*.5,22);
   ctx.filter='none';
   if(!dead){
     const spec=ZOMBIE_TYPES[z.type];if(spec?.icon)drawEmoji(spec.icon,8,-size*.59,z.boss?34:25);
@@ -463,7 +505,7 @@ function drawZombie(z,dead=false) {
     if(z.shield>0){ctx.strokeStyle='#dcddff';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,-4,size*.48,Math.PI*.5,Math.PI*1.5);ctx.stroke();}
     if(z.poisonTime>0)drawEmoji('☠️',-size*.35,0,17);
   }
-  if(!dead&&game.freeze>0){ctx.fillStyle='#c9f1ff30';ctx.strokeStyle='#dbfaffbb';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(-size*.34,-size*.46,size*.7,size*.86,10);ctx.fill();ctx.stroke();drawEmoji('❄️',size*.24,-size*.3,17);}
+  if(!dead&&game.freeze>0&&!z.charmed){ctx.fillStyle='#c9f1ff30';ctx.strokeStyle='#dbfaffbb';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(-size*.34,-size*.46,size*.7,size*.86,10);ctx.fill();ctx.stroke();drawEmoji('❄️',size*.24,-size*.3,17);}
   if(!dead&&(z.hp<z.maxHp||z.boss||z.tough)){
     ctx.fillStyle='#314b4169';ctx.beginPath();ctx.roundRect(-size*.31,-size*.67,size*.62,5,3);ctx.fill();
     ctx.fillStyle=z.boss?'#e8b061':'#d9f590';ctx.beginPath();ctx.roundRect(-size*.31,-size*.67,size*.62*Math.max(0,z.hp/z.maxHp),5,3);ctx.fill();
@@ -550,29 +592,36 @@ function drawSunflowerDefense(){
   }
 }
 function drawHero() {
+  if(game.clones>0){for(const dy of [-90,90]){ctx.save();ctx.globalAlpha=.65;if(captainSprite.complete&&captainSprite.naturalWidth)ctx.drawImage(getCaptainCutout(),game.hero.x-18,game.hero.y+dy-56,90,90);else drawEmoji('🌱',game.hero.x+35,game.hero.y+dy,60);ctx.restore();}ctx.save();ctx.fillStyle='#dbffb1';ctx.font='bold 12px system-ui';ctx.fillText('分身 '+game.clones.toFixed(1)+'秒',game.hero.x-15,game.hero.y+150);ctx.restore();}
   const target=game.target();const angle=Math.atan2(target.y-game.hero.y,target.x-game.hero.x);
   ctx.save();ctx.globalAlpha=1;ctx.filter='none';ctx.translate(game.hero.x,game.hero.y);
+  if(canvas.characterScale)ctx.scale(canvas.characterScale.x,canvas.characterScale.y);
   ctx.fillStyle='#28452040';ctx.beginPath();ctx.ellipse(-5,39,31,8,0,0,Math.PI*2);ctx.fill();
   if(captainSprite.complete&&captainSprite.naturalWidth){
     ctx.save();ctx.translate(game.shotKick>0?-3:0,0);
     ctx.rotate(Math.max(-.10,Math.min(.10,angle*.15)));
-    const growth=1+Math.min(5,game.stack('power'))*.035;ctx.scale(growth,growth);
+    const growth=(1+Math.min(5,game.stack('power'))*.035)*(game.rage>0?1.85:1);ctx.scale(growth,growth);
     ctx.drawImage(getCaptainCutout(),-70,-84,134,134);
     if(game.stack('rapid'))drawEmoji('⚙️',-35,28,20+Math.min(5,game.stack('rapid'))*2,reducedMotion?0:game.time*5);ctx.restore();
   }else drawEmoji('🌱',-8,0,95);
-  ctx.font='bold 11px system-ui';ctx.fillStyle='#f8ffed';ctx.textAlign='center';ctx.shadowColor='#39522b';ctx.shadowBlur=4;ctx.fillText('豌豆队长',-4,56);ctx.restore();
+  ctx.font='bold 11px system-ui';ctx.fillStyle='#f8ffed';ctx.textAlign='center';ctx.shadowColor='#39522b';ctx.shadowBlur=quality().glow?4:0;ctx.fillText(game.rage>0?'🔥 狂暴巨化 '+game.rage.toFixed(1)+'秒':'豌豆队长',-4,game.rage>0?91:56);ctx.restore();
   if(game.status==='playing'){
     ctx.save();ctx.strokeStyle='#ffffdc99';ctx.lineWidth=2;ctx.setLineDash([4,7]);
     ctx.beginPath();const muzzle=game.muzzle();ctx.moveTo(muzzle.x,muzzle.y);ctx.lineTo(target.x,target.y);ctx.globalAlpha=.17;ctx.stroke();ctx.restore();
-    ctx.save();ctx.translate(target.x,target.y);ctx.strokeStyle='#ffffe9d9';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,13,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(-20,0);ctx.lineTo(-8,0);ctx.moveTo(8,0);ctx.lineTo(20,0);ctx.moveTo(0,-20);ctx.lineTo(0,-8);ctx.moveTo(0,8);ctx.lineTo(0,20);ctx.stroke();ctx.restore();
+    ctx.save();const reticle=game.skillAuto?game.skillTarget('laser'):game.skillAim;ctx.translate(reticle.x,reticle.y);ctx.strokeStyle=game.skillAuto?'#ffffe9d9':'#ffcf68';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,13,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(-20,0);ctx.lineTo(-8,0);ctx.moveTo(8,0);ctx.lineTo(20,0);ctx.moveTo(0,-20);ctx.lineTo(0,-8);ctx.moveTo(0,8);ctx.lineTo(0,20);ctx.stroke();ctx.restore();
   }
 }
 function drawEffects() {
   for(const e of game.effects){
     const progress=1-e.life/e.fullLife;
+    if(e.kind==='lightning'){ctx.save();ctx.globalAlpha=1-progress;ctx.strokeStyle='#c6f7ff';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(game.hero.x,game.hero.y);for(const point of e.points){ctx.lineTo(point.x-14,point.y-20);ctx.lineTo(point.x,point.y);drawEmoji('⚡',point.x,point.y-25,35);}ctx.stroke();ctx.restore();}
+    if(e.kind==='blackhole'){ctx.save();ctx.translate(e.x,e.y);ctx.fillStyle='#261943bb';ctx.strokeStyle='#b890ff';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,e.radius,0,Math.PI*2);ctx.fill();ctx.stroke();for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(0,0,30+i*45,game.time*(i+1),game.time*(i+1)+Math.PI*1.5);ctx.stroke();}ctx.restore();}
+    if(e.kind==='judgment'){ctx.save();ctx.strokeStyle='#ffdf87';ctx.lineWidth=30*(1-progress);ctx.beginPath();ctx.moveTo(e.x,0);ctx.lineTo(e.x,e.y);ctx.stroke();ctx.restore();drawEmoji('☄️',e.x,e.y-100*(1-progress),100);}
+    if(e.kind==='mark'){ctx.save();ctx.globalAlpha=(1-progress)*.15;ctx.fillStyle='#ff683b';ctx.fillRect(0,0,1000,530);ctx.restore();}
+    if(e.kind==='charm'){ctx.save();ctx.globalAlpha=1-progress;ctx.strokeStyle='#ff91dd';ctx.lineWidth=3;const targets=e.targets||[{x:e.x,y:e.y,radius:e.radius||135}];for(const target of targets){ctx.beginPath();ctx.arc(target.x,target.y,target.radius||38+progress*25,0,Math.PI*2);ctx.stroke();drawEmoji('💗',target.x,target.y-32,36);}ctx.restore();}
     if(e.kind==='laser'){
       ctx.save();ctx.translate(game.hero.x,game.hero.y);ctx.rotate(e.angle);ctx.globalAlpha=Math.min(1,e.life*3);ctx.lineCap='round';
-      ['#d4a6ff99','#b1eeffbb','#fff59fcc','#ffffffff'].forEach((color,i)=>{ctx.strokeStyle=color;ctx.lineWidth=[110,72,38,13][i]*((e.width||85)/85);ctx.shadowBlur=20;ctx.shadowColor=color;ctx.beginPath();ctx.moveTo(30,0);ctx.lineTo(1150,0);ctx.stroke();});ctx.restore();
+      ['#d4a6ff99','#b1eeffbb','#fff59fcc','#ffffffff'].forEach((color,i)=>{ctx.strokeStyle=color;ctx.lineWidth=[110,72,38,13][i]*((e.width||85)/85);ctx.shadowBlur=quality().glow?20:0;ctx.shadowColor=color;ctx.beginPath();ctx.moveTo(30,0);ctx.lineTo(1150,0);ctx.stroke();});ctx.restore();
     }
     if(e.kind==='freeze'){
       ctx.save();ctx.strokeStyle='#ddfaff';ctx.lineWidth=7*(1-progress);ctx.globalAlpha=1-progress;ctx.beginPath();ctx.arc(500,270,progress*650,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#c5f0ff';ctx.globalAlpha=(1-progress)*.16;ctx.fillRect(0,0,1000,530);ctx.restore();
@@ -590,15 +639,24 @@ function drawEffects() {
 function render(dt) {
   ctx.clearRect(0,0,1000,530);ctx.save();
   if(shake>0&&!reducedMotion)ctx.translate((Math.random()-.5)*shake*12,(Math.random()-.5)*shake*8);
-  drawUpgradeScenery();
+  if(quality().glow)drawUpgradeScenery();
   drawSunflowerDefense();
   if(game.freeze>0){ctx.fillStyle='#b4e9ff24';ctx.fillRect(0,0,1000,530);}
   [...game.enemies].sort((a,b)=>a.y-b.y).forEach(z=>drawZombie(z));
   game.dead.forEach(z=>drawZombie(z,true));
+  if(!quality().glow&&!window.__renderBaseline){
+    ctx.save();ctx.lineWidth=5;ctx.lineCap='round';ctx.strokeStyle='#e6fa7ab0';ctx.beginPath();
+    for(const b of game.bullets){ctx.moveTo(b.x-b.vx*.018,b.y-b.vy*.018);ctx.lineTo(b.x,b.y);}ctx.stroke();
+    const radius=6+Math.min(5,game.stack('power'))*1.8;ctx.fillStyle=game.stack('poison')?'#be87f7':game.stack('frost')?'#a0ecff':'#e5ff77';ctx.beginPath();
+    for(const b of game.bullets){ctx.moveTo(b.x+radius,b.y);ctx.arc(b.x,b.y,radius,0,Math.PI*2);}ctx.fill();
+    ctx.fillStyle='#faffd6';ctx.beginPath();for(const b of game.bullets){ctx.moveTo(b.x+1,b.y-2);ctx.arc(b.x-1,b.y-2,2,0,Math.PI*2);}ctx.fill();
+    if(game.stack('pierce')){ctx.fillStyle='#eef7df';ctx.beginPath();for(const b of game.bullets){const length=Math.hypot(b.vx,b.vy)||1,dx=b.vx/length,dy=b.vy/length;ctx.moveTo(b.x+19*dx,b.y+19*dy);ctx.lineTo(b.x+dx+5*dy,b.y+dy-5*dx);ctx.lineTo(b.x+dx-5*dy,b.y+dy+5*dx);ctx.closePath();}ctx.fill();}ctx.restore();
+  }else{
   for(const b of game.bullets){
     if(game.stack('pierce')){ctx.save();ctx.translate(b.x,b.y);ctx.rotate(Math.atan2(b.vy,b.vx));ctx.fillStyle='#eef7df';ctx.beginPath();ctx.moveTo(19,0);ctx.lineTo(1,-5);ctx.lineTo(1,5);ctx.fill();ctx.restore();}
     ctx.save();ctx.strokeStyle='#e6fa7ab0';ctx.lineWidth=5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(b.x-b.vx*.018,b.y-b.vy*.018);ctx.lineTo(b.x,b.y);ctx.stroke();
-    ctx.fillStyle=game.stack('poison')?'#be87f7':game.stack('frost')?'#a0ecff':'#e5ff77';ctx.shadowColor='#f0ffaa';ctx.shadowBlur=8;ctx.beginPath();ctx.arc(b.x,b.y,6+Math.min(5,game.stack('power'))*1.8,0,Math.PI*2);ctx.fill();ctx.fillStyle='#faffd6';ctx.beginPath();ctx.arc(b.x-1,b.y-2,2,0,Math.PI*2);ctx.fill();ctx.restore();
+    ctx.fillStyle=game.stack('poison')?'#be87f7':game.stack('frost')?'#a0ecff':'#e5ff77';ctx.shadowColor='#f0ffaa';ctx.shadowBlur=quality().glow?8:0;ctx.beginPath();ctx.arc(b.x,b.y,6+Math.min(5,game.stack('power'))*1.8,0,Math.PI*2);ctx.fill();ctx.fillStyle='#faffd6';ctx.beginPath();ctx.arc(b.x-1,b.y-2,2,0,Math.PI*2);ctx.fill();ctx.restore();
+  }
   }
   drawEffects();
   drawHero();
@@ -606,27 +664,38 @@ function render(dt) {
     const p=particles[i];if(game.status!=='paused'){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;if(!p.text)p.vy+=190*dt;}
     if(p.life<=0){particles.splice(i,1);continue;}
     ctx.save();ctx.globalAlpha=Math.min(1,p.life/p.max*1.8);ctx.fillStyle=p.color;
-    if(p.text){ctx.font='900 '+p.size+'px system-ui';ctx.textAlign='center';ctx.shadowColor='#46612766';ctx.shadowBlur=5;ctx.fillText(p.text,p.x,p.y);}
+    if(p.text){ctx.font='900 '+p.size+'px system-ui';ctx.textAlign='center';ctx.shadowColor='#46612766';ctx.shadowBlur=quality().glow?5:0;ctx.fillText(p.text,p.x,p.y);}
     else{ctx.beginPath();ctx.arc(p.x,p.y,p.size*Math.min(1,p.life*3),0,Math.PI*2);ctx.fill();}ctx.restore();
   }
   ctx.restore();recoil=Math.max(0,recoil-dt);shake=Math.max(0,shake-dt);
 }
 function frame(time) {
-  const dt=lastTime?Math.min((time-lastTime)/1000,.05):0;lastTime=time;
-  game.update(dt);soundscape.update(dt,game);render(dt);if(['playing','paused','upgrade'].includes(game.status)){saveClock+=dt;if(saveClock>=2){persistRun();saveClock=0;}}hudClock+=dt;if(hudClock>.07){updateHud();hudClock=0;}
+  if(toastUntil&&time>=toastUntil){$('#battleToast').classList.remove('visible');toastUntil=0;}
+  if(bannerUntil&&time>=bannerUntil){$('#castBanner').classList.remove('show');bannerUntil=0;}
+  for(const button of pressedKeys)if(time>=button._pressedUntil){button.classList.remove('pressed');pressedKeys.delete(button);}
+  const dt=lastTime?Math.min((time-lastTime)/1000,.25):0;lastTime=time;
+  if(window.GuluPerformance)GuluPerformance.clock.advance(dt,simulateStep);else simulateStep(Math.min(dt,.05));
+  paintClock+=dt;const interval=game.status==='playing'?1/quality().fps:.2;if(window.__renderBaseline){if(paintClock>=interval){render(paintClock-paintClock%interval);paintClock%=interval;}}else{const steps=window.GuluPerformance?GuluPerformance.paintSteps(paintClock,interval):Math.floor((paintClock+1e-9)/interval);if(steps>0){render(steps*interval);paintClock=Math.max(0,paintClock-steps*interval);}}hudClock+=dt;if(hudClock>quality().hudInterval){updateHud();hudClock=0;}
   window.requestAnimationFrame(frame);
 }
+function simulateStep(dt){game.update(dt);soundscape.update(dt,game);}
 function begin(force=false) {
   if(force!==true&&(availableSave||saveProblem)){
     showDialog('<div class="dialog-icon">🌱</div><h2>开始全新的冒险？</h2><p>新的一局会替换当前存档。<br>想保留进度，可以返回并继续上次冒险。</p><button class="primary-button" id="confirmNewRun">重新开始一局 →</button><button class="secondary-button" id="keepRun">保留存档，返回</button>',game.status==='playing'||dialogResume);
     $('#confirmNewRun').onclick=()=>begin(true);$('#keepRun').onclick=()=>closeDialog();return;
   }
   if($('#gameDialog').open)closeDialog(false);
-  claimSave();particles.length=0;game.learningMode=['english','sentences','speaking'].includes($('#difficulty').value)?$('#difficulty').value:'letters';game.adaptive=true;
+  claimSave();
+  // A confirmed new run replaces the old slot, but creates no checkpoint yet.
+  try{if(localStorage.getItem(WRITER_KEY)===writerId){localStorage.removeItem(SAVE_KEY);availableSave=null;}}catch{}
+  particles.length=0;game.learningMode=['english','sentences','speaking'].includes($('#difficulty').value)?$('#difficulty').value:'letters';game.adaptive=true;
   if(window.GuluLibraryUI){try{game.setCustomBank(GuluLibraryUI.selected());}catch(e){toast(e.message);return;}}
   $('#startScreen').hidden=true;$('#settingsPanel').open=false;game.start();canvas.focus({preventScroll:true});updateHud(true);
+  window.GuluCommunity?.startSolo(game);
+  resumeGameAudio().then(ready=>{if(ready&&game.status==='playing')soundscape.play('horde',{variant:0});});
 }
 function showDialog(html,resume=game.status==='playing') {
+  delete $('#gameDialog').dataset.gameOverlay;
   $('#closeDialog').hidden=game.status==='upgrade';
   dialogResume=resume;
   if(game.status==='playing')game.pause();
@@ -643,64 +712,71 @@ function closeDialog(resume=true) {
 }
 function pauseScreen() {
   if(game.status!=='playing')return;
-  showDialog('<div class="dialog-icon">☁️</div><h2>小院暂停营业</h2><p>僵尸们也在休息，准备好再继续。</p><button class="primary-button" id="resumeButton">继续突突突 →</button><button class="secondary-button" id="pauseHomeButton">保存并返回主页</button><button class="secondary-button" id="restartButton">重新开始这一局</button>',true);
+  showDialog('<div class="dialog-icon">☁️</div><h2>小院暂停营业</h2><p>僵尸们也在休息，准备好再继续。</p><button class="primary-button" id="resumeButton">继续突突突 →</button><button class="secondary-button" id="pauseHomeButton">保存并返回主页</button><button class="secondary-button" id="restartButton">重新开始这一局</button><button class="secondary-button" id="pauseBuildButton">已获得的强化</button><button class="secondary-button" id="pauseSaveButton">存档管理</button><button class="secondary-button" id="pauseHelpButton">玩法说明</button>',true);
   $('#pauseHomeButton').onclick=returnHome;$('#resumeButton').onclick=()=>closeDialog();$('#restartButton').onclick=begin;
+  $('#pauseBuildButton').onclick=()=>{showBuild();dialogResume=true;};$('#pauseSaveButton').onclick=()=>{saveMenu();dialogResume=true;};$('#pauseHelpButton').onclick=help;
 }
 function finishScreen(win) {
   const copy=GuluModeCopy.practiceCopy(game.learningMode,{correct:game.correct,casts:game.casts,mobile:phoneSpeech});
   best=Math.max(best,game.score);try{localStorage.setItem('gulu-shooter-best',String(best));}catch{}
   $('#bestScore').textContent=best;
-  showDialog('<div class="dialog-icon">'+(win?'🏆':'🌻')+'</div><h2>'+(win?'小院守住啦！':'这一局也很勇敢！')+'</h2><p>'+(win?'你和豌豆小队赶跑了全部捣蛋鬼！':'你守到了第 '+game.wave+' 波！<br>下次试试另一套强化组合，挑战更远。')+'</p><div class="result-grid"><div><strong>'+game.score+'</strong><span>本局得分</span></div><div><strong>'+game.kills+'</strong><span>击退僵尸</span></div><div><strong>'+game.casts+'</strong><span>释放大招</span></div></div><p>'+copy.summary+'</p><button class="primary-button" id="againButton">'+copy.again+'</button><button class="secondary-button" id="finishHomeButton">返回主页</button>',false);
+  showDialog('<div class="dialog-icon">'+(win?'🏆':'🌻')+'</div><h2>'+(win?'小院守住啦！':'这一局也很勇敢！')+'</h2><p>'+(win?'你和豌豆小队赶跑了全部捣蛋鬼！':'你守到了第 '+game.wave+' 波！<br>下次试试另一套强化组合，挑战更远。')+'</p><div class="result-grid"><div><strong>'+game.score+'</strong><span>本局得分</span></div><div><strong>'+game.kills+'</strong><span>击退僵尸</span></div><div><strong>'+game.casts+'</strong><span>释放大招</span></div></div><p>总分 = 击退分 '+(game.score-(game.practiceScore||0))+' + 练习分 '+(game.practiceScore||0)+'</p><p>'+copy.summary+'</p><button class="primary-button" id="againButton">'+copy.again+'</button><button class="secondary-button" id="finishHomeButton">返回主页</button>',false);
   $('#againButton').onclick=begin;$('#finishHomeButton').onclick=returnHome;
-  if(win){tone(520,.3,'sine',.04,1040);for(let i=0;i<7;i++)puff(180+Math.random()*650,140+Math.random()*230,'#ffef92',20,'✦');}
+  window.GuluCommunity?.finishSolo(game);
+  if(win){soundscape.play('celebrate');for(let i=0;i<7;i++)puff(180+Math.random()*650,140+Math.random()*230,'#ffef92',20,'✦');}
 }
 
+let pendingSkillReplacement=null;
 function upgradeScreen(){
+  pendingSkillReplacement=null;
   const nextWave=game.wave+1;
   const modeNote=GuluModeCopy.practiceCopy(game.learningMode,{mobile:phoneSpeech}).wave;
   const forecast=nextWave%5===0?'👑 下一波：巨型首领，会不断召唤跑跑僵尸':nextWave===2?'⚡ 下一波解锁：闪电跑跑、铁桶卫士':nextWave===3?'🛡️ 下一波解锁：盾牌兵、分裂软糖':nextWave===4?'💚 下一波解锁：治疗僵尸、爆破客':'下一波：更多敌人，更高生命，更快进攻';
-  showDialog('<div class="upgrade-eyebrow">WAVE '+game.wave+' CLEAR</div><h2>守住了！选一张，变更强</h2><p>所有强化整局有效，同名卡牌可以叠加。<br>'+modeNote+'</p><div class="upgrade-options">'+game.offers.map((c,i)=>'<button class="upgrade-card cat-'+c.category+'" data-upgrade="'+c.id+'"><span class="upgrade-category">'+c.category+' <kbd>'+(i+1)+'</kbd></span><span class="upgrade-art">'+c.icon+'</span><strong>'+c.name+'</strong><span class="upgrade-description">'+c.description+'</span><span class="upgrade-stack">'+(game.stack(c.id)?'叠加强化：'+game.stack(c.id)+' → '+(game.stack(c.id)+1)+' 层':'新强化 · 获得第 1 层')+'</span><span class="choose-label">选择并迎战第 '+nextWave+' 波 →</span></button>').join('')+'</div><div class="next-wave-info">'+forecast+'</div><p class="upgrade-recovery">向日葵修复 '+(1+game.stack('repair'))+' 护盾 · 大招充能推进 3 秒 · 选卡时战场暂停</p><button class="secondary-button" id="upgradeHomeButton">保存并返回主页</button>',false);
+  showDialog('<div class="upgrade-eyebrow">WAVE '+game.wave+' CLEAR</div><h2>守住了！选一张，变更强</h2><p>属性强化可叠加；新大招限用5次，用完恢复该槽位基础大招。<br>'+modeNote+'</p><div class="upgrade-options">'+game.offers.map((c,i)=>'<button class="upgrade-card cat-'+c.category+'" data-upgrade="'+c.id+'"><span class="upgrade-category">'+c.category+' <kbd>'+(i+1)+'</kbd></span><span class="upgrade-art">'+c.icon+'</span><strong>'+c.name+'</strong><span class="upgrade-description">'+c.description+'</span><span class="upgrade-stack">'+(c.skill?'限用5次 · 用完恢复基础大招':game.stack(c.id)?'叠加强化：'+game.stack(c.id)+' → '+(game.stack(c.id)+1)+' 层':'新强化 · 获得第 1 层')+'</span><span class="choose-label">选择并迎战第 '+nextWave+' 波 →</span></button>').join('')+'</div><div class="next-wave-info">'+forecast+'</div><p class="upgrade-recovery">向日葵修复 '+(1+game.stack('repair'))+' 护盾 · 大招充能推进 3 秒 · 选卡时战场暂停</p><button class="secondary-button" id="upgradeHomeButton">保存并返回主页</button>',false);
   $('#upgradeHomeButton').onclick=returnHome;
-  $('#gameDialog').classList.add('upgrade-dialog');
+  $('#gameDialog').classList.add('upgrade-dialog');$('#gameDialog').dataset.gameOverlay='true';
   document.querySelectorAll('[data-upgrade]').forEach(b=>b.onclick=()=>pickUpgrade(b.dataset.upgrade));
 }
-function pickUpgrade(id){
-  if(!game.chooseCard(id))return;
+function pickUpgrade(id,slot){
+  const card=game.offers.find(c=>c.id===id);if(!card)return;
+  if(card.skill&&slot===undefined){pendingSkillReplacement=id;showDialog('<h2>获得 '+card.icon+' '+card.name+'</h2><p>'+GARDEN_SKILLS[card.skill].description+'。本次可用5次，用完恢复基础大招。选择一个槽位：</p><div class="upgrade-options">'+game.skills.map((s,i)=>'<button class="secondary-button" data-replace-slot="'+i+'">'+(i+1)+'. '+s.icon+' '+s.name+'</button>').join('')+'</div><button class="secondary-button" id="cancelReplacement">返回选卡</button>',false);$('#gameDialog').dataset.gameOverlay='true';document.querySelectorAll('[data-replace-slot]').forEach(b=>b.onclick=()=>pickUpgrade(id,Number(b.dataset.replaceSlot)));$('#cancelReplacement').onclick=upgradeScreen;return;}
+  if(!game.chooseCard(id,slot))return;pendingSkillReplacement=null;
   $('#gameDialog').close();$('#gameDialog').classList.remove('upgrade-dialog');$('#closeDialog').hidden=false;dialogResume=false;
   tone(660,.25,'sine',.04,1100);updateHud(true);canvas.focus({preventScroll:true});
 }
 function showBuild(){
   if(game.status==='upgrade')return;
   const owned=GARDEN_CARDS.filter(c=>game.stack(c.id));
-  showDialog('<div class="dialog-icon">🎒</div><h2>我的强化组合</h2><p>第 '+game.wave+' 波 · '+Object.values(game.stacks).reduce((a,b)=>a+b,0)+' 张卡牌 · '+owned.length+' 种强化</p><div class="owned-cards">'+(owned.length?owned.map(c=>'<div class="owned-card"><span>'+c.icon+'</span><div><strong>'+c.name+' <b>×'+game.stack(c.id)+'</b></strong><small>'+c.description+'</small></div></div>').join(''):'<p>打完第一波，就能三选一获得强化。<br>本局共可遇到 24 种卡牌，试试不同组合！</p>')+'</div>',game.status==='playing');
+  showDialog('<div class="dialog-icon">🎒</div><h2>已获得的强化</h2><p>当前大招：'+game.skills.map(s=>s.icon+' '+s.name+(s.remainingUses?'（剩'+s.remainingUses+'次）':'')).join(' · ')+'</p><p>第 '+game.wave+' 波 · '+Object.values(game.stacks).reduce((a,b)=>a+b,0)+' 张卡牌 · '+owned.length+' 种强化</p><div class="owned-cards">'+(owned.length?owned.map(c=>'<div class="owned-card"><span>'+c.icon+'</span><div><strong>'+c.name+' <b>×'+game.stack(c.id)+'</b></strong><small>'+c.description+'</small></div></div>').join(''):'<p>打完第一波，就能三选一获得强化。<br>本局还可抽取魅惑、狂暴等新大招，试试不同组合！</p>')+'</div>',game.status==='playing');
 }
 
 function help() {
   const resume=game.status==='playing'||dialogResume;
-  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>滑块可随时调低射速，调到 0 就完全关闭普通子弹。按住空格也能射击。开启「自动瞄准射击」，可以腾出双手练习。</div></div><div class="help-row"><span>⌨</span><div><strong>打字或开口朗读来放大招</strong><br>字母、单词和句子模式按卡片提示输入。英语口语模式先选择一张技能卡，按住麦克风朗读，松开停止录音并自动识别，文字匹配成功就释放大招。首次请允许系统语音识别和麦克风权限；这不是发音评分。激光和西瓜会朝准星释放。</div></div><div class="help-row"><span>✧</span><div><strong>向日葵就是小院防线</strong><br>僵尸靠近后会停下啃食，花瓣逐渐掉落，吃完只剩残茎。全部倒下后有 3 秒抢救时间；恢复护盾、修理或加固都能修复向日葵。<br><strong>每一波结束，三选一叠加强化</strong><br>敌人每波增多、变强，大招回蓝也更快。施法从 1～3 个字母逐步增加至多行，最多 60 个；逐行输入，不用回车。按错保留进度，每 5 波有首领！字母上限可用滑块控制，慢动作可自行开启或关闭。</div></div><p>单词模式每 3 波增加 1 遍输入；句子和口语模式每 3 波增加 1 句连贯上下文，最高练习量可在设置中调整。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
+  showDialog('<div class="dialog-icon">🌻</div><h2>队长，作战指南来啦！</h2><div class="help-row"><span>⌖</span><div><strong>鼠标瞄准，按住左键射击</strong><br>滑块可随时调低射速，调到 0 就完全关闭普通子弹。按住空格也能射击。开启「自动瞄准射击」，可以腾出双手练习。</div></div><div class="help-row"><span>⌨</span><div><strong>打字或开口朗读来放大招</strong><br>字母、单词和句子模式按卡片提示输入。英语口语模式先选择一张技能卡，按住麦克风朗读，松开停止录音并自动识别，文字匹配成功就释放大招。首次请允许系统语音识别和麦克风权限；这不是发音评分。大招默认自动选择目标；鼠标或手指点击战场可指定大招落点，保留5秒；再次点击立即换点并重新计时，到期自动恢复瞄准，无需设置。冰冻与死亡连锁作用于全场，狂暴作用于自身。</div></div><div class="help-row"><span>✧</span><div><strong>向日葵就是小院防线</strong><br>僵尸靠近后会停下啃食，花瓣逐渐掉落，吃完只剩残茎。全部倒下后有 3 秒抢救时间；恢复护盾、修理或加固都能修复向日葵。<br><strong>每一波结束，三选一叠加强化</strong><br>敌人每波增多、变强，大招回蓝也更快。施法从 1～3 个字母逐步增加至多行，最多 60 个；逐行输入，不用回车。按错保留进度，每 5 波有首领！字母上限可用滑块控制，慢动作可自行开启或关闭。</div></div><p>单词模式每 3 波增加 1 遍输入；句子和口语模式每 3 波增加 1 句连贯上下文，最高练习量可在设置中调整。<br>请切换英文输入；Esc 暂停。手机可点屏幕键盘。</p>',resume);
 }
 for(const row of ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM']){
   const line=document.createElement('div');line.className='key-row';
-  for(const letter of row){const button=document.createElement('button');button.className='touch-key';button.textContent=letter;button.dataset.key=letter;button.setAttribute('aria-label','输入字母 '+letter);button.onclick=()=>{game.input(letter);updateHud(true);button.classList.add('pressed');setTimeout(()=>button.classList.remove('pressed'),130);};line.append(button);}
+  for(const letter of row){const button=document.createElement('button');button.className='touch-key';button.textContent=letter;button.dataset.key=letter;button.setAttribute('aria-label','输入字母 '+letter);button.onclick=()=>{game.input(letter);updateHud(true);flashKey(button);};line.append(button);}
   $('#touchKeyboard').append(line);
 }
 const spaceButton=document.createElement('button');spaceButton.id='sentenceSpace';spaceButton.className='touch-key sentence-space';spaceButton.dataset.key=' ';spaceButton.textContent='␣ 空格';spaceButton.hidden=true;spaceButton.onclick=()=>{game.input(' ');updateHud(true);};$('#touchKeyboard').append(spaceButton);
 for(const key of ["'",'-','.']){const b=document.createElement('button');b.className='touch-key word-punctuation';b.textContent=key;b.dataset.key=key;b.hidden=true;b.onclick=()=>{game.input(key);updateHud(true);};$('#touchKeyboard').append(b);}
 updateTypingControls();
 function pointerAim(event) {
+  if(window.GuluWebOrientation){const p=GuluWebOrientation.point(event,canvas);game.setAim(p.x*1000,p.y*530);return;}
   const rect=canvas.getBoundingClientRect();game.setAim((event.clientX-rect.left)/rect.width*1000,(event.clientY-rect.top)/rect.height*530);
 }
 canvas.addEventListener('pointermove',pointerAim);
 canvas.addEventListener('pointerdown',event=>{
   if(event.button!==0||game.status!=='playing')return;
-  event.preventDefault();pointerAim(event);game.shooting=true;canvas.focus({preventScroll:true});canvas.setPointerCapture(event.pointerId);
+  event.preventDefault();pointerAim(event);game.setSkillAim(game.aim.x,game.aim.y);game.shooting=true;canvas.focus({preventScroll:true});canvas.setPointerCapture(event.pointerId);
 });
 function stopShooting(){game.shooting=false;}
 canvas.addEventListener('pointerup',stopShooting);canvas.addEventListener('pointercancel',stopShooting);canvas.addEventListener('lostpointercapture',stopShooting);window.addEventListener('pointerup',stopShooting);
 window.addEventListener('blur',()=>{stopShooting();if(game.status==='playing')pauseScreen();});
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&game.status==='playing')pauseScreen();});
+document.addEventListener('visibilitychange',()=>{lastTime=0;if(document.hidden&&game.status==='playing')pauseScreen();});
 document.addEventListener('keydown',event=>{
-  if(game.status==='upgrade'&&['1','2','3'].includes(event.key)&&!event.repeat&&!event.ctrlKey&&!event.metaKey&&!event.altKey){event.preventDefault();pickUpgrade(game.offers[Number(event.key)-1]?.id);return;}
+  if(game.status==='upgrade'&&['1','2','3'].includes(event.key)&&!event.repeat&&!event.ctrlKey&&!event.metaKey&&!event.altKey){event.preventDefault();if(pendingSkillReplacement)pickUpgrade(pendingSkillReplacement,Number(event.key)-1);else pickUpgrade(game.offers[Number(event.key)-1]?.id);return;}
   if(event.ctrlKey||event.metaKey||event.altKey||event.isComposing||$('#gameDialog').open)return;
   if(['INPUT','TEXTAREA','SELECT'].includes(event.target.tagName))return;
   if(event.key==='Escape'){event.preventDefault();pauseScreen();return;}
@@ -715,12 +791,40 @@ document.addEventListener('keyup',event=>{if(event.key===' ')game.shooting=false
 $('#homeButton').onclick=returnHome;$('#saveButton').onclick=saveMenu;$('#continueButton').onclick=continueRun;$('#buildButton').onclick=showBuild;$('#startButton').onclick=begin;$('#pauseButton').onclick=pauseScreen;$('#helpButton').onclick=help;
 $('#soundVolume').value=Math.round(soundscape.volume*100);$('#soundVolumeValue').textContent=Math.round(soundscape.volume*100)+'%';
 $('#soundVolume').addEventListener('input',event=>{const value=Number(event.target.value);soundscape.setVolume(value/100);$('#soundVolumeValue').textContent=value+'%';try{localStorage.setItem('gulu-sfx-volume-v2',String(value/100));}catch{}});
+const readoutLabel=document.createElement('label');readoutLabel.textContent='完成输入后朗读';
+const readoutSelect=document.createElement('select');readoutSelect.id='learningReadout';
+for(const [value,label] of [['both','英文 + 中文意思'],['english','只读英文'],['off','关闭']])readoutSelect.add(new Option(label,value));
+readoutSelect.value=learningReadout;readoutLabel.append(readoutSelect);
+const readoutStatus=document.createElement('small');readoutStatus.id='learningReadoutStatus';readoutStatus.setAttribute('role','status');readoutStatus.textContent='每完成一遍都朗读；英文清晰女声，中文普通朗读。';
+const readoutTest=document.createElement('button');readoutTest.type='button';readoutTest.textContent='试听英文和中文';
+readoutSelect.onchange=()=>{learningReadout=readoutSelect.value;localSpeech.cancel();try{localStorage.setItem('gulu-learning-readout',learningReadout);}catch{}};
+readoutTest.onclick=()=>{localSpeech.cancel();if(soundscape.volume===0){readoutStatus.textContent='请先调高音量。';return;}readoutStatus.textContent='正在试听 Apple，苹果。';if(!localSpeech.enqueueLearning('Apple','苹果',{volume:soundscape.volume,onError:error=>{readoutStatus.textContent=error==='missing-chinese'?'系统缺少本地中文声音，当前只读英文。':'朗读失败，请检查系统声音。';}}))readoutStatus.textContent='未找到本地英文声音，请在系统设置中添加英文声音后重试。';};
+$('.audio-volume-control').append(readoutLabel,readoutTest,readoutStatus);
+$('#soundVolume').addEventListener('input',()=>localSpeech.cancel());
+const recordLink=document.createElement('a');recordLink.href='zombie-recorder.html';recordLink.textContent='🎙 配音小能手 · 自己配音';recordLink.onclick=()=>{if(game.status==='playing')game.pause();stopListening();soundscape.stop();};$('.audio-volume-control').append(recordLink);
+const soundTest=document.createElement('button');soundTest.type='button';soundTest.id='soundTestButton';soundTest.textContent='恢复声音并试听';
+const previewLabel=document.createElement('label');previewLabel.textContent='试听音效';
+const previewKind=document.createElement('select');previewKind.id='soundPreviewKind';previewKind.setAttribute('aria-label','试听音效');
+for(const [value,label] of [['laser','技能音效'],['horde','大波僵尸来袭'],['groan','僵尸低吼'],['step','轻微脚步'],['nibble','啃食'],['celebrate','清波庆祝']])previewKind.add(new Option(label,value));
+previewLabel.append(previewKind);$('.audio-volume-control').append(previewLabel);
+const soundStatus=document.createElement('small');soundStatus.id='soundStatus';soundStatus.setAttribute('role','status');soundStatus.setAttribute('aria-live','polite');
+$('.audio-volume-control').append(soundTest,soundStatus);
+soundTest.onclick=async()=>{
+  if(soundscape.volume===0){soundStatus.textContent='当前音量为0，请先调高音效音量再试听。';return;}
+  soundTest.disabled=true;soundStatus.textContent='正在启用声音…';
+  try{
+    stopListening();soundscape.setRecording(false);soundscape.setEnabled(true);
+    if(!await soundscape.recover()){soundStatus.textContent='声音未能启用，请再次点击试听，或检查浏览器的网站声音权限。';return;}
+    soundscape.stop();soundscape.play(previewKind.value);
+    soundStatus.textContent=soundscape.failed?'播放未成功，请重试或换用系统浏览器。':'已播放试听音效。若未听到，请检查标签页静音、系统音量及耳机或蓝牙输出。';
+  }finally{soundTest.disabled=false;}
+};
 $('#soundButton').remove();
 $('#soundVolume').addEventListener('change',()=>{soundscape.setEnabled(true);resumeGameAudio();soundscape.play('laser');});
 $('#autoButton').onclick=()=>{game.auto=!game.auto;$('#autoButton').setAttribute('aria-pressed',String(game.auto));updateFireControl();if(game.status==='playing')canvas.focus({preventScroll:true});};
 $('#keyboardButton').onclick=()=>{const expanded=$('#touchKeyboard').hidden;$('#touchKeyboard').hidden=!expanded;$('#keyboardButton').setAttribute('aria-expanded',String(expanded));};
 $('#difficulty').onchange=()=>{game.learningMode=['english','sentences','speaking'].includes($('#difficulty').value)?$('#difficulty').value:'letters';game.adaptive=true;speechFeedback='';if(['english','sentences','speaking'].includes($('#difficulty').value))$('#settingsPanel').open=true;updateTypingControls();updateHud(true);if(game.learningMode==='speaking'&&!speechAuthorized)enableSpeech();};
-document.querySelectorAll('.skill-card').forEach((button,index)=>button.onclick=()=>{if(game.status!=='playing'){toast('先开始保卫小院吧！');return;}stopListening();speechFeedback='';if(phoneSpeech)document.body.dataset.visibleSkill=String(index);game.select(index);if(game.learningMode!=='speaking'&&window.matchMedia('(pointer: coarse)').matches){$('#touchKeyboard').hidden=game.learningMode==='speaking';$('#keyboardButton').setAttribute('aria-expanded','true');}updateHud(true);});
+document.querySelectorAll('.skill-card').forEach((button,index)=>button.onclick=()=>{if(game.status!=='playing'){toast('先开始保卫小院吧！');return;}if(game.learningMode==='speaking')stopListening();speechFeedback='';if(phoneSpeech)document.body.dataset.visibleSkill=String(index);game.select(index);if(game.learningMode!=='speaking'&&window.matchMedia('(pointer: coarse)').matches){$('#touchKeyboard').hidden=game.learningMode==='speaking';$('#keyboardButton').setAttribute('aria-expanded','true');}updateHud(true);});
 $('#speechSkip').onclick=skipSpeechPrompt;$('#speechReview').onclick=openSpeechReview;
 $('#speechEnable').addEventListener('click',enableSpeech);
 $('#speechButton').addEventListener('pointerdown',startListening);
@@ -733,7 +837,10 @@ $('#speechButton').addEventListener('keyup',e=>{if([' ','Enter'].includes(e.key)
 window.addEventListener('pointerup',()=>{if(microphone.held)microphone.release();});
 window.addEventListener('blur',stopListening);window.addEventListener('pagehide',stopListening);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)stopListening();});
-if(!phoneSpeech)fetch('/api/speech/status').then(r=>r.json()).then(info=>{nativeSpeechReady=info.available;if(!info.available)speechFeedback=info.error;updateSpeechControl();}).catch(()=>{speechFeedback='请通过本机游戏启动器开启系统语音助手。';updateSpeechControl();});
+if(!phoneSpeech&&['localhost','127.0.0.1','[::1]'].includes(location.hostname)){
+  window.guluSpeechStatus=fetch('api/speech/status').then(r=>r.json()).catch(()=>({available:false,error:'请通过本机游戏启动器开启系统语音助手。'}));
+  window.guluSpeechStatus.then(info=>{nativeSpeechReady=info.available;if(!info.available)speechFeedback=info.error;updateSpeechControl();});
+}
 $('#speechExample').addEventListener('click',()=>{
   const index=game.typing;if(index<0||game.status!=='playing')return;
   if(!localSpeech.speak((lookupSentence(game.skills[index].code)?.text||game.skills[index].code.toLowerCase()).replaceAll(' / ',' '),()=>{speechFeedback='系统朗读未成功，请检查系统英文声音。';updateSpeechControl();})){speechFeedback='没有可用的本地英文声音，请在系统设置中添加。';updateSpeechControl();}

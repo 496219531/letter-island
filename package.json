@@ -2,11 +2,12 @@
   "name": "gulu-island",
   "version": "1.0.0",
   "private": true,
+  "engines": {"node": ">=22.13.0"},
   "description": "豌豆突突队 · 咕噜游乐场",
   "scripts": {
     "build": "node build.mjs",
     "dev": "python3 -m http.server 4173 --bind 127.0.0.1",
-    "test": "node tests/engine.test.cjs && node tests/save.test.cjs && node tests/sound.test.cjs && node --test tests/custom-library.test.cjs tests/library-service.test.mjs tests/speech-review.test.cjs tests/mode-copy.test.cjs tests/mobile.test.cjs tests/dialogues.test.cjs tests/vocabulary.test.cjs tests/system-speech.test.cjs tests/press-to-talk.test.cjs && npm run test:lan",
+    "test": "node tests/engine.test.cjs && node tests/save.test.cjs && node tests/sound.test.cjs && node --test tests/custom-library.test.cjs tests/library-workflow.test.cjs tests/library-auto-classification.test.cjs tests/library-cloud.test.mjs tests/library-share.test.mjs tests/library-service.test.mjs tests/speech-review.test.cjs tests/mode-copy.test.cjs tests/mobile.test.cjs tests/performance.test.cjs tests/collision-optimization.test.cjs tests/practice-score.test.cjs tests/ice-slow.test.cjs tests/skill-balance.test.cjs tests/new-skills.test.cjs tests/expanded-skills.test.cjs tests/skill-aim.test.cjs tests/skill-charges.test.cjs tests/pierce-balance.test.cjs tests/zombie-audio.test.cjs tests/skill-audio.test.cjs tests/custom-effects.test.cjs tests/web-orientation.test.cjs tests/community.test.mjs tests/dialogues.test.cjs tests/vocabulary.test.cjs tests/system-speech.test.cjs tests/native-community.test.cjs tests/press-to-talk.test.cjs && npm run test:lan",
     "test:memory": "node --expose-gc tests/memory.test.cjs",
     "lan": "node lan-server.mjs",
     "test:lan": "node --test tests/duel.test.cjs tests/lan.test.mjs tests/speech-route.test.mjs",

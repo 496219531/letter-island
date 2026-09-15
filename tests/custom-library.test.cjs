@@ -21,3 +21,15 @@ test('custom sentences remain one prompt, support apostrophes and speech review 
  const group=C.repository(store()).save({name:'口语',kind:'sentence',entries:C.parse("I'm feeling fine. | 我感觉很好\nPlease close the blue door. | 关蓝色门",'sentence')});
  for(const mode of ['sentences','speaking']){const g=new GardenGame();g.learningMode=mode;g.setCustomBank(group);g.start();g.wave=7;assert.equal(g.learningLoad,1);g.select(0);if(mode==='speaking')assert.equal(g.speak(0,g.skills[0].code),true);else for(const ch of g.skills[0].code)g.input(ch);assert.equal(g.casts,1);assert.equal(GuluSave.validate(GuluSave.encode(g)),true);}
 });
+test('AI punctuation is safe to save: ellipses and decorative brackets disappear while separators become spaces',()=>{
+ const text='I/he think/thinks Minmin/Shenshen/Xiaojiang is...」';
+ const saved=C.entry({text,meaning:'',ipa:''},'sentence');
+ assert.equal(saved.text,'I/he think/thinks Minmin/Shenshen/Xiaojiang is');
+ assert.equal(saved.word,'I HE THINK THINKS MINMIN SHENSHEN XIAOJIANG IS');
+ assert.equal(C.entry({text:'Hello」 world',meaning:'',ipa:''},'word').text,'Hello world');
+});
+test('legacy punctuation lookup keys migrate instead of hiding an otherwise valid library',()=>{
+ let saved=JSON.stringify([{id:'old',name:'旧句子',kind:'sentence',entries:[{text:'I like apples.',word:'I LIKE APPLES ',meaning:'我喜欢苹果。',ipa:'',note:'',source:'manual'}]}]);
+ const repo=C.repository({getItem:()=>saved,setItem:(key,value)=>saved=value});const groups=repo.list();
+ assert.equal(groups.length,1);assert.equal(groups[0].entries[0].word,'I LIKE APPLES');assert.ok(C.validate(groups[0]));assert.equal(JSON.parse(saved)[0].entries[0].word,'I LIKE APPLES');
+});

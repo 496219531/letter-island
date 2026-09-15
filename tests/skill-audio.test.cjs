@@ -1,0 +1,6 @@
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const {GardenAudio}=require('../sound.js');
+function audio(){const node=()=>({connect(){},disconnect(){}}),c={currentTime:10,state:'running',destination:{},createGain:()=>({...node(),gain:{value:1}}),createDynamicsCompressor:()=>({...node(),threshold:{value:0},ratio:{value:0}}),createBuffer:(_,size)=>({getChannelData:()=>new Float32Array(size)}),createBufferSource:()=>({...node(),start(){},stop(){this.stopped=true;}})};return new GardenAudio(()=>c);}
+test('wave clear preserves skill playback but an explicit pause stops everything',()=>{const a=audio();a.play('laser');a.play('shot');a.stop({preserveSkills:true});assert.deepEqual([...a.voices].map(v=>v.kind),['laser']);a.stop();assert.equal(a.voices.size,0);});
+test('skill playback can replace an ordinary voice when the mixer is full',()=>{const a=audio();a.init();const buffer=a.context.createBuffer(1,10);for(let i=0;i<32;i++)assert.equal(a.start(buffer,.1,0,'flesh'),true);assert.equal(a.voices.size,32);a.play('laser');assert.equal(a.voices.size,32);assert.ok([...a.voices].some(v=>v.kind==='laser'));a.stop();});
+test('a cast sharing a recent wave cue still plays immediately',()=>{const a=audio();a.play('horde');const prior=[...a.voices][0];a.playSkill('horde');assert.ok(!a.voices.has(prior));assert.equal(a.voices.size,1);a.stop();});

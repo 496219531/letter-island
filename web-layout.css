@@ -1,0 +1,12 @@
+/* Use the requested game orientation even when Safari cannot rotate its viewport. */
+html:has(body.browser-phone){overflow:hidden;width:100%;height:100%}
+body.browser-phone.native-iphone{position:fixed;left:var(--web-left,0px);top:var(--web-top,0px);width:var(--web-width);height:var(--web-height);min-width:0;min-height:0;margin:0;transform-origin:0 0;transform:var(--web-transform);overflow:hidden!important}
+body.browser-phone[data-web-rotation="90"]{padding:env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left) env(safe-area-inset-top)}
+body.browser-phone[data-web-rotation="-90"]{padding:env(safe-area-inset-left) env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)}
+body.browser-phone.native-iphone[data-web-direction=landscape][data-game-state=ready] .start-panel{height:100%;min-height:0;overflow:auto}
+body.browser-phone #mobileSettingsDialog,body.browser-phone .library-dialog,body.browser-phone #gameDialog{position:fixed!important;inset:50% auto auto 50%!important;transform:translate(-50%,-50%) rotate(var(--web-angle));transform-origin:center;width:min(520px,calc(var(--web-width) - 24px))!important;min-width:0!important;max-width:calc(var(--web-width) - 24px)!important;max-height:calc(var(--web-height) - 24px)!important;min-height:0!important;margin:0!important}
+body.browser-phone .library-dialog{height:calc(var(--web-height) - 24px)!important}
+body.browser-phone #gameDialog{height:auto!important;border-radius:20px}
+body.browser-phone #gameDialog #dialogContent{max-height:calc(var(--web-height) - 24px)!important}
+body.browser-phone[data-web-direction=portrait] .start-screen{overflow:auto}
+body.browser-phone[data-web-direction=portrait] .start-panel{max-height:100%;flex-shrink:0}

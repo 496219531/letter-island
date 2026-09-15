@@ -18,7 +18,7 @@ test('dialogues contain 900 distinct lines with source, scene, goal and grammar 
 });
 test('all stages support complete typed and spoken conversations at each learning length',()=>{
   for(let level=0;level<5;level++)for(const wave of [1,4,7])for(const mode of ['sentences','speaking']){
-    const g=new GardenGame({random:()=>.35});g.learningMode=mode;g.englishLevel=level;g.start();g.wave=wave;
+    const g=new GardenGame({random:()=>.35});g.learningMode=mode;g.setMaxLearningLoad(3);g.englishLevel=level;g.start();g.wave=wave;
     for(let i=0;i<3;i++)g.skills[i].code=g.nextCode(i);
     const code=g.skills[0].code,entry=findSentenceEntry(code);assert.ok(entry.dialogueId);assert.equal(entry.text.split(' / ').length,1+Math.floor((wave-1)/3));
     if(mode==='sentences')for(const key of code)assert.equal(g.input(key),true);

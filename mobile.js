@@ -29,13 +29,13 @@
     });
     return hints;
   }
-  root.GuluMobile={isPhone,allowedMode,createSpeech,keySkillHints};
+  function sceneNeedsPortrait(state,dialogs=[]){return !['playing','upgrade'].includes(state)||dialogs.some(d=>!d.gameOverlay);}
+  root.GuluMobile={isPhone,allowedMode,createSpeech,keySkillHints,sceneNeedsPortrait};
   if(typeof module!=='undefined'&&module.exports)module.exports=root.GuluMobile;
   if(!root.document)return;
   const phone=isPhone(root);root.GuluMobile.active=phone;
   document.body.classList.toggle('mobile-game',phone);
-  if(!phone)return;
-  for(const id of ['difficulty','mode']){
+  for(const id of (phone?['difficulty','mode']:[])){
     const select=document.getElementById(id);if(!select)continue;
     if(id==='mode'&&document.body.classList.contains('duel-app'))continue;
     const mode=allowedMode(select.value,true);
@@ -43,9 +43,28 @@
     select.value=mode;
   }
   document.addEventListener('DOMContentLoaded',()=>{
-    if(!root.GuluNative){
+    if(phone&&!root.GuluNative){
       const grid=document.getElementById('skillGrid');
       if(grid&&root.IntersectionObserver){const observer=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.intersectionRatio>=.6){const index=entry.target.dataset.skill;if(document.body.dataset.visibleSkill!==index){document.body.dataset.visibleSkill=index;document.dispatchEvent(new Event('gulu-visible-skill'));}}},{root:grid,threshold:[.6]});grid.querySelectorAll('.skill-card').forEach(card=>observer.observe(card));}
+    }
+    if(phone||root.GuluNative){
+      let desired=null,sequence=Promise.resolve();
+      const syncScene=()=>{
+        const portrait=sceneNeedsPortrait(document.body.dataset.gameState,[...document.querySelectorAll('dialog[open]')].map(d=>({gameOverlay:d.dataset.gameOverlay==='true'})));
+        if(portrait===desired)return;desired=portrait;
+        sequence=sequence.catch(()=>{}).then(async()=>{
+          if(portrait!==desired)return;
+          const orientation=root.GuluNative||root.GuluWebOrientation;if(!orientation)return;
+          if(!portrait)await orientation.setScreenDirection('landscape');
+          if(portrait!==desired)return;
+          await orientation.setSettingsPortrait(portrait);
+        }).catch(()=>{});
+      };
+      const dialogs=new Map();
+      const watchDialogs=()=>{for(const [d,observer] of dialogs)if(!d.isConnected){observer.disconnect();dialogs.delete(d);}for(const d of document.querySelectorAll('dialog'))if(!dialogs.has(d)){const observer=new MutationObserver(syncScene);observer.observe(d,{attributes:true,attributeFilter:['open','data-game-overlay']});dialogs.set(d,observer);}};
+      watchDialogs();
+      new MutationObserver(records=>{if(records.some(r=>r.type==='attributes'))syncScene();if(records.some(r=>r.type==='childList')){watchDialogs();syncScene();}}).observe(document.body,{childList:true,attributes:true,attributeFilter:['data-game-state']});
+      syncScene();
     }
     const settings=document.getElementById('settingsPanel');
     if(!settings)return;
@@ -60,7 +79,7 @@
     let resume=false;
     function finish(){settings.open=false;if(dialog.open)dialog.close();trigger.focus({preventScroll:true});if(resume&&typeof game!=='undefined'&&game.status==='paused'){game.resume();updateHud(true);}resume=false;}
     function sync(){
-      if(settings.open&&!dialog.open){resume=typeof game!=='undefined'&&game.status==='playing';if(resume){stopListening();game.pause();updateHud(true);}trigger.focus({preventScroll:true});dialog.showModal();}
+      if(settings.open&&!dialog.open){resume=typeof game!=='undefined'&&game.status==='playing';if(resume){stopListening();game.pause();updateHud(true);}trigger.focus({preventScroll:true});title.textContent='游戏设置';dialog.showModal();}
       else if(!settings.open&&dialog.open)finish();
     }
     settings.addEventListener('toggle',sync);

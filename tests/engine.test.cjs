@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { GardenGame, CARDS, TYPES } = require('../engine.js');
+const { GardenGame, CARDS, TYPES, speechMatch } = require('../engine.js');
 const make = () => {const g=new GardenGame({random:()=>.35});g.setFireStrength(1);return g;};
 const advance = (game, seconds) => { for(let i=0;i<seconds*60;i++)game.update(1/60); };
 const test = (name, fn) => { fn(); console.log('PASS',name); };
@@ -7,7 +7,7 @@ test('ricochet keeps nearest-target order and excludes dead or previously hit en
   const g=make();g.start();g.enemies=[];
   const source=g.spawn(500,300,'walker',false),dead=g.spawn(501,300,'walker',false),hit=g.spawn(502,300,'walker',false);
   dead.hp=0;const first=g.spawn(510,300,'walker',false);g.spawn(496,300,'walker',false);
-  const bullet={damage:1,bounces:1,pierce:0,hitIds:new Set([hit.id]),life:2};
+  const bullet={damage:10,bounces:1,pierce:0,hitIds:new Set([hit.id]),life:2};
   g.hitBullet(bullet,source);assert.equal(bullet.bounces,0);assert.equal(bullet.vx,720);assert.equal(bullet.vy,0);
   assert.ok(first.hp>0);assert.ok(bullet.hitIds.has(source.id));
 });
@@ -15,16 +15,16 @@ test('ordinary shots collide with enemies and score kills',()=>{
   const g=make();g.start();g.auto=true;advance(g,2);assert.ok(g.kills>=1);assert.ok(g.score>=10);
 });
 test('laser only damages targets inside the aimed corridor',()=>{
-  const g=make();g.start();g.enemies=[];g.setAim(800,282);const a=g.spawn(700,282);const b=g.spawn(700,445);g.input('a');assert.ok(a.hp<=0);assert.equal(b.hp,b.maxHp);assert.equal(g.casts,1);assert.equal(g.skills[0].cd,8);
+  const g=make();g.start();g.enemies=[];g.setSkillAim(800,282);const a=g.spawn(700,282);const b=g.spawn(700,445);g.input('a');assert.ok(a.hp<=0);assert.equal(b.hp,b.maxHp);assert.equal(g.casts,1);assert.equal(g.skills[0].cd,6);
 });
 test('cooldowns reject recasts and become ready again',()=>{
-  const g=make();g.start();g.input('s');g.input('s');assert.equal(g.casts,1);advance(g,12.1);assert.equal(g.skills[1].cd,0);g.input('s');assert.equal(g.casts,2);
+  const g=make();g.start();g.input('s');g.input('s');assert.equal(g.casts,1);advance(g,14.1);assert.equal(g.skills[1].cd,0);g.input('s');assert.equal(g.casts,2);
 });
-test('freeze stops movement and doubles ordinary bullet damage',()=>{
-  const g=make();g.start();g.enemies=[];const z=g.spawn(400,282);g.input('s');const x=z.x;advance(g,.25);assert.equal(z.x,x);g.shooting=true;g.setAim(400,282);advance(g,.45);assert.ok(z.hp<=24);
+test('ice slows movement without stopping it and doubles ordinary bullet damage',()=>{
+  const g=make();g.start();g.enemies=[];const z=g.spawn(400,282);g.input('s');const x=z.x;advance(g,.25);assert.ok(z.x<x);g.shooting=true;g.setAim(400,282);advance(g,.45);assert.ok(z.hp<=24);
 });
 test('melon lands after a delay and hits only its blast radius',()=>{
-  const g=make();g.start();g.enemies=[];const a=g.spawn(700,282);const b=g.spawn(250,445);g.setAim(700,282);g.input('d');assert.equal(a.hp,a.maxHp);advance(g,.8);assert.ok(a.hp<=0);assert.equal(b.hp,b.maxHp);
+  const g=make();g.start();g.enemies=[];const a=g.spawn(700,282);const b=g.spawn(250,445);g.setSkillAim(700,282);g.input('d');assert.equal(a.hp,a.maxHp);advance(g,.8);assert.ok(a.hp<=0);assert.equal(b.hp,b.maxHp);
 });
 test('wrong letters preserve typed progress and health',()=>{
   const g=make();g.start();g.skills[0].code='AFJ';g.input('a');assert.equal(g.typing,0);g.input('x');assert.equal(g.skills[0].typed,1);assert.equal(g.health,8);g.input('f');g.input('j');assert.equal(g.casts,1);assert.equal(g.correct,3);
@@ -47,7 +47,7 @@ test('infinite waves stop for three unique choices and continue beyond wave five
  for(let wave=1;wave<=12;wave++){
   g.enemies=[];g.spawned=g.quota;g.update(.016);assert.equal(g.status,'upgrade');assert.equal(g.offers.length,3);assert.equal(new Set(g.offers.map(c=>c.id)).size,3);
   const time=g.time;advance(g,3);assert.equal(g.time,time);assert.equal(g.chooseCard('invalid'),false);
-  assert.equal(g.chooseCard(g.offers[0].id),true);assert.equal(g.wave,wave+1);assert.equal(g.status,'playing');assert.equal(g.chooseCard(CARDS[0].id),false);
+  assert.equal(g.chooseCard(g.offers[0].id,0),true);assert.equal(g.wave,wave+1);assert.equal(g.status,'playing');assert.equal(g.chooseCard(CARDS[0].id),false);
  }
  assert.equal(Object.values(g.stacks).reduce((a,b)=>a+b,0),12);assert.ok(g.quota>40);
 });
@@ -66,15 +66,15 @@ test('special enemies armor, shields, healer, splitters, bombers and bosses work
  g.wave=5;g.spawned=g.quota-1;const boss=g.spawn();assert.equal(boss.type,'boss');boss.ability=0;g.update(.016);assert.ok(g.enemies.some(z=>z.type==='runner'));
 });
 test('enemy health, speed and population scale across waves',()=>{
- const g=make();g.start();const early=g.spawn(900,200,'walker');g.wave=10;const late=g.spawn(900,200,'walker');assert.ok(late.hp>early.hp*4);assert.ok(late.speed>early.speed);assert.equal(CARDS.length,24);assert.equal(Object.keys(TYPES).length,9);
+ const g=make();g.start();const early=g.spawn(900,200,'walker');g.wave=10;const late=g.spawn(900,200,'walker');assert.ok(late.hp>early.hp*4);assert.ok(late.speed>early.speed);assert.equal(CARDS.length,36);assert.equal(Object.keys(TYPES).length,9);
 });
 
-test('walking stays full speed while typing and stops for ice and pause',()=>{
+test('walking continues under ice and only stops when paused',()=>{
  const a=make(),b=make();a.start();b.start();a.skills[0].code='AF';a.input('a');
  const phase=a.enemies[0].gait;advance(a,1);advance(b,1);
  assert.ok(Math.abs((a.enemies[0].gait-phase)/(b.enemies[0].gait-phase)-1)<.001);
- a.freeze=3;const frozen=a.enemies[0].gait;advance(a,1);assert.equal(a.enemies[0].gait,frozen);
- a.pause();advance(a,1);assert.equal(a.enemies[0].gait,frozen);
+ a.freeze=3;const frozen=a.enemies[0].gait;advance(a,1);assert.ok(a.enemies[0].gait>frozen);
+ const pausedPhase=a.enemies[0].gait;a.pause();advance(a,1);assert.equal(a.enemies[0].gait,pausedPhase);
  const g=make();g.start();g.enemies=[];const runner=g.spawn(900,200,'runner'),boss=g.spawn(900,400,'boss');
  const rp=runner.gait,bp=boss.gait;advance(g,1);assert.ok(runner.gait-rp>(boss.gait-bp)*2);
 });
@@ -90,7 +90,7 @@ test('100 percent preserves original rate and lower settings reduce it for both 
  const g=make();g.setFireStrength(-1);assert.equal(g.fireStrength,0);g.setFireStrength(2);assert.equal(g.fireStrength,1);g.setFireStrength(NaN);assert.equal(g.fireStrength,1);
 });
 test('spell length and recharge rate grow through late waves while fixed mode remains one letter',()=>{
- const g=make();g.start();for(const [wave,length] of [[1,1],[3,3],[5,6],[7,10],[10,16],[17,30],[32,60],[100,60]]){
+ const g=make();g.setMaxSpellLength(60);g.start();for(const [wave,length] of [[1,1],[3,3],[5,6],[7,10],[10,16],[17,30],[32,60],[100,60]]){
   g.wave=wave;assert.equal(g.spellLength,length);assert.equal(g.nextCode(0).length,length);
  }
  g.wave=10;assert.equal(g.rechargeRate,2.44);g.stacks.recharge=2;assert.ok(Math.abs(g.rechargeRate-3.416)<.0001);
@@ -120,6 +120,21 @@ test('letter cap affects only future prompts, clamps bounds and survives restart
  g.setMaxSpellLength(0);assert.equal(g.nextCode(1),'S');g.setMaxSpellLength(99);assert.equal(g.maxSpellLength,60);g.setMaxSpellLength(NaN);assert.equal(g.maxSpellLength,60);
  g.setMaxSpellLength(7);g.start();assert.equal(g.maxSpellLength,7);g.wave=20;g.adaptive=false;assert.equal(g.spellLength,1);
 });
+
+test('spoken Chinese surnames accept common system transcriptions only in name positions',()=>{
+ assert.equal(speechMatch('Good morning Miss Wang','good morning miss wong').matched,true);
+ assert.equal(speechMatch('Good morning Miss Wang','good morning ms one').matched,true);
+ assert.equal(speechMatch('My name is Zhang','my name is jang').matched,true);
+ assert.equal(speechMatch('My name is 王','my name is wong').matched,true);
+ assert.equal(speechMatch('The sun is bright','the sung is bright').matched,false);
+ assert.equal(speechMatch('Good morning Miss Wang','good evening miss wong').matched,false);
+ const events=[],g=new GardenGame({random:()=>.35,emit:(type,data)=>events.push({type,data})});g.learningMode='speaking';g.start();g.skills[0].code='GOOD MORNING MISS WANG';g.select(0);assert.equal(g.speak(0,'good morning miss wong'),true);assert.equal(events.find(event=>event.type==='speech').data.nameTolerated,true);
+});
+test('speech ignores ellipses and slash separators, while contractions accept transcripts without apostrophes',()=>{
+ assert.equal(speechMatch('I/he thinks Minmin is...', 'I he thinks Minmin is').matched,true);
+ assert.equal(speechMatch("I'm ready",'im ready').matched,true);
+ assert.equal(speechMatch('I/he thinks Minmin is...', 'I he thinks Minmin are').matched,false);
+});
 test('optional slow motion needs partial input and immediately stops when switched off',()=>{
  const a=make(),b=make();a.start();b.start();assert.equal(a.magicSlow,false);a.magicSlow=true;a.skills[0].code='AFJ';a.select(0);assert.equal(a.typingSlow,false);
  a.input('a');assert.equal(a.typingSlow,true);const ax=a.enemies[0].gait,bx=b.enemies[0].gait;
@@ -130,7 +145,7 @@ test('optional slow motion needs partial input and immediately stops when switch
 test('sunflowers are chewed over time; zero defense has rescue time and repair restores flowers',()=>{
  const g=make();g.start();g.enemies=[];g.setFireStrength(0);const z=g.spawn(194,110,'walker');const initial=g.health;
  advance(g,.3);assert.equal(g.health,initial);const x=z.x;advance(g,.4);assert.equal(g.health,initial-.25);assert.equal(g.flowerHealth[0],.75);assert.equal(z.x,x);assert.ok(z.hp>0);
- g.freeze=2;const hp=g.health;advance(g,1);assert.equal(g.health,hp);
+ g.freeze=2;const hp=g.health;advance(g,1);assert.ok(g.health<hp);
  g.freeze=0;g.health=0;advance(g,1);assert.equal(g.status,'playing');assert.ok(g.breachElapsed>0);g.health=2;assert.equal(g.breachElapsed,0);assert.equal(g.health,2);assert.ok(g.flowerHealth.some(h=>h>0));
  g.health=0;advance(g,2);assert.equal(g.status,'playing');g.pause();advance(g,4);assert.ok(Math.abs(g.breachElapsed-2)<.0001);g.resume();advance(g,1.2);assert.equal(g.status,'lost');
 });
@@ -196,8 +211,8 @@ test('learning load rises every three waves and respects the adjustable cap',()=
  const g=make();g.setMaxLearningLoad(4);assert.equal(g.learningLoad,1);g.wave=4;assert.equal(g.learningLoad,2);g.wave=10;assert.equal(g.learningLoad,4);g.setMaxLearningLoad(2);assert.equal(g.learningLoad,2);
 });
 test('word mode requires the current number of repetitions before casting',()=>{
- const g=make();g.learningMode='english';g.wave=4;g.start();g.wave=4;const word=g.skills[0].code;for(const c of word)g.input(c);assert.equal(g.casts,0);assert.equal(g.skills[0].repeatsDone,1);for(const c of word)g.input(c);assert.equal(g.casts,1);
+ const g=make();g.learningMode='english';g.setMaxLearningLoad(3);g.wave=4;g.start();g.wave=4;const word=g.skills[0].code;for(const c of word)g.input(c);assert.equal(g.casts,0);assert.equal(g.skills[0].repeatsDone,1);for(const c of word)g.input(c);assert.equal(g.casts,1);
 });
 test('sentence and speaking prompts grow as coherent context prefixes',()=>{
- const {findSentenceEntry}=require('../engine.js');for(const mode of ['sentences','speaking']){const g=make();g.learningMode=mode;g.start();g.wave=7;for(let i=0;i<3;i++)g.skills[i].code=g.nextCode(i);for(const skill of g.skills){const entry=findSentenceEntry(skill.code);assert.ok(entry);assert.equal(entry.text.split(' / ').length,3);}}
+ const {findSentenceEntry}=require('../engine.js');for(const mode of ['sentences','speaking']){const g=make();g.learningMode=mode;g.setMaxLearningLoad(3);g.start();g.wave=7;for(let i=0;i<3;i++)g.skills[i].code=g.nextCode(i);for(const skill of g.skills){const entry=findSentenceEntry(skill.code);assert.ok(entry);assert.equal(entry.text.split(' / ').length,3);}}
 });

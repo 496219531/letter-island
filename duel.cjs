@@ -28,6 +28,7 @@ class DuelGarden extends GardenGame {
   }
   // Only the match may send troops. Disable solo waves and upgrade screens.
   offerCards() {}
+  skillTarget(){return this.target();}
   canBiteDefense(z) {return !z.engaged;}
   shoot() {
     if(this.auto&&!this.enemies.some(z=>z.hp>0&&z.x<=390))return;
@@ -98,7 +99,7 @@ class DuelMatch {
     armies.forEach((army,index)=>{
       for(const z of army){
         z.engaged=false;z.duelTarget=null;
-        if(this.games[index].freeze<=0)z.duelBiteIn=Math.max(0,(z.duelBiteIn||0)-dt);
+        z.duelBiteIn=Math.max(0,(z.duelBiteIn||0)-dt);
         let target=null,nearest=Infinity;
         for(const other of armies[1-index]){
           const distance=Math.abs(z.x-(1000-other.x));
@@ -106,7 +107,7 @@ class DuelMatch {
         }
         if(!target)continue;
         z.engaged=true;z.duelTarget=target.id;
-        if(this.games[index].freeze<=0&&z.duelBiteIn<=0){
+        if(z.duelBiteIn<=0){
           const scale=Math.pow(1.19,this.games[index].wave-1);
           hits.push({garden:this.games[1-index],target,damage:(z.type==='armor'?13:z.type==='runner'?7:10)*scale});
           z.duelBiteIn=.65;

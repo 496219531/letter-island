@@ -2,15 +2,19 @@
 const $=s=>document.querySelector(s),sessionKey='gulu-lan-session-v1';
 let session=null,stream=null,state=null,connected=false,queue=Promise.resolve(),noticeTimer,lastAim=0,skillSignature='',feedbackId='',localAuto=true;
 const duelAudio=new GardenAudio(()=>new (window.AudioContext||window.webkitAudioContext)());
-let audioPrevious=null;
-function unlockDuelAudio(){try{duelAudio.init();}catch{}}
+let audioPrevious=null,audioWave='';
+function unlockDuelAudio(){return duelAudio.unlock();}
 document.addEventListener('pointerdown',unlockDuelAudio,{passive:true});
+document.addEventListener('pointerup',unlockDuelAudio,{passive:true});
+document.addEventListener('touchend',unlockDuelAudio,{passive:true});
 document.addEventListener('keydown',unlockDuelAudio);
-$('#duelSound').onclick=()=>{duelAudio.setEnabled(!duelAudio.enabled);$('#duelSound').textContent=duelAudio.enabled?'🔊 声音':'🔇 静音';$('#duelSound').setAttribute('aria-pressed',String(duelAudio.enabled));if(duelAudio.enabled){unlockDuelAudio();duelAudio.play('laser');}};
+$('#duelSound').onclick=async()=>{duelAudio.setEnabled(!duelAudio.enabled);$('#duelSound').textContent=duelAudio.enabled?'🔊 声音':'🔇 静音';$('#duelSound').setAttribute('aria-pressed',String(duelAudio.enabled));if(duelAudio.enabled&&await unlockDuelAudio())duelAudio.play('laser');};
 function playDuelSounds(s){
-  if(s.status!=='playing'||s.paused){duelAudio.stop();audioPrevious=null;return;}
+  if(s.status!=='playing'||s.paused){const won=audioPrevious&&s.status==='finished'&&s.winner===s.side;if(audioPrevious)duelAudio.stop();if(won)duelAudio.play('celebrate');audioPrevious=null;return;}
   const field=s.fields?.[s.side];if(!field)return;
   const key=s.code+':'+s.round;
+  const wave=key+':'+Math.floor(s.elapsed/40);if(audioWave!==wave){audioWave=wave;duelAudio.play('horde',{variant:Math.min(2,Math.floor(s.elapsed/80))});}
+  duelAudio.update(audioPrevious?.elapsed===undefined?0:Math.max(0,s.elapsed-audioPrevious.elapsed),{status:'playing',enemies:field.enemies,freeze:field.freeze,health:field.health});
   if(audioPrevious?.key===key){
     if(field.shotKick>0&&audioPrevious.shotKick<=0)duelAudio.play('shot');
     if(field.kills>audioPrevious.kills)duelAudio.play('kill');
@@ -18,7 +22,7 @@ function playDuelSounds(s){
     s.skills.forEach((skill,i)=>{if(skill.uses>audioPrevious.uses[i])duelAudio.play(['laser','freeze','melon'][i]);});
     if(field.enemies.some(z=>z.hit>0))duelAudio.play('flesh');
   }
-  audioPrevious={key,shotKick:field.shotKick,kills:field.kills,health:field.health,uses:s.skills.map(skill=>skill.uses)};
+  audioPrevious={key,elapsed:s.elapsed,shotKick:field.shotKick,kills:field.kills,health:field.health,uses:s.skills.map(skill=>skill.uses)};
 }
 const zombie=new Image();zombie.src='assets/zombie.png';
 const arenaArt=new Image();arenaArt.src='assets/duel-garden-v2.png';
@@ -48,7 +52,7 @@ const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 let addresses=[],stages=[],dialogueStages=[];
 function notice(text){$('#notice').textContent=text;$('#notice').hidden=false;clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>$('#notice').hidden=true,3500);}
 async function request(path,options={}) {
-  const res=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(session?{Authorization:'Bearer '+session.token}:{}),...options.headers},signal:AbortSignal.timeout(6000)});
+  const res=await fetch(path.replace(/^\//,''),{...options,headers:{'Content-Type':'application/json',...(session?{Authorization:'Bearer '+session.token}:{}),...options.headers},signal:AbortSignal.timeout(6000)});
   const data=await res.json();if(!res.ok)throw Object.assign(new Error(data.error||'连接失败'),{status:res.status});return data;
 }
 function action(command) {
@@ -60,12 +64,12 @@ function action(command) {
   });
   return queue;
 }
-function reset(){duelAudio.stop();audioPrevious=null;const clean=new URL(location.href);clean.searchParams.delete('room');history.replaceState(null,'',clean);document.body.dataset.duelState='lobby';stream?.close();stream=null;session=null;state=null;connected=false;try{sessionStorage.removeItem(sessionKey);}catch{}$('#lobby').hidden=false;$('#room').hidden=true;}
-function invitation(){const url=new URL(addresses[0]||location.href);url.pathname='/duel.html';url.search='';url.searchParams.set('room',session.code);return url.href;}
+function reset(){duelAudio.stop();audioPrevious=null;audioWave='';const clean=new URL(location.href);clean.searchParams.delete('room');history.replaceState(null,'',clean);document.body.dataset.duelState='lobby';stream?.close();stream=null;session=null;state=null;connected=false;try{sessionStorage.removeItem(sessionKey);}catch{}$('#lobby').hidden=false;$('#room').hidden=true;}
+function invitation(){const url=new URL('duel.html',addresses[0]||location.href);url.search='';url.searchParams.set('room',session.code);return url.href;}
 function attach() {
   $('#lobby').hidden=true;$('#room').hidden=false;$('#codeLabel').textContent=session.code;$('#invite').value=invitation();
   $('#connection').textContent='正在连接房间…';
-  stream?.close();const current=session,events=new EventSource(`/api/room/${session.code}/events?token=${encodeURIComponent(session.token)}`);stream=events;
+  stream?.close();const current=session,events=new EventSource(`api/room/${session.code}/events?token=${encodeURIComponent(session.token)}`);stream=events;
   events.onmessage=e=>{if(session!==current)return;connected=true;state=JSON.parse(e.data);render();};
   events.onerror=async()=>{
     if(session!==current)return;connected=false;$('#connection').textContent='连接中断，正在自动重连… 对局暂停，30 秒内可恢复。';$('#connection').classList.add('error');
@@ -106,8 +110,8 @@ $('#copy').onclick=async()=>{
 };
 async function leaveRoom(returnSolo=false){
   if(state?.status==='playing'&&!confirm('退出房间将结束当前对局，确定退出吗？'))return;
-  try{if(session)await request(`/api/room/${session.code}/leave`,{method:'POST',body:'{}'});reset();if(returnSolo){location.href=new URLSearchParams(location.search).get('source')==='ios'?'gulugarden://home':'/index.html';return;}notice('已退出房间，可以重新创建或加入');}
-  catch(e){if(returnSolo){reset();location.href=new URLSearchParams(location.search).get('source')==='ios'?'gulugarden://home':'/index.html';return;}if(e.status===401){reset();return;}notice('退出未成功，请重试：'+e.message);}
+  try{if(session)await request(`/api/room/${session.code}/leave`,{method:'POST',body:'{}'});reset();if(returnSolo){location.href=new URLSearchParams(location.search).get('source')==='ios'?'gulugarden://home':'index.html';return;}notice('已退出房间，可以重新创建或加入');}
+  catch(e){if(returnSolo){reset();location.href=new URLSearchParams(location.search).get('source')==='ios'?'gulugarden://home':'index.html';return;}if(e.status===401){reset();return;}notice('退出未成功，请重试：'+e.message);}
 }
 $('#leave').onclick=()=>leaveRoom();
 $('#leaveWaiting').onclick=()=>leaveRoom();
@@ -117,7 +121,7 @@ document.querySelectorAll('.topbar a').forEach(a=>a.onclick=e=>{e.preventDefault
 $('#unready').onclick=()=>action({type:'unready'});
 $('#surrender').onclick=()=>{if(confirm('确定认输并结束这一局吗？'))action({type:'surrender'});};
 $('#auto').onchange=()=>{localAuto=$('#auto').checked;action({type:'auto',value:localAuto});};
-setInterval(()=>{if(session&&connected)action({type:'ping'});},2000);
+let lastPing=0;setInterval(()=>{const gap=state?.status==='playing'?2000:15000;if(session&&connected&&Date.now()-lastPing>=gap){lastPing=Date.now();action({type:'ping'});}},2000);
 
 const skillCards=[];
 for(let i=0;i<3;i++){
@@ -158,6 +162,7 @@ function render() {
   if(!playing){
     $('#waitingTitle').textContent=finished?(s.winner===null?'平局':s.winner===s.side?'你守住了后院！':'这次后院失守了'):(other?'两位守卫已到齐':'等待朋友入场');
     $('#waitingDetail').textContent=finished?`${s.winner===null?s.reason:s.reason.startsWith('对方')?(s.winner===s.side?s.reason:s.reason.replace('对方','你的')):s.reason}。双方准备后可再来一局。`:'双方点击准备后自动开战。题目由房主设置，每个人独立作答。';
+    if(s.ranking)$('#waitingDetail').textContent+=' 上一局：'+s.ranking.reason;
     $('#playerList').replaceChildren();
     s.players.forEach((p,i)=>{const row=document.createElement('p'),name=document.createElement('strong'),status=document.createElement('span');name.textContent=p?`${p.name}${i===s.side?'（我）':''}`:'等待朋友…';status.textContent=p?(p.connected?(p.ready?'已准备 ✓':'未准备'):'未连接'):'';row.append(name,status);$('#playerList').append(row);});
     $('#unready').hidden=!me.ready;$('#unready').disabled=!connected;
@@ -191,7 +196,7 @@ function render() {
     const typed=document.createElement('span');typed.className='typed';typed.textContent=skill.code.slice(0,skill.typed);code.append(typed);
     const next=document.createElement('span');next.className='next';next.textContent=skill.code[skill.typed]===' '?'␣':skill.code[skill.typed]||'';code.append(next);code.append(document.createTextNode(skill.code.slice(skill.typed+1)));code.scrollTop=Math.max(0,next.offsetTop-code.clientHeight+24);
     b.querySelector('.dialogue-context').hidden=!skill.scene;b.querySelector('.dialogue-context').textContent=skill.scene||'';b.title=skill.scene?[skill.reference,skill.goal,skill.grammar].join(' · '):'';
-    b.querySelector('.skill-meaning').textContent=skill.meaning||['直线范围伤害','冻结敌方僵尸','瞄准区域爆炸'][i];
+    b.querySelector('.skill-meaning').textContent=skill.meaning||['直线范围伤害','敌方移动减速50%','瞄准区域爆炸'][i];
     b.querySelector('.skill-bar').style.width=`${100*(1-skill.cd/skill.duration)}%`;
   });}
   drawBattle($('#myCanvas'),s);
@@ -235,7 +240,7 @@ function drawBattle(canvas,s) {
     if(z.frozen){c.fillStyle='#b4ecff80';c.fillRect(z.x-size*.45,z.y-size*.55,size*.9,size);c.font='20px system-ui';c.fillText('❄',z.x-10,z.y-size*.75);}
     const icon={runner:'⚡',armor:'🪣',bomber:'💣',mini:'🍬',boss:'👑',healer:'💚',shield:'🛡️'}[z.type];if(icon){c.font='22px system-ui';c.fillText(icon,z.x-12,z.y-size*.45);}
     c.fillStyle='#384932';c.fillRect(z.x-24,z.y-size*.63,48,6);c.fillStyle=z.friendly?'#40845a':'#c57545';c.fillRect(z.x-24,z.y-size*.63,48*Math.max(0,z.hp/z.maxHp),6);
-    if(z.engaged){c.font='bold 14px system-ui';c.fillStyle=z.friendly?'#27573a':'#864024';c.textAlign='center';c.fillText(z.frozen?'冻住了':'互啃中',z.x,z.y+size*.65);c.textAlign='left';if(z.hit>0){c.strokeStyle='#fff5ba';c.lineWidth=3;c.beginPath();c.arc(z.x+(z.friendly?22:-22),z.y,13,0,Math.PI*2);c.stroke();}}
+    if(z.engaged){c.font='bold 14px system-ui';c.fillStyle=z.friendly?'#27573a':'#864024';c.textAlign='center';c.fillText(z.frozen?'冰霜中互啃':'互啃中',z.x,z.y+size*.65);c.textAlign='left';if(z.hit>0){c.strokeStyle='#fff5ba';c.lineWidth=3;c.beginPath();c.arc(z.x+(z.friendly?22:-22),z.y,13,0,Math.PI*2);c.stroke();}}
   }
   function weapons(field,flipped){
     c.save();if(flipped){c.translate(1000,0);c.scale(-1,1);}
@@ -249,7 +254,7 @@ function drawBattle(canvas,s) {
   }
   weapons(mine,false);weapons(other,true);
   if(!localAuto){c.strokeStyle='#fff';c.lineWidth=2;c.beginPath();c.arc(mine.target.x,mine.target.y,15,0,Math.PI*2);c.moveTo(mine.target.x-23,mine.target.y);c.lineTo(mine.target.x+23,mine.target.y);c.stroke();}
-  c.font='bold 16px system-ui';c.shadowColor='#18321b';c.shadowBlur=4;c.fillStyle='#f0e5ac';c.fillText('我方僵尸 →',185,505);c.fillStyle='#f4d09d';c.textAlign='right';c.fillText('← 敌方僵尸',815,505);c.textAlign='left';c.shadowBlur=0;
+  c.font='bold 16px system-ui';c.shadowColor='#18321b';c.shadowBlur=window.GuluPerformance?.current.glow===false?0:4;c.fillStyle='#f0e5ac';c.fillText('我方僵尸 →',185,505);c.fillStyle='#f4d09d';c.textAlign='right';c.fillText('← 敌方僵尸',815,505);c.textAlign='left';c.shadowBlur=0;
   if(mine.health<=0||other.health<=0){c.fillStyle='#993a26';c.font='bold 20px system-ui';c.textAlign='center';c.fillText(`${mine.health<=0?'我的':'对方'}后院告急 · ${Math.max(0,3-(mine.health<=0?mine.breach:other.breach)).toFixed(1)} 秒`,500,510);c.textAlign='left';}
 }
 async function boot(){
@@ -261,7 +266,8 @@ async function boot(){
   try{
     const info=await request('/api/lan');if(!Array.isArray(info.addresses))throw new Error();addresses=info.addresses;stages=info.stages||[];dialogueStages=info.dialogueStages||[];updateLevels();
     const note=$('#networkNote');note.replaceChildren(document.createTextNode('手机或电脑打开：'));
-    const url=addresses[0]||location.origin+'/duel.html';const a=document.createElement('a');a.href=url;a.textContent=url;note.append(a,document.createTextNode(' · 房主电脑保持运行。'));
+    const url=addresses[0]||new URL('duel.html',location.href).href;const a=document.createElement('a');a.href=url;a.textContent=url;note.append(a,document.createTextNode(info.hosted?' · 分享房间邀请即可联网对战，无需连接同一 Wi-Fi。':' · 房主电脑保持运行。'));
+    if(info.hosted){document.querySelector('.topbar .pill').textContent='在线 · 双人对战';document.querySelector('.lobby-card>p').textContent='手机与电脑均可加入，创建房间后把邀请发给朋友。';}
     try{session=JSON.parse(sessionStorage.getItem(sessionKey));}catch{}
     if(session?.code&&session?.token&&(!invited||session.code===code)){
       try{await request(`/api/room/${session.code}/state`);attach();return;}
