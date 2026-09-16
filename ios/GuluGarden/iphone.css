@@ -268,20 +268,20 @@ body.native-iphone #gameDialog p{color:#465747}
    clear start actions, matching the native card hierarchy. */
 body.native-iphone[data-game-state=ready] .game-shell{padding:0;overflow:hidden}
 body.native-iphone[data-game-state=ready] .game-frame{border-radius:0;box-shadow:none;background:transparent}
-body.native-iphone[data-game-state=ready] .start-screen{align-items:flex-end;background:linear-gradient(180deg,#17362905 0%,#17362918 42%,#f7f5ec 43%),url('assets/garden.png') center top/cover no-repeat}
+body.native-iphone[data-game-state=ready] .start-screen{align-items:flex-end;background:linear-gradient(180deg,#17362905 0%,#17362918 36%,#f7f5ec 37%),url('assets/garden.png') center top/cover no-repeat}
 body.native-iphone[data-game-state=ready] .start-screen:before{left:24px;top:28px;width:52px;height:52px;border-radius:16px;font-size:27px}
 body.native-iphone[data-game-state=ready] .start-screen:after{left:92px;top:48px;font-size:13px;color:#fff1bd;text-shadow:0 1px 4px #173629}
-body.native-iphone[data-game-state=ready] .start-panel{max-height:72%;padding:18px 20px calc(16px + env(safe-area-inset-bottom));border-radius:25px 25px 0 0;background:#f7f5ec;overflow:auto}
+body.native-iphone[data-game-state=ready] .start-panel{flex:0 0 84%;max-height:none;padding:18px 20px calc(16px + env(safe-area-inset-bottom));border-radius:25px 25px 0 0;background:#f7f5ec;overflow:auto}
 body.native-iphone[data-game-state=ready] .start-stamp{display:none}
 body.native-iphone[data-game-state=ready] .start-panel h2{margin:0 0 2px;font-size:27px;text-align:center}
 body.native-iphone[data-game-state=ready] .start-panel>p{font-size:11px;text-align:center}
 body.native-iphone[data-game-state=ready] .native-home-options{grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 10px}
-body.native-iphone[data-game-state=ready] .native-home-options .native-home-option{position:relative;min-height:104px;margin:0;padding:15px 13px;border-color:var(--app-line);border-radius:15px;background:#fff}
+body.native-iphone[data-game-state=ready] .native-home-options .native-home-option{position:relative;min-height:0;height:118px;margin:0;padding:13px;border-color:var(--app-line);border-radius:15px;background:#fff}
 body.native-iphone[data-game-state=ready] .native-home-options .native-home-option:before{display:none}
 body.native-iphone[data-game-state=ready] .native-home-card-icon{display:block;width:26px;height:26px;margin-bottom:7px;object-fit:cover;object-position:center;border-radius:8px;background:#edf3e8}
 body.native-iphone[data-game-state=ready] .native-home-mode>strong{margin:0 0 5px;font-size:11px;color:var(--app-muted)}
 body.native-iphone[data-game-state=ready] .native-home-mode .difficulty-label{display:block}
-body.native-iphone[data-game-state=ready] .native-home-mode .difficulty-label select,body.native-iphone[data-game-state=ready] .start-panel .custom-source select{min-height:0;padding:0;border:0;background:transparent;color:var(--app-ink);font-size:16px;font-weight:800;line-height:1.35}
+body.native-iphone[data-game-state=ready] .native-home-mode .difficulty-label select,body.native-iphone[data-game-state=ready] .start-panel .custom-source select{min-width:0;min-height:0;padding:0;border:0;background:transparent;color:var(--app-ink);font-size:14px;font-weight:800;line-height:1.35}
 body.native-iphone[data-game-state=ready] .start-panel .custom-source{display:block;margin:0;padding:0}
 body.native-iphone[data-game-state=ready] .native-home-library{min-height:42px;margin:0 0 10px;padding:9px 12px;border-radius:12px;background:#eaf1e5;color:var(--app-leaf);font-size:14px;text-align:left}
 body.native-iphone[data-game-state=ready] .native-home-actions{grid-template-columns:1fr 1fr;gap:10px}
@@ -308,3 +308,25 @@ body.native-iphone .mobile-settings-page .audio-volume-control{display:grid;gap:
 body.native-iphone .mobile-settings-page .audio-volume-control>a{padding:6px 0;color:var(--app-leaf);font-weight:700;text-decoration:underline}
 body.native-iphone .mobile-settings-page .audio-volume-control button{min-height:40px;background:#fff;color:var(--app-leaf);border:1px solid var(--app-leaf)}
 body.native-iphone .mobile-settings-page .magic-slow-switch{min-height:52px;background:#fff!important;color:var(--app-ink)!important;border:1px solid var(--app-line)!important}
+
+/* Library management follows the same compact hierarchy: one entry action,
+   one library card, then quiet utility rows. */
+body.native-iphone .library-dialog .library-body{padding:16px;background:#f7f5ec}
+body.native-iphone .library-dialog .library-info{margin:0 0 8px}
+body.native-iphone .library-dialog .library-info:not([open]) p{display:none}
+body.native-iphone .library-dialog .library-add{display:block;width:100%;margin:0 0 12px;background:var(--app-ink);border-color:var(--app-ink);font-size:16px}
+body.native-iphone .library-dialog .library-pipeline{margin:0 0 10px;font-size:13px;color:var(--app-text)}
+body.native-iphone .library-dialog .library-pipeline select{min-height:44px;margin-top:6px}
+body.native-iphone .library-dialog .library-group{padding:15px;margin-top:12px;border-color:var(--app-line);border-radius:16px;background:#fff}
+body.native-iphone .library-dialog .library-group h3{font-size:19px}
+body.native-iphone .library-dialog .library-group p{margin:7px 0;color:var(--app-muted)}
+body.native-iphone .library-dialog .library-group-actions{display:flex;gap:8px;margin-top:12px;align-items:stretch}
+body.native-iphone .library-dialog .library-group-actions>button{flex:1;margin:0;background:var(--app-ink);font-size:14px}
+body.native-iphone .library-dialog .library-more{position:relative;flex:none}
+body.native-iphone .library-dialog .library-more summary{display:grid;place-items:center;width:44px;height:42px;border:1px solid var(--app-line);border-radius:12px;background:#fff;color:var(--app-ink);font-size:17px;list-style:none}
+body.native-iphone .library-dialog .library-more summary::-webkit-details-marker{display:none}
+body.native-iphone .library-dialog .library-more[open]{position:relative;z-index:2}
+body.native-iphone .library-dialog .library-more[open]>button{display:block;min-width:130px;margin:6px 0 0;background:#fff;color:var(--app-ink);border-color:var(--app-line)}
+body.native-iphone .library-dialog .library-utility-button{display:block;width:100%;min-height:46px;margin:10px 0 0;background:#fff;color:var(--app-ink);border-color:var(--app-line);text-align:left}
+body.native-iphone .library-dialog .library-utility-field{margin:12px 0 0;font-size:14px;color:var(--app-text)}
+body.native-iphone .library-dialog .library-utility-field input{min-height:46px;background:#fff}
