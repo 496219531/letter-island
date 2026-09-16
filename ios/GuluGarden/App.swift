@@ -175,6 +175,9 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if ProcessInfo.processInfo.arguments.contains("--live-perf") {
             let muted=ProcessInfo.processInfo.arguments.contains("--live-perf-muted")
+            if muted { setEffectGain(0) }
+            let statusPath=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("live-performance-status.json")
+            try? JSONSerialization.data(withJSONObject:["muted":muted,"started":Date().timeIntervalSince1970]).write(to:statusPath)
             self.web.evaluateJavaScript("window.__guluLivePerf=true;"+(muted ? "soundscape.setEnabled(false);" : ""))
             DispatchQueue.main.asyncAfter(deadline: .now() + 90) {
                 self.web.evaluateJavaScript("JSON.stringify(window.GuluLivePerf?.snapshot() || {})") { result, error in
