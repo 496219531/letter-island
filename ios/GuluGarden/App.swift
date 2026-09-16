@@ -142,7 +142,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
         config.userContentController.add(self, name: "gulu")
-        let nativeCSS = try! String(contentsOf: Bundle.main.url(forResource: "iphone", withExtension: "css")!, encoding: .utf8)
+        let nativeCSS = try! String(contentsOf: Bundle.main.resourceURL!.appendingPathComponent("Web/iphone.css"), encoding: .utf8)
         let encodedCSS = String(data: try! JSONSerialization.data(withJSONObject: [nativeCSS]), encoding: .utf8)!
         let cssValue = String(encodedCSS.dropFirst().dropLast())
         let nativeBootstrap = """
