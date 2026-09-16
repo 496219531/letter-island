@@ -280,6 +280,8 @@
       if(this.processingDeath)return;this.processingDeath=true;
       try{while(this.deathQueue.length){const blast=this.deathQueue.shift();this.effects.push({kind:'explosion',x:blast.x,y:blast.y,life:.45,fullLife:.45});this.emit('explosion',blast);for(const z of [...this.enemies])if(z.hp>0&&!z.charmed&&Math.hypot(z.x-blast.x,z.y-blast.y)<=170)this.damage(z,blast.damage,'deathchain');}}finally{this.processingDeath=false;}
     }
+    pruneEnemies(){let write=0;for(let read=0;read<this.enemies.length;read++){const enemy=this.enemies[read];if(enemy.hp>0)this.enemies[write++]=enemy;}this.enemies.length=write;}
+    pruneBullets(){let write=0;for(let read=0;read<this.bullets.length;read++){const bullet=this.bullets[read];if(bullet.life>0&&bullet.x<1070&&bullet.y>-50&&bullet.y<600)this.bullets[write++]=bullet;}this.bullets.length=write;}
     buildCollisionGrid(){
       if(this.enemies.length<24||this.bullets.length<4){this.collisionGrid=null;return null;}
       const size=96,grid=new Map();
@@ -451,7 +453,7 @@
       }
       if(kind==='freeze'){this.freeze=6+1.5*this.stack('permafrost');if(this.stack('magic'))for(const z of [...this.enemies])this.damage(z,30*this.stack('magic'),'ice');this.effects.push({kind:'freeze',life:1,fullLife:1});}
       if(kind==='melon'){for(let i=0;i<1+Math.min(10,this.stack('twinmelon'));i++)this.effects.push({kind:'melon',x:clamp(target.x+(i?((i%2?1:-1)*60*Math.ceil(i/2)):0),160,1000),y:target.y,life:.75+i*.2,fullLife:.75+i*.2,damage:380*this.magicPower*Math.max(1,(1+this.stack('twinmelon'))/11),radius:225+45*this.stack('blast')});}
-      this.enemies=this.enemies.filter(z=>z.hp>0);
+      this.pruneEnemies();
       if(kind==='charm'){const targets=this.charmFrontlines();for(const z of targets){z.charmed=true;z.deathMark=0;z.eating=false;z.engaged=false;z.poisonTime=0;z.slowTime=0;z.biteIn=.6;}this.effects.push({kind:'charm',targets:targets.map(z=>({x:z.x,y:z.y})),life:.8,fullLife:.8});}
       if(kind==='rage'){this.rage=5+this.stack('rageDuration');this.shotIn=0;}
       if(kind==='lightning'){
@@ -463,7 +465,7 @@
       if(kind==='clones'){this.clones=8;this.cloneShot=0;}
       if(kind==='deathchain'){for(const z of this.enemies)if(z.hp>0&&!z.charmed)z.deathMark=8;this.effects.push({kind:'mark',life:.65,fullLife:.65});}
       if(kind==='judgment'){const targets=this.enemies.filter(z=>z.hp>0&&!z.charmed).sort((a,b)=>this.skillAuto?(b.hp+b.shield)-(a.hp+a.shield):Math.hypot(a.x-target.x,a.y-target.y)-Math.hypot(b.x-target.x,b.y-target.y));const count=6+this.stack('judgmentTargets');for(const z of targets.slice(0,count))this.damage(z,z.boss?z.maxHp*.55+z.shield:z.hp+z.shield+1,'judgment');if(targets.length)this.effects.push({kind:'judgment',x:target.x,y:target.y,targets:targets.slice(0,count).map(z=>({x:z.x,y:z.y})),life:1,fullLife:1});}
-      this.enemies=this.enemies.filter(z=>z.hp>0);
+      this.pruneEnemies();
       this.emit('cast',{index,kind,name:skill.name});
       if(!['laser','freeze','melon'].includes(kind)){
         skill.remainingUses=(skill.remainingUses??5)-1;
@@ -481,7 +483,7 @@
       for(let i=0;i<this.skills.length;i++){
         const s=this.skills[i];if(s.cd>0){s.cd=Math.max(0,s.cd-dt*this.rechargeRate);if(s.cd===0){s.code=this.nextCode(i);this.emit('ready',{index:i});}}
       }
-      this.freeze=Math.max(0,this.freeze-worldDt);const wasRage=this.rage>0;this.rage=Math.max(0,this.rage-dt);if(wasRage&&this.rage===0)this.bullets=this.bullets.filter(b=>!b.rageShot);this.clones=Math.max(0,this.clones-dt);
+      this.freeze=Math.max(0,this.freeze-worldDt);const wasRage=this.rage>0;this.rage=Math.max(0,this.rage-dt);if(wasRage&&this.rage===0){let write=0;for(let read=0;read<this.bullets.length;read++){const bullet=this.bullets[read];if(!bullet.rageShot)this.bullets[write++]=bullet;}this.bullets.length=write;}this.clones=Math.max(0,this.clones-dt);
       if(this.clones>0){this.cloneShot-=dt;if(this.cloneShot<=0){this.cloneShot=this.ordinaryShotInterval;const targets=this.enemies.filter(z=>z.hp>0&&!z.charmed).sort((a,b)=>a.x-b.x);if(targets.length){this.shoot({x:this.hero.x+35,y:this.hero.y-90,target:this.skillAuto?targets[0]:this.skillAim});this.shoot({x:this.hero.x+35,y:this.hero.y+90,target:this.skillAuto?(targets[1]||targets[0]):this.skillAim});}}}
       this.shotKick=Math.max(0,(this.shotKick||0)-dt);this.shotIn-=dt;
       if(((this.fireStrength>0&&(this.shooting||this.auto))||this.rage>0)&&this.shotIn<=0){this.shoot();this.shotIn=this.rage>0?this.rageShotInterval:this.ordinaryShotInterval;}
@@ -493,7 +495,9 @@
         }
         if(e.kind==='melon'&&e.life<=0&&!e.exploded){e.exploded=true;for(const z of [...this.enemies])if(Math.hypot(z.x-e.x,z.y-e.y)<e.radius+z.radius)this.damage(z,e.damage,'melon');this.effects.push({kind:'explosion',x:e.x,y:e.y,life:.7,fullLife:.7});this.emit('explosion',{x:e.x,y:e.y});}}
       this.effects=this.effects.filter(e=>e.life>0);
-      const allies=this.enemies.filter(z=>z.charmed&&z.hp>0),hostiles=allies.length?this.enemies.filter(z=>!z.charmed&&z.hp>0):[];
+      let hasAllies=false;for(const z of this.enemies)if(z.charmed&&z.hp>0){hasAllies=true;break;}
+      let allies=null,hostiles=null;
+      if(hasAllies){allies=[];hostiles=[];for(const z of this.enemies)if(z.hp>0)(z.charmed?allies:hostiles).push(z);}
       for(const z of [...this.enemies]){
         if(z.hp<=0)continue;
         z.hit=Math.max(0,z.hit-dt);z.deathMark=Math.max(0,(z.deathMark||0)-dt);
@@ -503,7 +507,7 @@
         if(this.stack('thorns')&&z.x<260)this.damage(z,25*this.stack('thorns')*worldDt,'thorns');
         if(z.hp<=0)continue;
         }
-        const opponent=(z.charmed?hostiles:allies).find(other=>other.hp>0&&Math.abs(other.y-z.y)<45&&Math.abs(other.x-z.x)<z.radius+other.radius+10);
+        const opponent=hasAllies?(z.charmed?hostiles:allies).find(other=>other.hp>0&&Math.abs(other.y-z.y)<45&&Math.abs(other.x-z.x)<z.radius+other.radius+10):null;
         z.charmEngaged=Boolean(opponent);
         if(opponent){z.eating=false;z.biteIn=(z.biteIn??.6)-worldDt;if(z.biteIn<=0){z.biteIn=.6;this.damage(opponent,z.maxHp*.18,'zombieBite');this.emit('nibble',{x:z.x,y:z.y});}continue;}
         if(z.charmed){z.eating=false;z.gait+=worldDt*3.35;z.x+=z.speed*worldDt*(1+.2*Math.sin(z.gait));if(z.x>1100)z.hp=0;continue;}
@@ -538,9 +542,8 @@
           if(ex*ex+ey*ey<z.radius*z.radius){this.hitBullet(b,z);break;}
         }
       }
-      this.enemies=this.enemies.filter(z=>z.hp>0);
-      this.bullets=this.bullets.filter(b=>b.life>0&&b.x<1070&&b.y>-50&&b.y<600);
-      this.dead.forEach(z=>z.life-=dt);this.dead=this.dead.filter(z=>z.life>0);
+      this.pruneEnemies();this.pruneBullets();
+      let deadWrite=0;for(let read=0;read<this.dead.length;read++){const dead=this.dead[read];dead.life-=dt;if(dead.life>0)this.dead[deadWrite++]=dead;}this.dead.length=deadWrite;
       if(this.health<=0){this.breachElapsed+=worldDt;if(this.breachElapsed>=3){this.finish(false);return;}}else this.breachElapsed=0;
       if(this.spawned<this.quota){
         this.spawnIn-=worldDt;if(this.spawnIn<=0&&this.enemies.length<100){this.spawn();this.spawnIn=Math.max(.28,2.1*Math.pow(.88,this.wave-1));}
