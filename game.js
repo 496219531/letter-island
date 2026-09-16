@@ -31,6 +31,7 @@ document.addEventListener('gulu-scene-resized',()=>{paintClock=.2;});
 let toastUntil=0,bannerUntil=0,recoil = 0, shake = 0, dialogResume = false;
 const pressedKeys=new Set();
 const localSpeech=GuluSystemSpeech.createLocalSpeech(window.speechSynthesis,window.SpeechSynthesisUtterance);
+const pendingLearningReadout=[];
 let learningReadout='both';
 try{const saved=localStorage.getItem('gulu-learning-readout');if(['both','english','off'].includes(saved))learningReadout=saved;}catch{}
 const reviewStore=GuluSpeechReview.repository(localStorage);
@@ -73,6 +74,12 @@ const buildVersion=document.createElement('small');buildVersion.id='buildVersion
 if(window.GuluNative?.getAppVersion)GuluNative.getAppVersion().then(info=>{buildVersion.textContent='版本 '+info.version+' · build '+info.build;}).catch(()=>{buildVersion.textContent='App 版本读取失败';});
 
 function tone(...args){soundscape.tone(...args);}
+function speakLearningReadout(item){
+  const report=error=>{const el=$('#learningReadoutStatus');if(el)el.textContent=error==='missing-chinese'?'系统缺少本地中文声音，当前只读英文。':'朗读未成功，请在设置中试听，并检查系统英文声音。';};
+  if(nativeSpeech&&window.GuluNative?.speakLearning){GuluNative.speakLearning({text:item.text,meaning:item.meaning,chinese:item.chinese,volume:item.volume}).catch(report);return;}
+  if(!localSpeech.enqueueLearning(item.text,item.meaning,{chinese:item.chinese,volume:item.volume,onError:report}))report('unavailable');
+}
+function queueLearningReadout(text,meaning){pendingLearningReadout.length=0;pendingLearningReadout.push({text,meaning,chinese:learningReadout==='both',volume:soundscape.volume,due:performance.now()+380});}
 function toast(text, time = 2200) {
   $('#battleToast').textContent = text; $('#battleToast').classList.add('visible');toastUntil=performance.now()+time;
 }
@@ -327,10 +334,7 @@ function onEvent(type, data = {}) {
     if(card){card.classList.remove('wrong');void card.offsetWidth;card.classList.add('wrong');}
   }
   if (type === 'typing') { toast(GuluModeCopy.practiceCopy(game.learningMode,{mobile:phoneSpeech}).action,2200); }
-  if(type==='practice-complete'&&learningReadout!=='off'&&soundscape.enabled&&soundscape.volume>0&&!document.hidden){
-    const report=error=>{const el=$('#learningReadoutStatus');if(el)el.textContent=error==='missing-chinese'?'系统缺少本地中文声音，当前只读英文。':'朗读未成功，请在设置中试听，并检查系统英文声音。';};
-    if(!localSpeech.enqueueLearning(data.text,data.meaning,{chinese:learningReadout==='both',volume:soundscape.volume,onError:report}))report('unavailable');
-  }
+  if(type==='practice-complete'&&learningReadout!=='off'&&soundscape.enabled&&soundscape.volume>0&&!document.hidden)queueLearningReadout(data.text,data.meaning);
   if(type==='repeat'){toast('很好！再输入 '+(data.total-data.done)+' 遍就能释放大招 ✦',1800);}
   if(type==='practice-score'){toast('完成'+data.repeats+'遍练习 · +'+data.points+'分（学段 ×'+(data.level+1)+'）',2200);}
   if(type==='speech'){
@@ -700,6 +704,7 @@ function frame(time) {
   if(toastUntil&&time>=toastUntil){$('#battleToast').classList.remove('visible');toastUntil=0;}
   if(bannerUntil&&time>=bannerUntil){$('#castBanner').classList.remove('show');bannerUntil=0;}
   for(const button of pressedKeys)if(time>=button._pressedUntil){button.classList.remove('pressed');pressedKeys.delete(button);}
+  if(pendingLearningReadout[0]?.due<=time)speakLearningReadout(pendingLearningReadout.shift());
   const dt=lastTime?Math.min((time-lastTime)/1000,.25):0;lastTime=time;
   recordLiveFrame(dt);
   const tracing=Boolean(window.__guluLivePerf),simulationStart=tracing?performance.now():0;if(window.GuluPerformance)GuluPerformance.clock.advance(dt,simulateStep);else simulateStep(Math.min(dt,.05));if(tracing)livePerfWork.simulation=Math.round((performance.now()-simulationStart)*100)/100;
@@ -825,8 +830,8 @@ for(const [value,label] of [['both','英文 + 中文意思'],['english','只读�
 readoutSelect.value=learningReadout;readoutLabel.append(readoutSelect);
 const readoutStatus=document.createElement('small');readoutStatus.id='learningReadoutStatus';readoutStatus.setAttribute('role','status');readoutStatus.textContent='每完成一遍都朗读；英文清晰女声，中文普通朗读。';
 const readoutTest=document.createElement('button');readoutTest.type='button';readoutTest.textContent='试听英文和中文';
-readoutSelect.onchange=()=>{learningReadout=readoutSelect.value;localSpeech.cancel();try{localStorage.setItem('gulu-learning-readout',learningReadout);}catch{}};
-readoutTest.onclick=()=>{localSpeech.cancel();if(soundscape.volume===0){readoutStatus.textContent='请先调高音量。';return;}readoutStatus.textContent='正在试听 Apple，苹果。';if(!localSpeech.enqueueLearning('Apple','苹果',{volume:soundscape.volume,onError:error=>{readoutStatus.textContent=error==='missing-chinese'?'系统缺少本地中文声音，当前只读英文。':'朗读失败，请检查系统声音。';}}))readoutStatus.textContent='未找到本地英文声音，请在系统设置中添加英文声音后重试。';};
+readoutSelect.onchange=()=>{learningReadout=readoutSelect.value;pendingLearningReadout.length=0;localSpeech.cancel();window.GuluNative?.stopLearningSpeech?.();try{localStorage.setItem('gulu-learning-readout',learningReadout);}catch{}};
+readoutTest.onclick=()=>{pendingLearningReadout.length=0;localSpeech.cancel();window.GuluNative?.stopLearningSpeech?.();if(soundscape.volume===0){readoutStatus.textContent='请先调高音量。';return;}readoutStatus.textContent='正在试听 Apple，苹果。';if(nativeSpeech&&window.GuluNative?.speakLearning){GuluNative.speakLearning({text:'Apple',meaning:'苹果',chinese:true,volume:soundscape.volume}).catch(()=>readoutStatus.textContent='朗读失败，请检查系统声音。');}else if(!localSpeech.enqueueLearning('Apple','苹果',{volume:soundscape.volume,onError:error=>{readoutStatus.textContent=error==='missing-chinese'?'系统缺少本地中文声音，当前只读英文。':'朗读失败，请检查系统声音。';}}))readoutStatus.textContent='未找到本地英文声音，请在系统设置中添加英文声音后重试。';};
 $('.audio-volume-control').append(readoutLabel,readoutTest,readoutStatus);
 $('#soundVolume').addEventListener('input',()=>localSpeech.cancel());
 const recordLink=document.createElement('a');recordLink.href='zombie-recorder.html';recordLink.textContent='🎙 配音小能手 · 自己配音';recordLink.onclick=()=>{if(game.status==='playing')game.pause();stopListening();soundscape.stop();};$('.audio-volume-control').append(recordLink);

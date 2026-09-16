@@ -40,6 +40,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     var audioFile: AVAudioFile?
     var audioID: String?
     var player: AVAudioPlayer?
+    let learningSynth=AVSpeechSynthesizer()
     final class EffectVoice {
         let node=AVAudioPlayerNode()
         var until:TimeInterval=0
@@ -459,6 +460,8 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         case "importImage", "organizeLibrary": importLibraryImage(data,id:id)
         case "translateTexts": translateLibrary(data,id:id)
         case "exportLibrary": exportLibrary(data,id:id)
+        case "speakLearning": speakLearning(data,id:id)
+        case "stopLearningSpeech": learningSynth.stopSpeaking(at:.immediate);send(["type":"nativeReply", "id":id, "ok":true])
         case "authorize":
             AVAudioSession.sharedInstance().requestRecordPermission { mic in
                 SFSpeechRecognizer.requestAuthorization { status in

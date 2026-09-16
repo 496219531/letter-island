@@ -2,6 +2,7 @@ import UIKit
 import Security
 import SwiftUI
 import Translation
+import AVFoundation
 
 @available(iOS 18.0, *)
 struct LibraryTranslationView: View {
@@ -80,6 +81,17 @@ extension GameController {
         } else {libraryReply(id,error:"苹果系统翻译需要 iOS 18 或更高版本，可先手动填写中文。")}
     }
     func libraryProgress(_ id: Int, completed: Int, total: Int) { send(["type":"libraryProgress", "id":id, "completed":completed, "total":total]) }
+    func speakLearning(_ data: [String:Any], id: Int) {
+        guard let text=data["text"] as? String,!text.isEmpty,text.count<=500 else { libraryReply(id,error:"朗读内容无效");return }
+        let chinese=data["chinese"] as? Bool ?? true,meaning=data["meaning"] as? String ?? "",volume=max(0,min(1,(data["volume"] as? NSNumber)?.floatValue ?? 0.6))
+        learningSynth.stopSpeaking(at:.immediate)
+        let voices=AVSpeechSynthesisVoice.speechVoices()
+        let english=voices.first { $0.language == "en-US" && $0.name.lowercased().contains("samantha") } ?? AVSpeechSynthesisVoice(language:"en-US")
+        let chineseVoice=voices.first { $0.language.hasPrefix("zh-CN") } ?? AVSpeechSynthesisVoice(language:"zh-CN")
+        func utterance(_ line:String,_ voice:AVSpeechSynthesisVoice?)->AVSpeechUtterance { let item=AVSpeechUtterance(string:line.replacingOccurrences(of:" / ",with:". "));item.voice=voice;item.rate=AVSpeechUtteranceDefaultSpeechRate*0.88;item.volume=volume;return item }
+        learningSynth.speak(utterance(text,english));if chinese,!meaning.isEmpty,let chineseVoice { learningSynth.speak(utterance(meaning,chineseVoice)) }
+        libraryReply(id)
+    }
     func exportLibrary(_ data: [String:Any], id: Int) {
         guard let text=data["text"] as? String,text.count<2000000 else {libraryReply(id,error:"导出内容过大");return}
         do {let file=FileManager.default.temporaryDirectory.appendingPathComponent("我的词句库.json");try text.write(to:file,atomically:true,encoding:.utf8);let sheet=UIActivityViewController(activityItems:[file],applicationActivities:nil);sheet.completionWithItemsHandler={_,_,_,error in self.libraryReply(id,error:error?.localizedDescription)};present(sheet,animated:true)}catch{libraryReply(id,error:error.localizedDescription)}
