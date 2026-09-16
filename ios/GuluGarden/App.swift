@@ -47,6 +47,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         var kind=""
     }
     let effectEngine=AVAudioEngine()
+    let effectQueue=DispatchQueue(label:"com.hankk.gulugarden.effects",qos:.userInitiated)
     var effectVoices:[EffectVoice]=[]
     var effectBuffers:[String:AVAudioPCMBuffer]=[:]
     let priorityEffects:Set<String>=["laser","freeze","melon","explosion","boss","horde","celebrate"]
@@ -68,13 +69,17 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         }
         if !effectEngine.isRunning { try effectEngine.start() }
     }
-    func warmEffects() {
+    func warmEffectsNow() {
         do {
             for kind in effectKinds { for variant in 0...2 { _=try effectBuffer("\(kind)-\(variant)") } }
             try prepareEffectEngine(effectBuffer("shot-0"))
         } catch { effectLastError=error.localizedDescription }
     }
+    func warmEffects() { effectQueue.async { [weak self] in self?.warmEffectsNow() } }
     func playEffect(_ data:[String:Any]) {
+        effectQueue.async { [weak self] in self?.playEffectNow(data) }
+    }
+    func playEffectNow(_ data:[String:Any]) {
         guard let kind=data["kind"] as? String,effectKinds.contains(kind),let variant=data["variant"] as? Int,(0...2).contains(variant) else {return}
         do {
             let key="\(kind)-\(variant)"
@@ -88,7 +93,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
             voice.node.volume=max(0,min(1,(data["volume"] as? NSNumber)?.floatValue ?? 0.2))
             voice.node.pan=max(-0.6,min(0.6,(data["pan"] as? NSNumber)?.floatValue ?? 0))
             voice.node.scheduleBuffer(buffer,completionCallbackType:.dataPlayedBack) { [weak self,weak voice] _ in
-                DispatchQueue.main.async {
+                self?.effectQueue.async {
                     guard let self=self,let voice=voice,voice.token==token else {return}
                     voice.until=0
                 }
@@ -96,7 +101,8 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
             voice.node.play();effectStarts+=1
         }catch{effectLastError=error.localizedDescription;NSLog("Effect playback failed: %@",effectLastError)}
     }
-    func stopEffects(){effectActivity+=1;for voice in effectVoices {voice.token+=1;voice.until=0;voice.node.stop()}}
+    func stopEffects(_ suspend: Bool = false){effectQueue.async { [weak self] in guard let self=self else{return};self.effectActivity+=1;for voice in self.effectVoices {voice.token+=1;voice.until=0;voice.node.stop()};if suspend {self.effectEngine.pause()}}}
+    func setEffectGain(_ value: Float){let gain=max(0,min(1,value));effectQueue.async { [weak self] in guard let self=self else{return};self.effectGain=gain;self.effectEngine.mainMixerNode.outputVolume=gain;if gain==0 {self.effectActivity+=1;for voice in self.effectVoices {voice.token+=1;voice.until=0;voice.node.stop()}}}}
     var tapped = false
     var timeout: DispatchWorkItem?
     var settingsPortrait = true
@@ -160,7 +166,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
             web?.evaluateJavaScript("document.dispatchEvent(new Event('gulu-audio-ready'))")
         } catch { NSLog("Game audio restoration failed: %@", error.localizedDescription) }
     }
-    @objc func background() { stopEffects();effectEngine.pause();cancel(restorePlayback: false); web.evaluateJavaScript("window.dispatchEvent(new Event('blur')); document.dispatchEvent(new Event('gulu-background'))") }
+    @objc func background() { stopEffects(true);cancel(restorePlayback: false); web.evaluateJavaScript("window.dispatchEvent(new Event('blur')); document.dispatchEvent(new Event('gulu-background'))") }
     var ranPerformanceQA = false
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if ProcessInfo.processInfo.arguments.contains("--live-perf") {
@@ -399,7 +405,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         case "communityRequest": communityRequest(data, id: id)
         case "playEffect": playEffect(data)
         case "setEffectGain":
-            if let gain=(data["gain"] as? NSNumber)?.floatValue,gain.isFinite { effectGain=max(0,min(1,gain));effectEngine.mainMixerNode.outputVolume=effectGain;if effectGain==0{stopEffects()} }
+            if let gain=(data["gain"] as? NSNumber)?.floatValue,gain.isFinite { setEffectGain(gain) }
         case "stopEffects": stopEffects()
         case "getScreenDirection": send(["type":"nativeReply", "id":id, "ok":true, "result":preferredScreenDirection])
         case "setSettingsPortrait":
