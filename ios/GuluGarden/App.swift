@@ -517,7 +517,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
             try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker])
             try session.setActive(true)
             let req = SFSpeechAudioBufferRecognitionRequest()
-            req.shouldReportPartialResults = false
+            req.shouldReportPartialResults = true
             req.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
             request = req
             let input = engine.inputNode
@@ -534,6 +534,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
                     guard let self = self, self.activeID == id else { return }
                     if let result = result, result.isFinal { self.stopAudio(); self.send(["type":"result", "id":id, "text":result.bestTranscription.formattedString, "audioId":self.audioID ?? ""]); self.cancel() }
                     else if let error = error { self.fail(id, error.localizedDescription) }
+                    else if let result = result { self.send(["type":"partial", "id":id, "text":result.bestTranscription.formattedString]) }
                 }
             }
             engine.prepare(); try engine.start()

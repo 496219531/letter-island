@@ -3,7 +3,7 @@
   'use strict';
   function isPhone(env){return env.matchMedia('(pointer: coarse)').matches && env.matchMedia('(max-device-width: 1100px)').matches;}
   function allowedMode(mode,phone){return phone&&['adaptive','letters'].includes(mode)?'english':mode;}
-  function createSpeech({onState=()=>{},onResult=()=>{},onError=()=>{},Recognition=root.SpeechRecognition||root.webkitSpeechRecognition}={}){
+  function createSpeech({onState=()=>{},onResult=()=>{},onPartial=()=>{},onError=()=>{},Recognition=root.SpeechRecognition||root.webkitSpeechRecognition}={}){
     let phase='idle',held=false,recognizer=null,timer=null,target=null,words=[];
     const state=p=>{phase=p;onState(p);};
     function cancel(){const r=recognizer;recognizer=null;held=false;clearTimeout(timer);r?.abort();state('idle');}
@@ -11,9 +11,9 @@
     function start(next){
       if(phase!=='idle')return;
       if(!Recognition){onError('当前手机浏览器不支持语音识别，请使用支持语音识别的系统浏览器。');return;}
-      target=next;words=[];held=true;const r=new Recognition();recognizer=r;r.lang='en-US';r.continuous=true;r.interimResults=false;state('preparing');
+      target=next;words=[];held=true;const r=new Recognition();recognizer=r;r.lang='en-US';r.continuous=true;r.interimResults=true;state('preparing');
       r.onstart=()=>{if(recognizer!==r)return;if(!held){cancel();return;}state('recording');timer=setTimeout(release,30000);};
-      r.onresult=e=>{if(recognizer!==r)return;for(let i=e.resultIndex;i<e.results.length;i++)if(e.results[i].isFinal)words[i]=e.results[i][0].transcript;};
+      r.onresult=e=>{if(recognizer!==r)return;for(let i=e.resultIndex;i<e.results.length;i++)if(e.results[i].isFinal)words[i]=e.results[i][0].transcript;onPartial(Array.from(e.results,result=>result[0].transcript).join(' '),target);};
       r.onerror=e=>{if(recognizer!==r)return;cancel();onError(['not-allowed','service-not-allowed'].includes(e.error)?'语音权限被拒绝，请在手机浏览器设置中允许麦克风与语音识别。':'手机语音识别未成功：'+e.error,target,{audioId:r.audioId||null});};
       r.onend=()=>{if(recognizer!==r)return;const text=words.filter(Boolean).join(' '),value=target;recognizer=null;held=false;clearTimeout(timer);state('idle');if(text.trim())onResult(text,value,{audioId:r.audioId||null});else onError('没有听清，请按住麦克风再说一次。',value,{audioId:r.audioId||null});};
       try{r.start();}catch(e){cancel();onError(e.message);}

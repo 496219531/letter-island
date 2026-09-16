@@ -36,11 +36,13 @@ let learningReadout='both';
 try{const saved=localStorage.getItem('gulu-learning-readout');if(['both','english','off'].includes(saved))learningReadout=saved;}catch{}
 const reviewStore=GuluSpeechReview.repository(localStorage);
 const speechAttempts=new Map();
+let speechPartial=null;
 let listening=false,speechHeld=false,speechFeedback='',nativeSpeechReady=false,speechAuthorized=false,permissionPhase='idle';
 const phoneSpeech=Boolean(window.GuluMobile?.active);
 const nativeSpeech=Boolean(window.GuluNative);
 const microphone=(phoneSpeech?GuluMobile.createSpeech:GuluPressToTalk.createPressToTalk)({
   authorize:async()=>{if(!speechAuthorized)throw new Error('请先点击启用语音权限');},
+  onPartial(text,target){if(game.learningMode!=='speaking'||game.typing!==target.index||game.skills[target.index].code!==target.code)return;speechPartial={text,code:target.code};updateSpeechControl();},
   onState(phase){listening=phase==='recording';speechHeld=microphone.held;soundscape.setRecording(speechHeld&&['preparing','recording'].includes(phase));updateSpeechControl();},
   onError(message,target,meta){if(target)rememberSpeechAttempt(target,'',message,meta);if(message.includes('权限')){speechAuthorized=false;permissionPhase='error';}speechFeedback=message;updateSpeechControl();toast(message,4500);},
   onResult(text,target,meta){
@@ -285,7 +287,9 @@ function updateSpeechControl(){
   $('#speechExample').hidden=true;$('#speechReview').hidden=true;$('#speechExample').disabled=!ready||granting||phase!=='idle'||!localSpeech.available();
   $('#speechButtonLabel').textContent=phase==='preparing'?'正在准备／等待系统授权…':phase==='recording'?'正在录音 · 松开识别':phase==='recognizing'?'录音已停止 · 正在识别':!speechAuthorized?'先启用语音权限':!ready?(phoneSpeech&&selected?'当前大招充能中':'先选择一张大招卡'):'按住麦克风说话';
   $('#speechTranscript').textContent=permissionPhase==='microphone'?(nativeSpeech?'正在申请本 App 的麦克风权限。此步骤不录制、不上传语音。':'正在申请麦克风权限。此步骤不录制、不上传语音。'):permissionPhase==='system'?(nativeSpeech?'麦克风权限已通过。请允许本 App 使用系统英语语音识别；首次可能需要下载 Apple 英文识别资源，请保持页面打开。':'麦克风权限已通过。请允许系统识别；首次可能需要下载 Apple 英文识别资源，请保持页面打开。'):phase==='recording'?'麦克风已开启，松开后立即停止录音，最多30秒。':phase==='recognizing'?(nativeSpeech?'正在用本 App 的系统语音识别，匹配成功后自动放招。':phoneSpeech?'正在用手机语音服务识别，匹配成功后自动放招。':'正在用 Mac 系统识别，匹配成功后自动放招。'):phase==='preparing'?(nativeSpeech?'首次使用请允许本 App 使用麦克风和系统语音识别；授权后重新按住按钮。':'首次使用请允许系统语音识别和麦克风权限；授权后重新按住按钮。'):speechFeedback||(nativeSpeech?'朗读当前卡片 → 按住录音 → 松开识别；点上方技能可切换。':phoneSpeech?'朗读当前卡片 → 按住录音 → 松开识别；点上方技能可切换。':'选一句 → 按住录音 → 松开停止并自动识别。');
-  const last=selected?(speechAttempts.get(selected.code)||[]).at(-1):null;
+  const provisional=selected&&speechPartial?.code===selected.code&&['recording','recognizing'].includes(phase)?speechPartial:null;
+  if(provisional)$('#speechTranscript').textContent='正在识别：'+provisional.text;
+  const last=provisional||(selected?(speechAttempts.get(selected.code)||[]).at(-1):null);
   const diffs=last?.text?GuluSpeechReview.compare(selected.code,last.text).filter(p=>p.type!=='same'):[];
   const diffBox=$('#speechDiff');diffBox.hidden=!diffs.length;diffBox.classList.toggle('has-issues',diffs.length>0);
   const signature=JSON.stringify(diffs);if(diffBox.dataset.signature!==signature){diffBox.dataset.signature=signature;diffBox.replaceChildren();for(const part of diffs){const item=document.createElement('span');item.textContent=part.type==='missing'?'未识别到：'+part.expected:part.type==='extra'?'多识别：'+part.heard:part.expected+' → 识别成 '+part.heard;diffBox.append(item);}}
@@ -297,7 +301,7 @@ function layoutSpeechFeedback(){
   if(card){let panel=card.querySelector('.speech-feedback-panel');if(!panel){panel=document.createElement('div');panel.className='speech-feedback-panel';card.append(panel);}panel.append(transcript,diff,skip);return;}
   control.append(skip,transcript,diff);
 }
-function stopListening(cancelSpeech=true){if(cancelSpeech)localSpeech.cancel();microphone.cancel();listening=false;speechHeld=false;}
+function stopListening(cancelSpeech=true){speechPartial=null;if(cancelSpeech)localSpeech.cancel();microphone.cancel();listening=false;speechHeld=false;}
 function startListening(event){
   syncMobileSpeechTarget();
   if(event?.button!==undefined&&event.button!==0)return;
@@ -305,7 +309,7 @@ function startListening(event){
   if(!speechAuthorized){event?.preventDefault();enableSpeech();return;}
   if(!nativeSpeechReady)return;
   event?.preventDefault();if(event?.pointerId!==undefined)$('#speechButton').setPointerCapture(event.pointerId);
-  localSpeech.cancel();speechFeedback='';microphone.start({index:game.typing,code:game.skills[game.typing].code});
+  localSpeech.cancel();speechFeedback='';speechPartial=null;microphone.start({index:game.typing,code:game.skills[game.typing].code});
 }
 function saveTypingSettings(){
   try{localStorage.setItem('gulu-typing-settings',JSON.stringify({maxSpellLength:game.maxSpellLength,maxLearningLoad:game.maxLearningLoad,magicSlow:game.magicSlow,englishLevel:game.englishLevel}));}catch{}
@@ -867,7 +871,7 @@ $('#autoButton').onclick=()=>{game.auto=!game.auto;$('#autoButton').setAttribute
 $('#keyboardButton').onclick=()=>{const expanded=$('#touchKeyboard').hidden;$('#touchKeyboard').hidden=!expanded;$('#keyboardButton').setAttribute('aria-expanded',String(expanded));};
 $('#difficulty').onchange=()=>{game.learningMode=['english','sentences','speaking'].includes($('#difficulty').value)?$('#difficulty').value:'letters';game.adaptive=true;speechFeedback='';if(['english','sentences','speaking'].includes($('#difficulty').value))$('#settingsPanel').open=true;updateTypingControls();updateHud(true);if(game.learningMode==='speaking'&&!speechAuthorized)enableSpeech();};
 document.querySelectorAll('.skill-card').forEach((button,index)=>button.onclick=()=>{if(game.status!=='playing'){toast('先开始保卫小院吧！');return;}if(game.learningMode==='speaking')stopListening();speechFeedback='';if(phoneSpeech)document.body.dataset.visibleSkill=String(index);game.select(index);if(game.learningMode!=='speaking'&&window.matchMedia('(pointer: coarse)').matches){$('#touchKeyboard').hidden=game.learningMode==='speaking';$('#keyboardButton').setAttribute('aria-expanded','true');}updateHud(true);});
-$('#speechSkip').onclick=skipSpeechPrompt;$('#speechReview').onclick=openSpeechReview;
+$('#speechSkip').onclick=event=>{event.stopPropagation();skipSpeechPrompt();};$('#speechReview').onclick=openSpeechReview;
 $('#speechEnable').addEventListener('click',enableSpeech);
 $('#speechButton').addEventListener('pointerdown',startListening);
 $('#speechButton').addEventListener('pointerup',()=>microphone.release());

@@ -13,6 +13,12 @@ function setup(){
  const mic=createSpeech({Recognition,onResult:(...x)=>results.push(x),onError:e=>errors.push(e)});
  return {mic,results,errors,get r(){return instance;}};
 }
+test('partial speech updates feedback without submitting and ignores cancelled sessions',()=>{
+ let r;const partial=[],final=[];class Recognition{constructor(){r=this;}start(){}abort(){}stop(){}}
+ const mic=createSpeech({Recognition,onPartial:text=>partial.push(text),onResult:text=>final.push(text)});
+ mic.start({index:0,code:'HELLO THERE'});r.onstart();const event={resultIndex:0,results:[Object.assign([{transcript:'Hello'}],{isFinal:false})]};r.onresult(event);
+ assert.deepEqual(partial,['Hello']);assert.deepEqual(final,[]);mic.cancel();r.onresult(event);assert.equal(partial.length,1);
+});
 test('phone speech stops on release and delivers final text to the original skill',()=>{
  const s=setup(),target={index:1,code:'HELLO THERE'};s.mic.start(target);s.r.onstart();assert.equal(s.mic.phase,'recording');
  s.r.onresult({resultIndex:0,results:[Object.assign([{transcript:'Hello there'}],{isFinal:true})]});
