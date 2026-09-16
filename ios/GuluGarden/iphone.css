@@ -129,7 +129,9 @@ body.native-iphone[data-learning-mode=speaking] #skillGrid .skill-info strong{co
 body.native-iphone[data-learning-mode=speaking] #skillGrid .word-meaning{display:block!important;color:var(--app-leaf);font-size:14px;line-height:1.55}
 body.native-iphone[data-learning-mode=speaking] #skillGrid .skill-status{display:none}
 body.native-iphone[data-learning-mode=speaking] #speechControl{grid-template-columns:1fr 1fr;gap:7px;margin-top:8px;padding:10px;border:1px solid var(--app-line);border-radius:15px;background:#fff}
-body.native-iphone[data-learning-mode=speaking] #speechButton{min-height:62px;font-size:16px}
+body.native-iphone[data-learning-mode=speaking] #speechEnable,body.native-iphone[data-learning-mode=speaking] #speechExample,body.native-iphone[data-learning-mode=speaking] #speechReview{display:none!important}
+body.native-iphone[data-learning-mode=speaking] #speechButton{min-height:62px;border:1px solid var(--app-line);background:transparent!important;color:var(--app-ink);box-shadow:none;font-size:16px}
+body.native-iphone[data-learning-mode=speaking] #speechSkip{border:1px solid var(--app-line);background:transparent;color:var(--app-leaf);box-shadow:none}
 body.native-iphone[data-learning-mode=speaking] #speechTranscript{max-height:none;padding:3px 2px;color:var(--app-text);font-size:13px;line-height:1.5;text-align:left}
 body.native-iphone[data-learning-mode=speaking] #speechDiff{grid-column:1/-1;display:grid;gap:6px;max-height:132px;padding:9px;border:1px solid #d69a86;border-radius:10px;background:#fff2ec;color:#873e2e;font-size:13px;line-height:1.45}
 body.native-iphone[data-learning-mode=speaking] #speechDiff span{padding:6px 8px;border-radius:7px;background:#fde0d5}
