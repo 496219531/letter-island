@@ -70,8 +70,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     }
     func warmEffects() {
         do {
-            let common=["shot","flesh","metal","shield","iceHit","kill","nibble","critical"]
-            for kind in common { for variant in 0...2 { _=try effectBuffer("\(kind)-\(variant)") } }
+            for kind in effectKinds { for variant in 0...2 { _=try effectBuffer("\(kind)-\(variant)") } }
             try prepareEffectEngine(effectBuffer("shot-0"))
         } catch { effectLastError=error.localizedDescription }
     }
@@ -164,6 +163,15 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     @objc func background() { stopEffects();effectEngine.pause();cancel(restorePlayback: false); web.evaluateJavaScript("window.dispatchEvent(new Event('blur')); document.dispatchEvent(new Event('gulu-background'))") }
     var ranPerformanceQA = false
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if ProcessInfo.processInfo.arguments.contains("--live-perf") {
+            self.web.evaluateJavaScript("window.__guluLivePerf=true")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 90) {
+                self.web.evaluateJavaScript("JSON.stringify(window.GuluLivePerf?.snapshot() || {})") { result, error in
+                    let path=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("live-performance.json")
+                    try? String(describing:result ?? error as Any).write(to:path,atomically:true,encoding:.utf8)
+                }
+            }
+        }
         if !ranPerformanceQA && ProcessInfo.processInfo.arguments.contains("--performance-qa") {
             ranPerformanceQA = true
             UIApplication.shared.isIdleTimerDisabled = true

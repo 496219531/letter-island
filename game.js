@@ -6,6 +6,13 @@ const sprite = new Image(); sprite.src = 'assets/zombie.png';
 const captainSprite=new Image();captainSprite.src='assets/pea-captain-v1.png';
 const particles = [];
 const renderEnemies=[],renderEnemySources=[],renderEnemyY=[];
+const livePerfFrames=[];
+function recordLiveFrame(dt){
+  if(!window.__guluLivePerf||dt<.025)return;
+  livePerfFrames.push({gap:Math.round(dt*1000),wave:game?.wave||0,status:game?.status||'ready',enemies:game?.enemies.length||0,bullets:game?.bullets.length||0,effects:game?.effects.length||0,particles:particles.length,rage:Math.round((game?.rage||0)*10)/10,quality:quality().fps,sound:Boolean(soundscape?.enabled&&soundscape?.volume)});
+  if(livePerfFrames.length>160)livePerfFrames.splice(0,livePerfFrames.length-160);
+}
+window.GuluLivePerf={snapshot:()=>({frames:[...livePerfFrames],maxGap:Math.max(0,...livePerfFrames.map(frame=>frame.gap)),count:livePerfFrames.length})};
 const quality=()=>window.GuluPerformance?.current||{fps:60,dpr:2,particles:260,glow:true,hudInterval:.07};
 document.addEventListener('gulu-quality-change',()=>{particles.splice(quality().particles);paintClock=.2;});
 const soundscape=new GardenAudio(()=>new (window.AudioContext||window.webkitAudioContext)());
@@ -463,18 +470,17 @@ function drawWalkingSpriteMesh(pen,z,size){
 }
 let walkAtlas = null, walkFrames=0;
 const WALK_CELL=128;
+function ensureWalkAtlas(frames){
+  if(walkAtlas&&walkFrames===frames)return;
+  if(walkAtlas)walkAtlas.width=walkAtlas.height=0;walkFrames=frames;
+  walkAtlas=document.createElement('canvas');walkAtlas.width=WALK_CELL*frames;walkAtlas.height=WALK_CELL;
+  const pen=walkAtlas.getContext('2d');
+  for(let frame=0;frame<frames;frame++){pen.save();pen.translate(frame*WALK_CELL+64,76);drawWalkingSpriteMesh(pen,{gait:frame/frames*Math.PI*2},96);pen.restore();}
+}
 function drawWalkingSprite(z,size,dead){
   if(dead){ctx.drawImage(sprite,-size/2,-size*.59,size,size);return;}
   const frames=quality().glow?32:12;
-  if(!walkAtlas||walkFrames!==frames){
-    if(walkAtlas)walkAtlas.width=walkAtlas.height=0;walkFrames=frames;
-    walkAtlas=document.createElement('canvas');walkAtlas.width=WALK_CELL*frames;walkAtlas.height=WALK_CELL;
-    const pen=walkAtlas.getContext('2d');
-    for(let frame=0;frame<frames;frame++){
-      pen.save();pen.translate(frame*WALK_CELL+64,76);
-      drawWalkingSpriteMesh(pen,{gait:frame/frames*Math.PI*2},96);pen.restore();
-    }
-  }
+  ensureWalkAtlas(frames);
   const phase=((z.gait??z.phase)%(Math.PI*2)+Math.PI*2)%(Math.PI*2);
   const frame=Math.floor(phase/(Math.PI*2)*frames);
   const scale=size/96;
@@ -530,6 +536,13 @@ function getCaptainCutout(){
   }
   pen.putImageData(pixels,0,0);captainCutout=layer;return layer;
 }
+let visualPrewarmQueued=false;
+function prewarmVisuals(){
+  if(visualPrewarmQueued||!sprite.complete||!sprite.naturalWidth||!captainSprite.complete||!captainSprite.naturalWidth)return;
+  visualPrewarmQueued=true;const run=()=>{getCaptainCutout();ensureWalkAtlas(quality().glow?32:12);};
+  if(window.requestIdleCallback)window.requestIdleCallback(run,{timeout:1800});else setTimeout(run,180);
+}
+sprite.addEventListener('load',prewarmVisuals,{once:true});captainSprite.addEventListener('load',prewarmVisuals,{once:true});prewarmVisuals();
 // Visual upgrades are bounded even when card stacks grow indefinitely.
 function drawUpgradeScenery(){
   const level=id=>Math.min(5,game.stack(id)),time=reducedMotion?0:game.time;
@@ -684,6 +697,7 @@ function frame(time) {
   if(bannerUntil&&time>=bannerUntil){$('#castBanner').classList.remove('show');bannerUntil=0;}
   for(const button of pressedKeys)if(time>=button._pressedUntil){button.classList.remove('pressed');pressedKeys.delete(button);}
   const dt=lastTime?Math.min((time-lastTime)/1000,.25):0;lastTime=time;
+  recordLiveFrame(dt);
   if(window.GuluPerformance)GuluPerformance.clock.advance(dt,simulateStep);else simulateStep(Math.min(dt,.05));
   paintClock+=dt;const interval=game.status==='playing'?1/quality().fps:.2;if(window.__renderBaseline){if(paintClock>=interval){render(paintClock-paintClock%interval);paintClock%=interval;}}else{const steps=window.GuluPerformance?GuluPerformance.paintSteps(paintClock,interval):Math.floor((paintClock+1e-9)/interval);if(steps>0){render(steps*interval);paintClock=Math.max(0,paintClock-steps*interval);}}hudClock+=dt;if(hudClock>quality().hudInterval){updateHud();hudClock=0;}
   window.requestAnimationFrame(frame);
