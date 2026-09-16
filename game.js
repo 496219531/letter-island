@@ -5,6 +5,7 @@ const ctx = canvas.getContext('2d');
 const sprite = new Image(); sprite.src = 'assets/zombie.png';
 const captainSprite=new Image();captainSprite.src='assets/pea-captain-v1.png';
 const particles = [];
+const renderEnemies=[],renderEnemySources=[],renderEnemyY=[];
 const quality=()=>window.GuluPerformance?.current||{fps:60,dpr:2,particles:260,glow:true,hudInterval:.07};
 document.addEventListener('gulu-quality-change',()=>{particles.splice(quality().particles);paintClock=.2;});
 const soundscape=new GardenAudio(()=>new (window.AudioContext||window.webkitAudioContext)());
@@ -639,13 +640,19 @@ function drawEffects() {
     }
   }
 }
+function orderedEnemies(){
+  const current=game.enemies;let dirty=current.length!==renderEnemySources.length;
+  if(!dirty)for(let i=0;i<current.length;i++)if(renderEnemySources[i]!==current[i]||renderEnemyY[i]!==current[i].y){dirty=true;break;}
+  if(dirty){renderEnemySources.length=0;renderEnemyY.length=0;renderEnemies.length=0;for(const z of current){renderEnemySources.push(z);renderEnemyY.push(z.y);renderEnemies.push(z);}renderEnemies.sort((a,b)=>a.y-b.y);}
+  return renderEnemies;
+}
 function render(dt) {
   ctx.clearRect(0,0,1000,530);ctx.save();
   if(shake>0&&!reducedMotion)ctx.translate((Math.random()-.5)*shake*12,(Math.random()-.5)*shake*8);
   if(quality().glow)drawUpgradeScenery();
   drawSunflowerDefense();
   if(game.freeze>0){ctx.fillStyle='#b4e9ff24';ctx.fillRect(0,0,1000,530);}
-  [...game.enemies].sort((a,b)=>a.y-b.y).forEach(z=>drawZombie(z));
+  for(const z of orderedEnemies())drawZombie(z);
   game.dead.forEach(z=>drawZombie(z,true));
   if(!quality().glow&&!window.__renderBaseline){
     ctx.save();ctx.lineWidth=5;ctx.lineCap='round';ctx.strokeStyle='#e6fa7ab0';ctx.beginPath();

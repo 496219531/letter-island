@@ -30,6 +30,11 @@ a.setEnabled(false);a.setRecording(true);a.setRecording(false);assert.equal(a.en
 a.setEnabled(true);a.setVolume(0);a.setRecording(true);a.setRecording(false);assert.equal(a.master.gain.value,0);
 const cold=new GardenAudio(()=>fake);cold.setRecording(true);cold.init();assert.equal(cold.master.gain.value,.6*.65*.15);cold.setRecording(false);assert.equal(cold.master.gain.value,.6*.65);
 console.log('PASS recording ducking, lazy initialization, volume changes and mute preservation');
+const previousNative=global.GuluNative,previousNow=Date.now,nativeEvents=[];let nativeNow=10000;
+global.GuluNative={playEffect:(...args)=>nativeEvents.push(args)};Date.now=()=>nativeNow;
+const nativeAudio=new GardenAudio(()=>fake);nativeAudio.play('shot');nativeNow+=20;nativeAudio.play('flesh');nativeNow+=90;nativeAudio.play('flesh');nativeAudio.play('laser');nativeAudio.tone(800);nativeNow+=80;nativeAudio.tone(800);
+assert.equal(nativeEvents.filter(event=>event[0]==='shot'||event[0]==='flesh').length,2);assert.equal(nativeEvents.filter(event=>event[0]==='laser').length,1);assert.equal(nativeEvents.filter(event=>event[0]==='ui').length,2);global.GuluNative=previousNative;Date.now=previousNow;
+console.log('PASS native minor-effect coalescing preserves skill cues while reducing bridge traffic');
 let resumed=0;fake.resume=()=>{resumed++;return Promise.resolve();};
 fake.state='interrupted';cold.init();assert.equal(resumed,1);
 fake.state='suspended';cold.init();assert.equal(resumed,2);

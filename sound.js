@@ -91,7 +91,7 @@
     return out;
   }
   class GardenAudio{
-    constructor(factory){this.factory=factory;this.context=null;this.enabled=true;this.volume=.6;this.recording=false;this.voices=new Set();this.cache=new Map();this.last=new Map();this.duckUntil=0;this.ambientClock=0;this.stepDelay=1.4;this.chewDelay=0;this.groanDelay=2;this.customEffects=new Map();this.customPlaying=new Set();this.customGeneration=0;
+    constructor(factory){this.factory=factory;this.context=null;this.enabled=true;this.volume=.6;this.recording=false;this.voices=new Set();this.cache=new Map();this.last=new Map();this.duckUntil=0;this.ambientClock=0;this.stepDelay=1.4;this.chewDelay=0;this.groanDelay=2;this.nativeMinorNext=0;this.nativeUiNext=0;this.customEffects=new Map();this.customPlaying=new Set();this.customGeneration=0;
       for(const kind of Object.keys(SPECS)){try{const clip=root.localStorage?.getItem('gulu-effect-recording-v1-'+kind)||(kind==='groan'?root.localStorage?.getItem('gulu-zombie-recording-v1'):null);if(clip&&/^data:audio\//.test(clip)&&clip.length<1400000&&root.Audio){const audio=new root.Audio(clip);audio.preload='none';this.customEffects.set(kind,audio);}}catch{}}
     }
 
@@ -155,7 +155,7 @@
         const failed=()=>{if(this.customGeneration!==generation||this.customEffects.get(kind)!==clip)return;try{clip.pause();}catch{}this.customPlaying.delete(kind);this.customEffects.delete(kind);this.last.delete(kind);this.play(kind,{x});};
         clip.onerror=failed;try{clip.play().catch(failed);}catch{failed();}return;
       }
-      if(root.GuluNative?.playEffect){const now=Date.now()/1000;if(now-(this.last.get(kind)??-Infinity)<GAPS[kind])return;this.last.set(kind,now);root.GuluNative.playEffect(kind,Number.isInteger(chosenVariant)?Math.max(0,Math.min(2,chosenVariant)):Math.floor(Math.random()*3),LEVELS[kind],Math.max(-.6,Math.min(.6,(x-500)/900)));return;}
+      if(root.GuluNative?.playEffect){const now=Date.now()/1000,priority=SPELLS.has(kind)||kind==='warning';if(now-(this.last.get(kind)??-Infinity)<GAPS[kind]||(!priority&&now<this.nativeMinorNext))return;this.last.set(kind,now);if(!priority)this.nativeMinorNext=now+.085;root.GuluNative.playEffect(kind,Number.isInteger(chosenVariant)?Math.max(0,Math.min(2,chosenVariant)):Math.floor(Math.random()*3),LEVELS[kind],Math.max(-.6,Math.min(.6,(x-500)/900)));return;}
       try{
         if(!this.init())return;
         const now=this.context.currentTime;if(now-(this.last.get(kind)??-Infinity)<GAPS[kind])return;
@@ -169,7 +169,7 @@
     }
     tone(frequency,duration=.1,type='sine',volume=.035,end=frequency){
       if(!this.enabled||this.volume===0)return;
-      if(root.GuluNative?.playEffect){const now=Date.now()/1000;if(now-(this.last.get('ui')??-Infinity)<.045)return;this.last.set('ui',now);root.GuluNative.playEffect('ui',frequency<720?0:frequency<840?1:2,Math.min(.12,volume*2),0);return;}
+      if(root.GuluNative?.playEffect){const now=Date.now()/1000;if(now-(this.last.get('ui')??-Infinity)<.045||now<this.nativeUiNext)return;this.last.set('ui',now);this.nativeUiNext=now+.075;root.GuluNative.playEffect('ui',frequency<720?0:frequency<840?1:2,Math.min(.12,volume*2),0);return;}
       try{
         if(!this.init()||this.voices.size>=32)return;
         const now=this.context.currentTime;if(now-(this.last.get('ui')??-Infinity)<.045)return;this.last.set('ui',now);
@@ -186,7 +186,7 @@
       for(const [kind,clip] of this.customEffects){if(preserveSkills&&SPELLS.has(kind))continue;this.customPlaying.delete(kind);this.last.delete(kind);try{clip.pause();clip.currentTime=0;}catch{}}
       if(!preserveSkills)root.GuluNative?.stopEffects?.();
       for(const voice of [...this.voices]){if(preserveSkills&&SPELLS.has(voice.kind))continue;try{voice.source.stop();}catch{}voice.cleanup();}
-      if(!preserveSkills){this.customPlaying.clear();this.last.clear();this.duckUntil=0;}
+      if(!preserveSkills){this.customPlaying.clear();this.last.clear();this.duckUntil=0;this.nativeMinorNext=0;this.nativeUiNext=0;}
       this.ambientClock=0;this.stepDelay=1.4;this.chewDelay=0;this.groanDelay=2;
     }
 
