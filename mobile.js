@@ -73,7 +73,14 @@
     const header=document.createElement('div');header.className='mobile-settings-header';
     const title=document.createElement('strong');title.id='mobileSettingsTitle';title.textContent='游戏设置';
     const close=document.createElement('button');close.type='button';close.textContent='完成';close.setAttribute('aria-label','关闭游戏设置');
-    header.append(title,close);dialog.append(header,controls);document.body.append(dialog);
+    header.append(title,close);
+    const tabs=document.createElement('nav');tabs.className='mobile-settings-tabs';tabs.setAttribute('aria-label','设置分类');
+    const learningTab=document.createElement('button'),soundTab=document.createElement('button');learningTab.type=soundTab.type='button';learningTab.textContent='学习';soundTab.textContent='声音与性能';tabs.append(learningTab,soundTab);
+    const learning=document.createElement('section'),sound=document.createElement('section');learning.className=sound.className='mobile-settings-page';learning.dataset.page='learning';sound.dataset.page='sound';
+    const items=[...controls.children];for(const item of items){const isSound=item.classList.contains('audio-volume-control')||Boolean(item.querySelector('#renderQuality'));(isSound?sound:learning).append(item);}controls.replaceChildren(learning,sound);
+    const selectPage=page=>{for(const [name,node] of [['learning',learning],['sound',sound]])node.hidden=name!==page;learningTab.classList.toggle('active',page==='learning');soundTab.classList.toggle('active',page==='sound');learningTab.setAttribute('aria-selected',String(page==='learning'));soundTab.setAttribute('aria-selected',String(page==='sound'));};
+    learningTab.onclick=()=>selectPage('learning');soundTab.onclick=()=>selectPage('sound');selectPage('learning');
+    dialog.append(header,tabs,controls);document.body.append(dialog);
     const trigger=settings.querySelector('summary');
     trigger.tabIndex=0;
     let resume=false;
