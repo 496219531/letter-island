@@ -14,9 +14,9 @@
 .game-app .library-dialog button:disabled{opacity:.5}
 .game-app .library-image{display:block;width:100%;max-height:280px;object-fit:contain;background:#10291c}
 .game-app .library-entry,.game-app .library-group{padding:10px;border:1px solid #72895c;border-radius:10px;margin-top:12px}
-.game-app .library-filter-controls{display:grid;grid-template-columns:minmax(150px,.8fr) minmax(0,1.2fr);gap:10px;align-items:end;margin-top:12px}
-.game-app .library-filter-controls label{margin:0}
-@media(max-width:480px){.game-app .library-filter-controls{grid-template-columns:1fr}}
+.game-app .library-tabs{display:flex;gap:7px;margin-top:12px;overflow-x:auto;scrollbar-width:none}
+.game-app .library-tabs button{flex:1;min-width:max-content;margin:0;background:#29452f;color:#d7dfc5}
+.game-app .library-tabs button.active{background:#f1ce77;border-color:#f6df9b;color:#213421}
 .game-app .library-dialog h3{font-size:16px;margin:3px 0}
 .game-app .library-review-actions{display:flex;gap:8px;margin-top:18px;padding-top:12px;border-top:1px solid #72895c}
 .game-app .library-review-actions button{flex:1;margin:0}

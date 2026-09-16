@@ -11,6 +11,13 @@ test('related groups merge fresh nonempty fields and retain the original group w
  const sentence=repo.list().find(g=>g.kind==='sentence');repo.saveClassified({id:sentence.id,name:sentence.name,entries:[{kind:'word',text:'APPLE',meaning:'新',ipa:''},{kind:'sentence',text:'I like pears.',meaning:''}]});
  const groups=repo.list();assert.equal(groups.length,2);assert.equal(groups.find(g=>g.id===root.id).entries[0].meaning,'新');assert.equal(groups.find(g=>g.id===root.id).entries[0].ipa,'已有音标');assert.equal(groups.find(g=>g.kind==='sentence').entries.length,2);
 });
+test('editing an entry can atomically move it between word and sentence tabs',()=>{
+ const repo=C.repository(store()),root=repo.save({name:'本周',kind:'word',entries:[{text:'apple',meaning:'苹果',ipa:'æpəl'},{text:'I like apples',meaning:'我喜欢苹果'}]});
+ repo.moveEntry({sourceId:root.id,sourceWord:'I LIKE APPLES',input:{text:'I like apples',meaning:'我喜欢苹果'},kind:'sentence'});
+ let groups=repo.list(),words=groups.find(g=>g.kind==='word'),sentences=groups.find(g=>g.kind==='sentence');assert.equal(words.entries.length,1);assert.equal(sentences.entries[0].text,'I like apples');assert.equal(words.familyId,sentences.familyId);
+ repo.moveEntry({sourceId:sentences.id,sourceWord:'I LIKE APPLES',input:{text:'I like apples',meaning:'更新中文'},kind:'word'});
+ groups=repo.list();words=groups.find(g=>g.kind==='word');assert.equal(groups.some(g=>g.kind==='sentence'),false);assert.equal(words.entries.length,2);assert.equal(words.entries.find(e=>e.text==='I like apples').meaning,'更新中文');
+});
 test('mixed save is atomic if splitting exceeds group capacity',()=>{const storage=store(),repo=C.repository(storage);for(let i=0;i<99;i++)repo.save({name:'组'+i,kind:'word',entries:[{text:'apple'}]});const before=storage.getItem();assert.throws(()=>repo.saveClassified({name:'混合',entries:[{text:'cat',kind:'word'},{text:'I am here.',kind:'sentence'}]}),/100/);assert.equal(storage.getItem(),before);});
 test('restored backup families are independent of their source groups',()=>{const repo=C.repository(store());const original=repo.saveClassified({name:'原组',entries:[{text:'apple',kind:'word'},{text:'Hello there.',kind:'sentence'}]});repo.importGroups(original);const all=repo.list();assert.notEqual(all[2].familyId,original[0].familyId);assert.equal(all[2].familyId,all[3].familyId);});
 test('missing AI classification stops before saving or translating',async()=>{await assert.rejects(C.prepare({kind:'auto',organize:async()=>({entries:[{text:'take care'}]}),translate:async()=>{throw Error('should not translate');}}),/分类/);});

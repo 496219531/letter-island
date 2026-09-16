@@ -287,7 +287,7 @@ function updateSpeechControl(){
   $('#speechTranscript').textContent=permissionPhase==='microphone'?(nativeSpeech?'正在申请本 App 的麦克风权限。此步骤不录制、不上传语音。':'正在申请麦克风权限。此步骤不录制、不上传语音。'):permissionPhase==='system'?(nativeSpeech?'麦克风权限已通过。请允许本 App 使用系统英语语音识别；首次可能需要下载 Apple 英文识别资源，请保持页面打开。':'麦克风权限已通过。请允许系统识别；首次可能需要下载 Apple 英文识别资源，请保持页面打开。'):phase==='recording'?'麦克风已开启，松开后立即停止录音，最多30秒。':phase==='recognizing'?(nativeSpeech?'正在用本 App 的系统语音识别，匹配成功后自动放招。':phoneSpeech?'正在用手机语音服务识别，匹配成功后自动放招。':'正在用 Mac 系统识别，匹配成功后自动放招。'):phase==='preparing'?(nativeSpeech?'首次使用请允许本 App 使用麦克风和系统语音识别；授权后重新按住按钮。':'首次使用请允许系统语音识别和麦克风权限；授权后重新按住按钮。'):speechFeedback||(nativeSpeech?'朗读当前卡片 → 按住录音 → 松开识别；点上方技能可切换。':phoneSpeech?'朗读当前卡片 → 按住录音 → 松开识别；点上方技能可切换。':'选一句 → 按住录音 → 松开停止并自动识别。');
   const last=selected?(speechAttempts.get(selected.code)||[]).at(-1):null;
   const diffs=last?.text?GuluSpeechReview.compare(selected.code,last.text).filter(p=>p.type!=='same'):[];
-  const diffBox=$('#speechDiff');diffBox.hidden=!diffs.length;
+  const diffBox=$('#speechDiff');diffBox.hidden=!diffs.length;diffBox.classList.toggle('has-issues',diffs.length>0);
   const signature=JSON.stringify(diffs);if(diffBox.dataset.signature!==signature){diffBox.dataset.signature=signature;diffBox.replaceChildren();for(const part of diffs){const item=document.createElement('span');item.textContent=part.type==='missing'?'未识别到：'+part.expected:part.type==='extra'?'多识别：'+part.heard:part.expected+' → 识别成 '+part.heard;diffBox.append(item);}}
   $('#speechExample').title=localSpeech.available()?'使用本地英文声音示范':'请在系统语音设置中添加英文声音';
 }
@@ -339,7 +339,7 @@ function onEvent(type, data = {}) {
   if(type==='practice-score'){toast('完成'+data.repeats+'遍练习 · +'+data.points+'分（学段 ×'+(data.level+1)+'）',2200);}
   if(type==='speech'){
     if(data.matched){speechFeedback=data.nameTolerated?'姓名发音已按中国姓名宽容匹配成功！':'朗读内容匹配成功！';$('#speechTranscript').textContent=speechFeedback;tone(720,.16,'sine',.04,980);}
-    else{const heard=data.heard?data.heard.toLowerCase():'没有听清';speechFeedback='识别成：'+heard+' · 请再试一次';$('#speechTranscript').textContent=speechFeedback;toast('识别文字没有匹配当前句子，可以再朗读一次。',3000);tone(270,.09,'sine',.025,350);}
+    else{const heard=data.heard?data.heard.toLowerCase():'没有听清';speechFeedback='识别结果：'+heard+' · 请看下方标出的遗漏或错词后再试。';$('#speechTranscript').textContent=speechFeedback;toast('识别文字没有匹配当前句子，可以再朗读一次。',3000);tone(270,.09,'sine',.025,350);}
   }
   if(type==='skill-expired')toast('本次大招已用完5次，恢复为'+data.name,2500);
   if (type === 'cooldown') { toast('还要 '+Math.ceil(game.skills[data.index].cd/game.rechargeRate)+' 秒，先用豌豆突突突',1400); }

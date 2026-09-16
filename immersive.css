@@ -54,6 +54,11 @@
 .solo-app .home-button{flex:none;min-height:30px;padding:3px 8px;border:1px solid #c8d19a66;border-radius:8px;background:#263f2c;color:#fff1bd;font-size:12px;white-space:nowrap}
 .game-app .speech-diff{font-size:12px;line-height:1.5;color:#ffe3a0;display:flex;flex-wrap:wrap;gap:5px;max-height:80px;overflow:auto}
 .game-app .speech-diff span{padding:3px 6px;background:#51362c;border-radius:5px}
+.solo-app[data-learning-mode=speaking] .keyboard-toggle-row,.solo-app[data-learning-mode=speaking] #touchKeyboard{display:none!important}
+.solo-app[data-learning-mode=speaking] .speech-control{padding:10px;border:1px solid #d9cb8655;border-radius:12px;background:#102b1d}
+.solo-app[data-learning-mode=speaking] #speechTranscript{font-size:12px;line-height:1.5;text-align:left}
+.solo-app[data-learning-mode=speaking] .speech-diff.has-issues{max-height:130px;padding:8px;border:1px solid #cf806c;border-radius:9px;background:#442c25;color:#ffe1d6}
+.solo-app[data-learning-mode=speaking] .speech-diff.has-issues span{padding:5px 7px;background:#643b30}
 .game-app .speech-review-dialog{width:min(600px,calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:auto;background:#173322;color:#fff1bd;border:1px solid #a4b077;border-radius:16px;padding:18px;box-sizing:border-box}
 .game-app .speech-review-dialog::backdrop{background:#061b12b8}
 .game-app .speech-review-dialog p{font-size:13px;line-height:1.6;white-space:normal}

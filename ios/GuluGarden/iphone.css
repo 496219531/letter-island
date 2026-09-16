@@ -117,6 +117,22 @@ body.native-iphone.browser-phone{height:var(--browser-app-height,100dvh);box-siz
 body.native-iphone #touchKeyboard .utility-row .sentence-space{flex:3;min-width:0;width:auto}
 body.native-iphone #touchKeyboard .utility-row .touch-key{flex:1;width:0;min-width:0;height:36px;min-height:36px}
 body.native-iphone #touchKeyboard .utility-row .sentence-space{flex:3}
+/* Speaking is a review surface: no keyboard, one visible target, then the
+   recording control and the exact recognition mistakes. */
+body.native-iphone[data-learning-mode=speaking] .keyboard-toggle-row,body.native-iphone[data-learning-mode=speaking] #touchKeyboard{display:none!important}
+body.native-iphone[data-learning-mode=speaking] .arsenal{padding:8px;background:#f7f5ec}
+body.native-iphone[data-learning-mode=speaking] .iphone-skill-tabs{gap:5px}
+body.native-iphone[data-learning-mode=speaking] .iphone-skill-tabs button{min-height:34px;font-size:11px}
+body.native-iphone[data-learning-mode=speaking] #skillGrid{flex:0 0 auto;height:auto;min-height:0}
+body.native-iphone[data-learning-mode=speaking] #skillGrid .skill-card.iphone-visible{height:auto;min-height:0;padding:12px;overflow:visible;background:#fff}
+body.native-iphone[data-learning-mode=speaking] #skillGrid .skill-info strong{color:var(--app-ink);font-size:18px;line-height:1.45}
+body.native-iphone[data-learning-mode=speaking] #skillGrid .word-meaning{display:block!important;color:var(--app-leaf);font-size:14px;line-height:1.55}
+body.native-iphone[data-learning-mode=speaking] #skillGrid .skill-status{display:none}
+body.native-iphone[data-learning-mode=speaking] #speechControl{grid-template-columns:1fr 1fr;gap:7px;margin-top:8px;padding:10px;border:1px solid var(--app-line);border-radius:15px;background:#fff}
+body.native-iphone[data-learning-mode=speaking] #speechButton{min-height:62px;font-size:16px}
+body.native-iphone[data-learning-mode=speaking] #speechTranscript{max-height:none;padding:3px 2px;color:var(--app-text);font-size:13px;line-height:1.5;text-align:left}
+body.native-iphone[data-learning-mode=speaking] #speechDiff{grid-column:1/-1;display:grid;gap:6px;max-height:132px;padding:9px;border:1px solid #d69a86;border-radius:10px;background:#fff2ec;color:#873e2e;font-size:13px;line-height:1.45}
+body.native-iphone[data-learning-mode=speaking] #speechDiff span{padding:6px 8px;border-radius:7px;background:#fde0d5}
 body.native-iphone .skill-card .word-ipa{color:#d4dfc6}
 body.native-iphone .skill-card .skill-status{color:#d4dfc6}
 body.native-iphone .start-panel{transform:none;rotate:none;box-shadow:none}
