@@ -60,7 +60,7 @@
     if(!Array.isArray(s.enemies)||s.enemies.length>500||s.enemies.some(z=>!z||!Object.hasOwn(root.ZOMBIE_TYPES,z.type)||enemyNumbers.some(k=>!Number.isFinite(z[k]))||z.hp<=0||(z.charmed!==undefined&&typeof z.charmed!=='boolean')||(z.deathMark!==undefined&&(!Number.isFinite(z.deathMark)||z.deathMark<0||z.deathMark>8))))return false;
     if(!Array.isArray(s.bullets)||s.bullets.length>4000||s.bullets.some(b=>!b||['x','y','px','py','vx','vy','life','damage','pierce','bounces'].some(k=>!Number.isFinite(b[k]))||(b.rageShot!==undefined&&typeof b.rageShot!=='boolean')||!Array.isArray(b.hitIds)||b.hitIds.some(x=>!Number.isInteger(x))))return false;
     if(!Array.isArray(s.effects)||s.effects.length>200||s.effects.some(e=>!e||!['laser','freeze','melon','explosion','charm','lightning','blackhole','mark','judgment'].includes(e.kind)||!Number.isFinite(e.life)||!Number.isFinite(e.fullLife)||e.fullLife<=0||(['melon','explosion','blackhole','judgment'].includes(e.kind)&&(!Number.isFinite(e.x)||!Number.isFinite(e.y)))||(e.kind==='melon'&&(!Number.isFinite(e.damage)||!Number.isFinite(e.radius)))||(e.kind==='laser'&&!Number.isFinite(e.angle))))return false;
-    if(s.effects.some(e=>(e.kind==='lightning'&&(!Array.isArray(e.points)||e.points.length>10||e.points.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y))))||(e.kind==='charm'&&(!Array.isArray(e.targets)?(!Number.isFinite(e.x)||!Number.isFinite(e.y)||!Number.isFinite(e.radius)):e.targets.length>5||e.targets.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y))))||(e.kind==='blackhole'&&(!Number.isFinite(e.radius)||e.radius!==210||!Number.isFinite(e.tick)))))return false;
+    if(s.effects.some(e=>(e.kind==='lightning'&&(!Array.isArray(e.points)||e.points.length>10||e.points.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y))))||(e.kind==='charm'&&(!Array.isArray(e.targets)?(!Number.isFinite(e.x)||!Number.isFinite(e.y)||!Number.isFinite(e.radius)):e.targets.length>5||e.targets.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y))))||(e.kind==='blackhole'&&(!Number.isFinite(e.radius)||![105,210].includes(e.radius)||!Number.isFinite(e.tick)))))return false;
     if(!Array.isArray(s.offers)||s.offers.some(id=>!cardIds.has(id)))return false;
     if(s.status==='upgrade'&&(s.offers.length!==3||new Set(s.offers).size!==3))return false;
     return true;
@@ -69,6 +69,9 @@
     if(!validate(save))return false;
     const s=JSON.parse(JSON.stringify(save.state));
     for(const key of FIELDS)game[key]=s[key];
+    // Older suspended games may still contain the former 210px black hole.
+    // Resume them safely, but apply the current balance immediately.
+    game.effects=game.effects.map(effect=>effect.kind==='blackhole'?{...effect,radius:105}:effect);
     game.flowerHealth=s.flowerHealth?[...s.flowerHealth]:Array(8).fill(0);game.health=s.health;game.breachElapsed=s.breachElapsed??0;
     game.customBank=s.customBank||null;game.promptHistory=s.promptHistory||{};
     game.learningMode=s.learningMode??'letters';game.englishLevel=s.englishLevel??0;

@@ -194,7 +194,7 @@
     setSkillAim(x,y){this.skillAim={x:clamp(x,160,980),y:clamp(y,100,455)};this.skillAuto=false;this.skillAimLeft=5;}
     skillTarget(kind){
       if(!this.skillAuto)return this.skillAim;
-      if(kind==='blackhole'||kind==='melon')return this.clusterTarget(kind==='blackhole'?210:225);
+      if(kind==='blackhole'||kind==='melon')return this.clusterTarget(kind==='blackhole'?105:225);
       let nearest=null;for(const z of this.enemies)if(z.hp>0&&!z.charmed&&(!nearest||z.x<nearest.x))nearest=z;
       return nearest?{x:nearest.x,y:nearest.y}:this.aim;
     }
@@ -461,7 +461,7 @@
         for(let i=0;i<10&&remaining.length;i++){remaining.sort((a,b)=>i===0?(this.skillAuto?a.x-b.x:Math.hypot(a.x-target.x,a.y-target.y)-Math.hypot(b.x-target.x,b.y-target.y)):Math.hypot(a.x-from.x,a.y-from.y)-Math.hypot(b.x-from.x,b.y-from.y));const z=remaining.shift();points.push({x:z.x,y:z.y});this.damage(z,Math.max(300,z.maxHp*.25)*(1+i*.22)*this.magicPower,'lightning');from=z;}
         this.effects.push({kind:'lightning',points,life:.65,fullLife:.65});
       }
-      if(kind==='blackhole')this.effects.push({kind:'blackhole',x:target.x,y:target.y,radius:210,tick:0,life:3,fullLife:3});
+      if(kind==='blackhole')this.effects.push({kind:'blackhole',x:target.x,y:target.y,radius:105,tick:0,life:3,fullLife:3});
       if(kind==='clones'){this.clones=8;this.cloneShot=0;}
       if(kind==='deathchain'){for(const z of this.enemies)if(z.hp>0&&!z.charmed)z.deathMark=8;this.effects.push({kind:'mark',life:.65,fullLife:.65});}
       if(kind==='judgment'){const targets=this.enemies.filter(z=>z.hp>0&&!z.charmed).sort((a,b)=>this.skillAuto?(b.hp+b.shield)-(a.hp+a.shield):Math.hypot(a.x-target.x,a.y-target.y)-Math.hypot(b.x-target.x,b.y-target.y));const count=6+this.stack('judgmentTargets');for(const z of targets.slice(0,count))this.damage(z,z.boss?z.maxHp*.55+z.shield:z.hp+z.shield+1,'judgment');if(targets.length)this.effects.push({kind:'judgment',x:target.x,y:target.y,targets:targets.slice(0,count).map(z=>({x:z.x,y:z.y})),life:1,fullLife:1});}
