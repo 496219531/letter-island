@@ -81,13 +81,6 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
                 DispatchQueue.main.async {
                     guard let self=self,let voice=voice,voice.token==token else {return}
                     voice.until=0
-                    if self.effectVoices.allSatisfy({$0.until==0}) {
-                        let activity=self.effectActivity
-                        DispatchQueue.main.asyncAfter(deadline:.now()+1) { [weak self] in
-                            guard let self=self,self.effectActivity==activity,self.effectVoices.allSatisfy({$0.until==0}) else {return}
-                            self.effectEngine.pause()
-                        }
-                    }
                 }
             }
             voice.node.play();effectStarts+=1
@@ -172,13 +165,12 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
                  render=function(dt){const t=performance.now();if(stage!=='no-drawing')originalRender(dt);if(stage){paint.push(performance.now()-t);if(last)gaps.push(t-last);last=t;}};
                  simulateStep=function(dt){const t=performance.now();originalStep(dt);if(stage)sim.push(performance.now()-t);};
                  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-                 const stats=values=>{values.sort((a,b)=>a-b);return {count:values.length,median:values[Math.floor(values.length*.5)]||0,p95:values[Math.floor(values.length*.95)]||0};};
+                 const stats=values=>{values.sort((a,b)=>a-b);return {count:values.length,median:values[Math.floor(values.length*.5)]||0,p95:values[Math.floor(values.length*.95)]||0,max:values.at(-1)||0};};
                  try{
-                  for(const variant of ['before','after','muted','no-drawing']){const baseline=variant==='before';soundscape.setEnabled(variant==='before'||variant==='after');
+                  for(const variant of ['before','after','muted','no-drawing','sparse-audio','sparse-muted']){const baseline=variant==='before',sparse=variant.startsWith('sparse');soundscape.setEnabled(variant==='before'||variant==='after'||variant==='sparse-audio');
                    window.__renderBaseline=baseline;game.reset();game.status='playing';game.auto=true;game.fireStrength=1;game.quota=10000;game.spawnIn=9999;game.rage=30;game.clones=30;game.stacks.multishot=4;game.stacks.pierce=2;game.random=()=>.4;
-                   for(let i=0;i<80;i++){const z=game.spawn(450+(i%16)*30,130+(i%5)*65,'walker',false);z.hp=z.maxHp=1000000000;z.speed=0;}
-                   for(let i=0;i<5;i++)game.effects.push({kind:'melon',x:500+i*80,y:280,life:10,fullLife:10,damage:0,radius:225});
-                   document.querySelector('#startScreen').hidden=true;updateHud(true);await sleep(2000);paint=[];sim=[];gaps=[];last=0;raf=[];lastRAF=0;stage=variant;await sleep(6000);
+                   if(sparse){game.auto=false;game.fireStrength=0;game.rage=0;game.clones=0;}else{for(let i=0;i<80;i++){const z=game.spawn(450+(i%16)*30,130+(i%5)*65,'walker',false);z.hp=z.maxHp=1000000000;z.speed=0;}for(let i=0;i<5;i++)game.effects.push({kind:'melon',x:500+i*80,y:280,life:10,fullLife:10,damage:0,radius:225});}
+                   document.querySelector('#startScreen').hidden=true;updateHud(true);await sleep(2000);paint=[];sim=[];gaps=[];last=0;raf=[];lastRAF=0;stage=variant;const sparseTimer=sparse&&variant==='sparse-audio'?setInterval(()=>soundscape.play('shot'),2200):0;await sleep(6000);if(sparseTimer)clearInterval(sparseTimer);
                    report.stages.push({stage,paint:stats(paint),simulation:stats(sim),frameGaps:stats(gaps),rafGaps:stats(raf),bullets:game.bullets.length,enemies:game.enemies.length});stage=null;
                   }
                  }catch(e){report.error=e.message;}
@@ -186,7 +178,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
                 })();void 0;
                 """
                 self.web.evaluateJavaScript(script)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 43) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 55) {
                     UIApplication.shared.isIdleTimerDisabled = false
                     self.web.evaluateJavaScript("window.__devicePerfReport || JSON.stringify({error:'measurement incomplete'})") { value, error in
                         let file=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("performance-qa.json")
