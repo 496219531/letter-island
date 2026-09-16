@@ -55,20 +55,26 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     var effectLastError=""
     var effectStarts=0
     var effectActivity=0
+    func effectBuffer(_ key: String) throws -> AVAudioPCMBuffer {
+        if let buffer=effectBuffers[key] { return buffer }
+        let file=try AVAudioFile(forReading:Bundle.main.resourceURL!.appendingPathComponent("Web/sfx/\(key).wav"))
+        guard let buffer=AVAudioPCMBuffer(pcmFormat:file.processingFormat,frameCapacity:AVAudioFrameCount(file.length)) else { throw NSError(domain:"Gulu",code:1) }
+        try file.read(into:buffer);effectBuffers[key]=buffer;return buffer
+    }
+    func prepareEffectEngine(_ buffer: AVAudioPCMBuffer) throws {
+        if effectVoices.isEmpty {
+            for _ in 0..<12 {let voice=EffectVoice();effectEngine.attach(voice.node);effectEngine.connect(voice.node,to:effectEngine.mainMixerNode,format:buffer.format);effectVoices.append(voice)}
+            effectEngine.mainMixerNode.outputVolume=effectGain;effectEngine.prepare()
+        }
+        if !effectEngine.isRunning { try effectEngine.start() }
+    }
+    func warmEffects() { do { try prepareEffectEngine(effectBuffer("shot-0")) } catch { effectLastError=error.localizedDescription } }
     func playEffect(_ data:[String:Any]) {
         guard let kind=data["kind"] as? String,effectKinds.contains(kind),let variant=data["variant"] as? Int,(0...2).contains(variant) else {return}
         do {
             let key="\(kind)-\(variant)"
-            if effectBuffers[key]==nil {
-                let file=try AVAudioFile(forReading:Bundle.main.resourceURL!.appendingPathComponent("Web/sfx/\(key).wav"))
-                guard let buffer=AVAudioPCMBuffer(pcmFormat:file.processingFormat,frameCapacity:AVAudioFrameCount(file.length)) else {return}
-                try file.read(into:buffer);effectBuffers[key]=buffer
-            }
-            guard let buffer=effectBuffers[key] else {return}
-            if effectVoices.isEmpty {
-                for _ in 0..<12 {let voice=EffectVoice();effectEngine.attach(voice.node);effectEngine.connect(voice.node,to:effectEngine.mainMixerNode,format:buffer.format);effectVoices.append(voice)}
-                effectEngine.mainMixerNode.outputVolume=effectGain;effectEngine.prepare()
-            }
+            let buffer=try effectBuffer(key)
+            try prepareEffectEngine(buffer)
             let now=ProcessInfo.processInfo.systemUptime
             guard let voice=effectVoices.first(where:{$0.until<=now}) ?? (priorityEffects.contains(kind) ? effectVoices.first(where:{!priorityEffects.contains($0.kind)}) : nil) else {return}
             effectActivity+=1
@@ -76,7 +82,6 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
             voice.until=now+Double(buffer.frameLength)/buffer.format.sampleRate
             voice.node.volume=max(0,min(1,(data["volume"] as? NSNumber)?.floatValue ?? 0.2))
             voice.node.pan=max(-0.6,min(0.6,(data["pan"] as? NSNumber)?.floatValue ?? 0))
-            if !effectEngine.isRunning {try effectEngine.start()}
             voice.node.scheduleBuffer(buffer,completionCallbackType:.dataPlayedBack) { [weak self,weak voice] _ in
                 DispatchQueue.main.async {
                     guard let self=self,let voice=voice,voice.token==token else {return}
@@ -86,7 +91,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
             voice.node.play();effectStarts+=1
         }catch{effectLastError=error.localizedDescription;NSLog("Effect playback failed: %@",effectLastError)}
     }
-    func stopEffects(){effectActivity+=1;for voice in effectVoices {voice.token+=1;voice.until=0;voice.node.stop()};effectEngine.pause()}
+    func stopEffects(){effectActivity+=1;for voice in effectVoices {voice.token+=1;voice.until=0;voice.node.stop()}}
     var tapped = false
     var timeout: DispatchWorkItem?
     var settingsPortrait = true
@@ -146,10 +151,11 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
             try session.setActive(true)
+            warmEffects()
             web?.evaluateJavaScript("document.dispatchEvent(new Event('gulu-audio-ready'))")
         } catch { NSLog("Game audio restoration failed: %@", error.localizedDescription) }
     }
-    @objc func background() { stopEffects();cancel(restorePlayback: false); web.evaluateJavaScript("window.dispatchEvent(new Event('blur')); document.dispatchEvent(new Event('gulu-background'))") }
+    @objc func background() { stopEffects();effectEngine.pause();cancel(restorePlayback: false); web.evaluateJavaScript("window.dispatchEvent(new Event('blur')); document.dispatchEvent(new Event('gulu-background'))") }
     var ranPerformanceQA = false
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if !ranPerformanceQA && ProcessInfo.processInfo.arguments.contains("--performance-qa") {
