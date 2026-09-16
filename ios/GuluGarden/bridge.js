@@ -150,5 +150,8 @@
     window.addEventListener('resize',scheduleLayout);window.visualViewport?.addEventListener('resize',scheduleLayout);
     sheet.addEventListener('load',scheduleLayout);scheduleLayout();
     document.addEventListener('gulu-background',()=>{if(typeof stopListening==='function')stopListening();if(typeof game!=='undefined'&&game.status==='playing')game.pause();});
+    // The native stylesheet was injected before parsing. Reveal only after all
+    // native layout mutations have completed, so the desktop page never flashes.
+    document.documentElement.classList.add('native-ready');
   });
 })();

@@ -142,6 +142,18 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
         config.userContentController.add(self, name: "gulu")
+        let nativeCSS = try! String(contentsOf: Bundle.main.url(forResource: "iphone", withExtension: "css")!, encoding: .utf8)
+        let encodedCSS = String(data: try! JSONSerialization.data(withJSONObject: [nativeCSS]), encoding: .utf8)!
+        let cssValue = String(encodedCSS.dropFirst().dropLast())
+        let nativeBootstrap = """
+        document.documentElement.classList.add('native-shell');
+        const guluNativeStyle=document.createElement('style');
+        guluNativeStyle.id='gulu-native-startup-style';
+        guluNativeStyle.textContent=\(cssValue)+"\\nhtml.native-shell body{visibility:hidden;background:#f7f5ec}html.native-shell.native-ready body{visibility:visible}";
+        document.documentElement.appendChild(guluNativeStyle);
+        setTimeout(()=>document.documentElement.classList.add('native-ready'),1000);
+        """
+        config.userContentController.addUserScript(WKUserScript(source: nativeBootstrap, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         let bridge = try! String(contentsOf: Bundle.main.url(forResource: "bridge", withExtension: "js")!, encoding: .utf8)
         config.userContentController.addUserScript(WKUserScript(source: bridge, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         web = WKWebView(frame: .zero, configuration: config)
