@@ -291,6 +291,12 @@ function updateSpeechControl(){
   const signature=JSON.stringify(diffs);if(diffBox.dataset.signature!==signature){diffBox.dataset.signature=signature;diffBox.replaceChildren();for(const part of diffs){const item=document.createElement('span');item.textContent=part.type==='missing'?'未识别到：'+part.expected:part.type==='extra'?'多识别：'+part.heard:part.expected+' → 识别成 '+part.heard;diffBox.append(item);}}
   $('#speechExample').title=localSpeech.available()?'使用本地英文声音示范':'请在系统语音设置中添加英文声音';
 }
+function layoutSpeechFeedback(){
+  const control=$('#speechControl'),transcript=$('#speechTranscript'),diff=$('#speechDiff'),skip=$('#speechSkip');
+  const card=game.learningMode==='speaking'&&game.typing>=0?document.querySelector('.skill-card[data-skill="'+game.typing+'"]'):null;
+  if(card){let panel=card.querySelector('.speech-feedback-panel');if(!panel){panel=document.createElement('div');panel.className='speech-feedback-panel';card.append(panel);}panel.append(transcript,diff,skip);return;}
+  control.append(skip,transcript,diff);
+}
 function stopListening(cancelSpeech=true){if(cancelSpeech)localSpeech.cancel();microphone.cancel();listening=false;speechHeld=false;}
 function startListening(event){
   syncMobileSpeechTarget();
@@ -429,6 +435,7 @@ function updateHud(force=false) {
     setHudText($('#skillStatus'+index),skillStatus);
     $('#cooldown'+index).style.width=(1-s.cd/s.duration)*100+'%';
   });
+  layoutSpeechFeedback();
   updateSpeechControl();
   const hints=GuluMobile.keySkillHints(game.skills,game.typing,game.learningMode);
   const names=game.skills.map(s=>s.name);
