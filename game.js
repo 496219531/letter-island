@@ -10,7 +10,8 @@ const livePerfFrames=[];
 const livePerfWork={simulation:0,paint:0,hud:0};
 function recordLiveFrame(dt){
   if(!window.__guluLivePerf||dt<.025)return;
-  livePerfFrames.push({gap:Math.round(dt*1000),wave:game?.wave||0,status:game?.status||'ready',enemies:game?.enemies.length||0,bullets:game?.bullets.length||0,effects:game?.effects.length||0,particles:particles.length,rage:Math.round((game?.rage||0)*10)/10,quality:quality().fps,sound:Boolean(soundscape?.enabled&&soundscape?.volume),previousWork:{...livePerfWork}});
+  const latestSound=window.__guluLastNativeSound,now=performance.now(),soundAge=latestSound?Math.round(now-latestSound.at):null;
+  livePerfFrames.push({gap:Math.round(dt*1000),wave:game?.wave||0,status:game?.status||'ready',enemies:game?.enemies.length||0,bullets:game?.bullets.length||0,effects:game?.effects.length||0,particles:particles.length,rage:Math.round((game?.rage||0)*10)/10,quality:quality().fps,sound:Boolean(soundscape?.enabled&&soundscape?.volume),latestSound:soundAge!==null&&soundAge<600?latestSound.kind:null,soundAge,previousWork:{...livePerfWork}});
   if(livePerfFrames.length>160)livePerfFrames.splice(0,livePerfFrames.length-160);
 }
 window.GuluLivePerf={snapshot:()=>({frames:[...livePerfFrames],maxGap:Math.max(0,...livePerfFrames.map(frame=>frame.gap)),count:livePerfFrames.length})};

@@ -155,7 +155,7 @@
         const failed=()=>{if(this.customGeneration!==generation||this.customEffects.get(kind)!==clip)return;try{clip.pause();}catch{}this.customPlaying.delete(kind);this.customEffects.delete(kind);this.last.delete(kind);this.play(kind,{x});};
         clip.onerror=failed;try{clip.play().catch(failed);}catch{failed();}return;
       }
-      if(root.GuluNative?.playEffect){const now=Date.now()/1000,priority=SPELLS.has(kind)||kind==='warning';if(now-(this.last.get(kind)??-Infinity)<GAPS[kind]||(!priority&&now<this.nativeMinorNext))return;this.last.set(kind,now);if(!priority)this.nativeMinorNext=now+.085;root.GuluNative.playEffect(kind,Number.isInteger(chosenVariant)?Math.max(0,Math.min(2,chosenVariant)):Math.floor(Math.random()*3),LEVELS[kind],Math.max(-.6,Math.min(.6,(x-500)/900)));return;}
+      if(root.GuluNative?.playEffect){const now=Date.now()/1000,priority=SPELLS.has(kind)||kind==='warning';if(now-(this.last.get(kind)??-Infinity)<GAPS[kind]||(!priority&&now<this.nativeMinorNext))return;this.last.set(kind,now);if(!priority)this.nativeMinorNext=now+.085;root.__guluLastNativeSound={kind,at:root.performance?.now?.()||Date.now()};root.GuluNative.playEffect(kind,Number.isInteger(chosenVariant)?Math.max(0,Math.min(2,chosenVariant)):Math.floor(Math.random()*3),LEVELS[kind],Math.max(-.6,Math.min(.6,(x-500)/900)));return;}
       try{
         if(!this.init())return;
         const now=this.context.currentTime;if(now-(this.last.get(kind)??-Infinity)<GAPS[kind])return;
@@ -169,7 +169,7 @@
     }
     tone(frequency,duration=.1,type='sine',volume=.035,end=frequency){
       if(!this.enabled||this.volume===0)return;
-      if(root.GuluNative?.playEffect){const now=Date.now()/1000;if(now-(this.last.get('ui')??-Infinity)<.045||now<this.nativeUiNext)return;this.last.set('ui',now);this.nativeUiNext=now+.075;root.GuluNative.playEffect('ui',frequency<720?0:frequency<840?1:2,Math.min(.12,volume*2),0);return;}
+      if(root.GuluNative?.playEffect){const now=Date.now()/1000;if(now-(this.last.get('ui')??-Infinity)<.045||now<this.nativeUiNext)return;this.last.set('ui',now);this.nativeUiNext=now+.075;root.__guluLastNativeSound={kind:'ui',at:root.performance?.now?.()||Date.now()};root.GuluNative.playEffect('ui',frequency<720?0:frequency<840?1:2,Math.min(.12,volume*2),0);return;}
       try{
         if(!this.init()||this.voices.size>=32)return;
         const now=this.context.currentTime;if(now-(this.last.get('ui')??-Infinity)<.045)return;this.last.set('ui',now);
