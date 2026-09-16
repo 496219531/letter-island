@@ -148,6 +148,10 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         web.isOpaque = false
         web.backgroundColor = view.backgroundColor
         web.scrollView.contentInsetAdjustmentBehavior = .never
+        web.scrollView.minimumZoomScale = 1
+        web.scrollView.maximumZoomScale = 1
+        web.scrollView.bouncesZoom = false
+        web.scrollView.pinchGestureRecognizer?.isEnabled = false
         web.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(web)
         NSLayoutConstraint.activate([web.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor), web.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor), web.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), web.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)])

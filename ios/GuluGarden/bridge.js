@@ -32,6 +32,11 @@
   document.addEventListener('DOMContentLoaded',()=>{
     if(!document.getElementById('gameCanvas'))return;
     document.body.classList.add('native-iphone');
+    const editable=target=>target instanceof Element&&Boolean(target.closest('input,textarea,select,[contenteditable=true]'));
+    document.addEventListener('selectstart',event=>{if(!editable(event.target))event.preventDefault();});
+    document.addEventListener('contextmenu',event=>{if(!editable(event.target))event.preventDefault();});
+    document.addEventListener('dblclick',event=>{if(!editable(event.target))event.preventDefault();});
+    for(const type of ['gesturestart','gesturechange','gestureend'])document.addEventListener(type,event=>event.preventDefault(),{passive:false});
     // Keep configuration choices and game actions as two groups of peer controls.
     const startPanel=document.querySelector('.start-panel'),difficulty=document.querySelector('.difficulty-label'),duel=document.querySelector('.lan-entry');
     if(startPanel&&difficulty){

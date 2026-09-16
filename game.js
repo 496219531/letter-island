@@ -7,9 +7,10 @@ const captainSprite=new Image();captainSprite.src='assets/pea-captain-v1.png';
 const particles = [];
 const renderEnemies=[],renderEnemySources=[],renderEnemyY=[];
 const livePerfFrames=[];
+const livePerfWork={simulation:0,paint:0,hud:0};
 function recordLiveFrame(dt){
   if(!window.__guluLivePerf||dt<.025)return;
-  livePerfFrames.push({gap:Math.round(dt*1000),wave:game?.wave||0,status:game?.status||'ready',enemies:game?.enemies.length||0,bullets:game?.bullets.length||0,effects:game?.effects.length||0,particles:particles.length,rage:Math.round((game?.rage||0)*10)/10,quality:quality().fps,sound:Boolean(soundscape?.enabled&&soundscape?.volume)});
+  livePerfFrames.push({gap:Math.round(dt*1000),wave:game?.wave||0,status:game?.status||'ready',enemies:game?.enemies.length||0,bullets:game?.bullets.length||0,effects:game?.effects.length||0,particles:particles.length,rage:Math.round((game?.rage||0)*10)/10,quality:quality().fps,sound:Boolean(soundscape?.enabled&&soundscape?.volume),previousWork:{...livePerfWork}});
   if(livePerfFrames.length>160)livePerfFrames.splice(0,livePerfFrames.length-160);
 }
 window.GuluLivePerf={snapshot:()=>({frames:[...livePerfFrames],maxGap:Math.max(0,...livePerfFrames.map(frame=>frame.gap)),count:livePerfFrames.length})};
@@ -698,8 +699,8 @@ function frame(time) {
   for(const button of pressedKeys)if(time>=button._pressedUntil){button.classList.remove('pressed');pressedKeys.delete(button);}
   const dt=lastTime?Math.min((time-lastTime)/1000,.25):0;lastTime=time;
   recordLiveFrame(dt);
-  if(window.GuluPerformance)GuluPerformance.clock.advance(dt,simulateStep);else simulateStep(Math.min(dt,.05));
-  paintClock+=dt;const interval=game.status==='playing'?1/quality().fps:.2;if(window.__renderBaseline){if(paintClock>=interval){render(paintClock-paintClock%interval);paintClock%=interval;}}else{const steps=window.GuluPerformance?GuluPerformance.paintSteps(paintClock,interval):Math.floor((paintClock+1e-9)/interval);if(steps>0){render(steps*interval);paintClock=Math.max(0,paintClock-steps*interval);}}hudClock+=dt;if(hudClock>quality().hudInterval){updateHud();hudClock=0;}
+  const tracing=Boolean(window.__guluLivePerf),simulationStart=tracing?performance.now():0;if(window.GuluPerformance)GuluPerformance.clock.advance(dt,simulateStep);else simulateStep(Math.min(dt,.05));if(tracing)livePerfWork.simulation=Math.round((performance.now()-simulationStart)*100)/100;
+  livePerfWork.paint=0;paintClock+=dt;const interval=game.status==='playing'?1/quality().fps:.2;if(window.__renderBaseline){if(paintClock>=interval){const paintStart=tracing?performance.now():0;render(paintClock-paintClock%interval);if(tracing)livePerfWork.paint=Math.round((performance.now()-paintStart)*100)/100;paintClock%=interval;}}else{const steps=window.GuluPerformance?GuluPerformance.paintSteps(paintClock,interval):Math.floor((paintClock+1e-9)/interval);if(steps>0){const paintStart=tracing?performance.now():0;render(steps*interval);if(tracing)livePerfWork.paint=Math.round((performance.now()-paintStart)*100)/100;paintClock=Math.max(0,paintClock-steps*interval);}}livePerfWork.hud=0;hudClock+=dt;if(hudClock>quality().hudInterval){const hudStart=tracing?performance.now():0;updateHud();if(tracing)livePerfWork.hud=Math.round((performance.now()-hudStart)*100)/100;hudClock=0;}
   window.requestAnimationFrame(frame);
 }
 function simulateStep(dt){game.update(dt);soundscape.update(dt,game);}

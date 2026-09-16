@@ -1,7 +1,8 @@
 /* Native iPhone design system. WKWebView supplies the native safe-area bounds. */
 :root{--app-ink:#173629;--app-ink-2:#224635;--app-paper:#f7f5ec;--app-mist:#e6eddf;--app-line:#d7e0cf;--app-leaf:#4d7d58;--app-gold:#efc968;--app-gold-deep:#dcae43;--app-text:#173629;--app-muted:#738173;--app-radius:18px}
 html:has(.native-iphone){height:100%;overflow:hidden;background:var(--app-paper)}
-body.native-iphone{height:100dvh;min-height:0;overflow:hidden!important;display:flex;flex-direction:column;background:var(--app-paper);color:var(--app-text);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",system-ui,sans-serif}
+body.native-iphone{height:100dvh;min-height:0;overflow:hidden!important;display:flex;flex-direction:column;background:var(--app-paper);color:var(--app-text);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",system-ui,sans-serif;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body.native-iphone input,body.native-iphone textarea,body.native-iphone select,body.native-iphone [contenteditable=true]{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default;touch-action:auto}
 
 /* App chrome: the home screen gets only identity, settings, and sound. */
 .native-iphone .fullscreen-button,.native-iphone .lan-entry,.native-iphone #saveButton,.native-iphone #buildButton,.native-iphone .old-game,.native-iphone #helpButton,.native-iphone footer{display:none!important}
