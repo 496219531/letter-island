@@ -7,6 +7,11 @@ for (const script of ['zombie-recorder.js', 'performance.js', 'custom-library.js
 // so an App build cannot silently use an older game engine than the web build.
 const nativeCore=['custom-library.js','engine.js','game.js','save.js','sound.js','library-ui.js','library.css','performance.js','performance.css','mobile.js','mobile.css','game-ui.js','system-speech.js','press-to-talk.js','speech-review.js','mode-copy.js','vocabulary.js','dialogues.js','styles.css','immersive.css','index.html'];
 for(const file of nativeCore){const target=`ios/GuluGarden/Web/${file}`;await cp(file,target,{recursive:true});const [source,embedded]=await Promise.all([readFile(file),readFile(target)]);if(!source.equals(embedded))throw new Error(`iPhone embedded file is stale: ${file}`);}
+// The native shell loads this stylesheet from its embedded Web directory.
+// Keep it in the same verified sync path as the game code.
+await cp('ios/GuluGarden/iphone.css','ios/GuluGarden/Web/iphone.css');
+const [nativePhoneCSS,embeddedPhoneCSS]=await Promise.all([readFile('ios/GuluGarden/iphone.css'),readFile('ios/GuluGarden/Web/iphone.css')]);
+if(!nativePhoneCSS.equals(embeddedPhoneCSS))throw new Error('iPhone embedded stylesheet is stale');
 // Hosting uploads the complete dist directory, so always remove files left by
 // older builds before assembling the deployable bundle.
 await rm('dist', { recursive: true, force: true });
