@@ -42,11 +42,11 @@
     if(startPanel&&difficulty){
       const start=startPanel.querySelector('#startButton'),resume=startPanel.querySelector('#continueButton'),source=startPanel.querySelector('.custom-source');
       const options=document.createElement('section');options.className='native-home-options';options.setAttribute('aria-label','练习配置');start.before(options);
-      const card=(label,content,kind)=>{const section=document.createElement('section');section.className='native-home-mode native-home-option';section.dataset.homeCard=kind;const title=document.createElement('strong');title.textContent=label;section.append(title,content);options.append(section);};
+      const card=(label,content,kind)=>{const section=document.createElement('section');section.className='native-home-mode native-home-option';section.dataset.homeCard=kind;const title=document.createElement('strong'),icon=document.createElement('img');icon.className='native-home-card-icon';icon.alt='';icon.src=kind==='mode'?'assets/pea-captain-v1.png':'assets/garden.png';title.append(icon,label);section.append(title,content);options.append(section);};
       card('练习方式',difficulty,'mode');
       const manage=source?.querySelector('button');if(manage)manage.remove();
       if(source)card('练习题库',source,'library');
-      if(manage){manage.className='native-home-library';manage.textContent='管理我的词句库';options.after(manage);}
+      if(manage){manage.className='native-home-library';manage.textContent='🗂️ 管理我的词句库';options.after(manage);}
       const actions=document.createElement('nav');actions.className='native-home-actions';actions.setAttribute('aria-label','开始游玩');start.before(actions);
       start.textContent='🌱 开始新冒险';actions.append(start);if(resume){resume.textContent='▶ 继续冒险';actions.append(resume);}if(duel){duel.textContent='⚔ 和朋友对战';actions.append(duel);}
       for(const action of actions.children){action.classList.remove('primary-button','new-run-button','build-button');action.classList.add('native-home-action');}

@@ -277,8 +277,8 @@ body.native-iphone[data-game-state=ready] .start-panel h2{margin:0 0 2px;font-si
 body.native-iphone[data-game-state=ready] .start-panel>p{font-size:11px;text-align:center}
 body.native-iphone[data-game-state=ready] .native-home-options{grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 10px}
 body.native-iphone[data-game-state=ready] .native-home-options .native-home-option{position:relative;min-height:104px;margin:0;padding:15px 13px;border-color:var(--app-line);border-radius:15px;background:#fff}
-body.native-iphone[data-game-state=ready] .native-home-options .native-home-option:before{display:block;margin-bottom:7px;color:var(--app-leaf);font-size:22px;line-height:1;content:'▤'}
-body.native-iphone[data-game-state=ready] .native-home-options .native-home-option[data-home-card=mode]:before{content:'▥'}
+body.native-iphone[data-game-state=ready] .native-home-options .native-home-option:before{display:none}
+body.native-iphone[data-game-state=ready] .native-home-card-icon{display:block;width:26px;height:26px;margin-bottom:7px;object-fit:cover;object-position:center;border-radius:8px;background:#edf3e8}
 body.native-iphone[data-game-state=ready] .native-home-mode>strong{margin:0 0 5px;font-size:11px;color:var(--app-muted)}
 body.native-iphone[data-game-state=ready] .native-home-mode .difficulty-label{display:block}
 body.native-iphone[data-game-state=ready] .native-home-mode .difficulty-label select,body.native-iphone[data-game-state=ready] .start-panel .custom-source select{min-height:0;padding:0;border:0;background:transparent;color:var(--app-ink);font-size:16px;font-weight:800;line-height:1.35}
@@ -300,6 +300,7 @@ body.native-iphone .mobile-settings-tabs button.active{background:var(--app-ink)
 body.native-iphone #mobileSettingsDialog .difficulty-controls{padding:12px 14px 18px;background:#f7f5ec;gap:0}
 body.native-iphone .mobile-settings-page{display:grid;gap:10px}
 body.native-iphone .mobile-settings-page>*{margin:0!important;padding:12px;border:1px solid var(--app-line);border-radius:13px;background:#fff}
+body.native-iphone .mobile-settings-page>*[data-setting-icon]:not([data-setting-icon=""]):before{content:attr(data-setting-icon);display:block;margin-bottom:6px;font-size:18px;line-height:1}
 body.native-iphone .mobile-settings-page label{font-size:14px}
 body.native-iphone .mobile-settings-page select{min-height:40px;padding:7px 10px;font-size:15px}
 body.native-iphone .mobile-settings-page .fire-control,.native-iphone .mobile-settings-page .learning-load-control,.native-iphone .mobile-settings-page .spell-control{display:flex;flex-direction:column;gap:7px}
