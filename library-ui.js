@@ -64,6 +64,7 @@
   }
   function viewFamily(id,onSave){
     const {d,body}=modal('查看词句');
+    let entryType='all',searchText='';
     function render(preserveScroll=false){
       const scrollTop=preserveScroll?body.scrollTop:0;
       const related=groups().filter(group=>familyKey(group)===id);if(!related.length){d.close();return;}const title=familyName(related[0]);
@@ -71,12 +72,14 @@
       const words=related.find(group=>group.kind==='word')?.entries.length||0,sentences=related.find(group=>group.kind==='sentence')?.entries.length||0;note(body,'单词／词组 '+words+' 条 · 句子／口语 '+sentences+' 条');
       button(body,'修改词库名称',()=>{const box=document.createElement('section');body.prepend(box);const field=input(box,'词库名称',title);button(box,'保存名称',()=>{try{const current=groups().filter(group=>familyKey(group)===id);for(const group of current)repo.save({...group,name:current.length>1?field.value+' · '+(group.kind==='word'?'单词词组':'句子'):field.value});render();onSave();}catch(error){note(box,error.message);}});button(box,'取消',()=>box.remove());});
       button(body,'＋ 录入新词句 / 图片',()=>editor(related[0],()=>{render();onSave();}));
-      const filter=input(body,'搜索英文或中文'),list=document.createElement('div');body.append(list);
-      function rows(){list.replaceChildren();const query=filter.value.trim().toLowerCase(),items=related.flatMap(group=>group.entries.map(entry=>({group,entry}))).filter(({entry})=>(entry.text+' '+entry.meaning).toLowerCase().includes(query));for(const {group,entry:e} of items){
+      const filters=document.createElement('div');filters.className='library-filter-controls';
+      const type=input(filters,'显示内容','','select');type.add(new Option('全部','all'));type.add(new Option('单词／词组','word'));type.add(new Option('句子／口语','sentence'));type.value=entryType;
+      const filter=input(filters,'搜索英文或中文',searchText);body.append(filters);const list=document.createElement('div');body.append(list);
+      function rows(){list.replaceChildren();const query=filter.value.trim().toLowerCase(),items=related.flatMap(group=>group.entries.map(entry=>({group,entry}))).filter(({group,entry})=>(entryType==='all'||group.kind===entryType)&&(entry.text+' '+entry.meaning).toLowerCase().includes(query));for(const {group,entry:e} of items){
         const row=document.createElement('section');row.className='library-entry';const entryTitle=document.createElement('strong');entryTitle.textContent=e.text;row.append(entryTitle);note(row,group.kind==='word'?'单词／词组':'句子／口语');if(e.meaning)note(row,e.meaning);if(e.ipa)note(row,'/'+e.ipa+'/');
         button(row,'修改此条',()=>{row.replaceChildren();const en=input(row,'英文',e.text),zh=input(row,'中文（可空）',e.meaning),ipa=input(row,'音标（可空）',e.ipa),status=note(row,'空白保留已有值。');button(row,'保存修改',()=>{try{const latest=groups().find(item=>item.id===group.id),updated=C.entry({text:en.value,meaning:zh.value,ipa:ipa.value},latest.kind),entries=latest.entries.filter(old=>old.word!==e.word);entries.push(C.mergeFields(e,updated));repo.save({...latest,entries});render(true);onSave();}catch(error){status.textContent=error.message;}});button(row,'取消',rows);});
         const remove=button(row,'删除此条',()=>{if(remove.dataset.confirm!=='yes'){remove.dataset.confirm='yes';remove.textContent='再次点击确认删除';return;}try{const latest=groups().find(item=>item.id===group.id),entries=latest.entries.filter(old=>old.word!==e.word);if(entries.length)repo.save({...latest,entries});else repo.remove(group.id);render(true);onSave();}catch(error){note(row,error.message);}});list.append(row);
-      }}filter.oninput=rows;rows();
+      }}filter.oninput=()=>{searchText=filter.value;rows();};type.onchange=()=>{entryType=type.value;rows();};rows();
       if(preserveScroll)requestAnimationFrame(()=>body.scrollTop=Math.min(scrollTop,Math.max(0,body.scrollHeight-body.clientHeight)));
     }render();
   }
