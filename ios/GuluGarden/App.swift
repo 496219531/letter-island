@@ -68,7 +68,13 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         }
         if !effectEngine.isRunning { try effectEngine.start() }
     }
-    func warmEffects() { do { try prepareEffectEngine(effectBuffer("shot-0")) } catch { effectLastError=error.localizedDescription } }
+    func warmEffects() {
+        do {
+            let common=["shot","flesh","metal","shield","iceHit","kill","nibble","critical"]
+            for kind in common { for variant in 0...2 { _=try effectBuffer("\(kind)-\(variant)") } }
+            try prepareEffectEngine(effectBuffer("shot-0"))
+        } catch { effectLastError=error.localizedDescription }
+    }
     func playEffect(_ data:[String:Any]) {
         guard let kind=data["kind"] as? String,effectKinds.contains(kind),let variant=data["variant"] as? Int,(0...2).contains(variant) else {return}
         do {
