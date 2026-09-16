@@ -3,6 +3,9 @@
   'use strict';
   const CUSTOM=typeof module!=='undefined'&&module.exports?require('./custom-library.js'):root.GuluCustomLibrary;
   const clamp = (n, low, high) => Math.max(low, Math.min(high, n));
+  // Ten projectiles per rage volley can otherwise grow without bound after
+  // several fire-rate cards. This keeps the skill powerful and predictable.
+  const RAGE_MIN_SHOT_INTERVAL=.12;
   const CHINESE_NAME_TEXT={王:'WANG',张:'ZHANG',李:'LI',刘:'LIU',陈:'CHEN',赵:'ZHAO',黄:'HUANG',吴:'WU',周:'ZHOU',徐:'XU',孙:'SUN',马:'MA',胡:'HU',朱:'ZHU',高:'GAO',林:'LIN',何:'HE',郭:'GUO',梁:'LIANG',宋:'SONG',郑:'ZHENG',谢:'XIE',韩:'HAN',唐:'TANG',冯:'FENG',于:'YU',董:'DONG',萧:'XIAO'};
   const CHINESE_SURNAME_ALIASES={WANG:['WONG','ONE','WAN'],ZHANG:['JANG','CHANG','JUNG'],LI:['LEE','LEA'],LIU:['LEO','LOU'],CHEN:['CHIN','CHAN'],ZHAO:['JOW','CHAO'],HUANG:['WONG','HWANG'],WU:['WOO'],ZHOU:['JOE','JOU'],XU:['SHU','SUE'],SUN:['SUNG'],MA:['MARG'],HU:['WHO'],ZHU:['JOO'],GAO:['GOW'],LIN:['LYNN'],HE:['HER'],GUO:['GWOO'],LIANG:['LEONG'],SONG:['SUNG'],ZHENG:['JENG'],XIE:['SHEE'],HAN:['HUN'],TANG:['TONG'],FENG:['FUNG'],YU:['YOU'],DONG:['DUNG'],XIAO:['SHIAO']};
   const NAME_TITLES=new Set(['MISS','MS','MRS','MR']);
@@ -31,7 +34,7 @@
     freeze:{name:'冰冻派对',icon:'❄️',duration:14,description:'全场减速50%，豌豆伤害提升'},
     melon:{name:'西瓜轰轰',icon:'🍉',duration:11,description:'西瓜打击大范围敌人'},
     charm:{name:'魅惑之吻',icon:'💗',duration:13,description:'每条路线最前方的僵尸变为友军，包含Boss'},
-    rage:{name:'狂暴巨化',icon:'🔥',duration:12,description:'变大5秒，射速为当前普通射速×2，每轮10发，伤害×3'},
+    rage:{name:'狂暴巨化',icon:'🔥',duration:12,description:'变大5秒，射速为当前普通射速×2，最快每0.12秒一轮；每轮10发，伤害×3'},
     lightning:{name:'连锁闪电',icon:'⚡',duration:9,description:'自动连击最多10个敌人，伤害逐跳递增'},
     blackhole:{name:'黑洞吞噬',icon:'🌀',duration:13,description:'自动聚怪3秒，持续伤害后爆发'},
     clones:{name:'豌豆分身',icon:'🌱',duration:12,description:'复制2个队长持续8秒，按普通射速射击，不额外加速'},
@@ -247,7 +250,7 @@
       return {x:this.hero.x+(this.shotKick>0?-3:0)+x*Math.cos(tilt)-y*Math.sin(tilt),y:this.hero.y+x*Math.sin(tilt)+y*Math.cos(tilt),tilt};
     }
     get ordinaryShotInterval(){return Math.max(.025,.15/((this.fireStrength||.3)*(1+.18*this.stack('rapid'))));}
-    get rageShotInterval(){return this.ordinaryShotInterval/2;}
+    get rageShotInterval(){return Math.max(RAGE_MIN_SHOT_INTERVAL,this.ordinaryShotInterval/2);}
     shoot(origin=null) {
       if(!origin&&this.fireStrength<=0&&!(this.rage>0))return;
       if(!origin)this.shotKick=.1;const target=origin?.target||this.target(),muzzle=origin||this.muzzle(),angle=Math.atan2(target.y-muzzle.y,target.x-muzzle.x);
