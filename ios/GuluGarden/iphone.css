@@ -268,14 +268,14 @@ body.native-iphone #gameDialog p{color:#465747}
    clear start actions, matching the native card hierarchy. */
 body.native-iphone[data-game-state=ready] .game-shell{padding:0;overflow:hidden}
 body.native-iphone[data-game-state=ready] .game-frame{border-radius:0;box-shadow:none;background:transparent}
-body.native-iphone[data-game-state=ready] .start-screen{align-items:flex-end;background:linear-gradient(180deg,#17362905 0%,#17362918 36%,#f7f5ec 37%),url('assets/garden.png') center top/cover no-repeat}
+body.native-iphone[data-game-state=ready] .start-screen{display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;gap:0;padding:clamp(112px,18dvh,156px) 0 0;overflow:auto;background:url('assets/garden.png') center top/100% auto no-repeat #f7f5ec}
 body.native-iphone[data-game-state=ready] .start-screen:before{left:24px;top:28px;width:52px;height:52px;border-radius:16px;font-size:27px}
 body.native-iphone[data-game-state=ready] .start-screen:after{left:92px;top:48px;font-size:13px;color:#fff1bd;text-shadow:0 1px 4px #173629}
-body.native-iphone[data-game-state=ready] .start-panel{flex:0 0 84%;max-height:none;padding:18px 20px calc(16px + env(safe-area-inset-bottom));border-radius:25px 25px 0 0;background:#f7f5ec;overflow:auto}
+body.native-iphone[data-game-state=ready] .start-panel{flex:1 0 auto;width:100%;max-width:none;min-width:0;min-height:0;max-height:none;margin:0;padding:18px 20px calc(16px + env(safe-area-inset-bottom));border-radius:25px 25px 0 0;background:#f7f5ec;overflow:visible}
 body.native-iphone[data-game-state=ready] .start-stamp{display:none}
 body.native-iphone[data-game-state=ready] .start-panel h2{margin:0 0 2px;font-size:27px;text-align:center}
 body.native-iphone[data-game-state=ready] .start-panel>p{font-size:11px;text-align:center}
-body.native-iphone[data-game-state=ready] .native-home-options{grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 10px}
+body.native-iphone[data-game-state=ready] .native-home-options{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0 10px}
 body.native-iphone[data-game-state=ready] .native-home-options .native-home-option{position:relative;min-height:0;height:118px;margin:0;padding:13px;border-color:var(--app-line);border-radius:15px;background:#fff}
 body.native-iphone[data-game-state=ready] .native-home-options .native-home-option:before{display:none}
 body.native-iphone[data-game-state=ready] .native-home-card-icon{display:block;width:26px;height:26px;margin-bottom:7px;object-fit:cover;object-position:center;border-radius:8px;background:#edf3e8}
@@ -284,7 +284,7 @@ body.native-iphone[data-game-state=ready] .native-home-mode .difficulty-label{di
 body.native-iphone[data-game-state=ready] .native-home-mode .difficulty-label select,body.native-iphone[data-game-state=ready] .start-panel .custom-source select{min-width:0;min-height:0;padding:0;border:0;background:transparent;color:var(--app-ink);font-size:14px;font-weight:800;line-height:1.35}
 body.native-iphone[data-game-state=ready] .start-panel .custom-source{display:block;margin:0;padding:0}
 body.native-iphone[data-game-state=ready] .native-home-library{min-height:42px;margin:0 0 10px;padding:9px 12px;border-radius:12px;background:#eaf1e5;color:var(--app-leaf);font-size:14px;text-align:left}
-body.native-iphone[data-game-state=ready] .native-home-actions{grid-template-columns:1fr 1fr;gap:10px}
+body.native-iphone[data-game-state=ready] .native-home-actions{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 body.native-iphone[data-game-state=ready] .start-panel .native-home-actions .native-home-action{min-height:48px;padding:10px;border-color:#71806a;border-radius:13px;font-size:14px}
 body.native-iphone[data-game-state=ready] .start-panel .native-home-actions .native-home-action:first-child{grid-column:1/-1;border-color:#b78b25;background:var(--app-gold);color:#173629;font-size:17px}
 body.native-iphone[data-game-state=ready] .save-hint{margin:12px 0 0!important;font-size:10px!important;text-align:left!important}
