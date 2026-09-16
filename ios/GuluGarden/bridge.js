@@ -12,7 +12,7 @@
   function audioCommand(command,ids=[]){return new Promise((resolve,reject)=>{const id=++serial;waiting.set(id,{resolve,reject});window.webkit.messageHandlers.gulu.postMessage({command,id,ids});});}
   Object.assign(window.GuluNative,{retainAudio:ids=>audioCommand('retainAudio',ids),playAudio:id=>audioCommand('playAudio',[id]),deleteAudio:ids=>audioCommand('deleteAudio',ids).catch(()=>{}),stopAudio:()=>audioCommand('stopAudio').catch(()=>{})});
   function libraryCommand(command,payload={},onProgress){return new Promise((resolve,reject)=>{const id=++serial;waiting.set(id,{resolve,reject,onProgress});window.webkit.messageHandlers.gulu.postMessage({command,id,...payload});});}
-  Object.assign(window.GuluNative,{setSettingsPortrait:enabled=>libraryCommand('setSettingsPortrait',{enabled}),getScreenDirection:()=>libraryCommand('getScreenDirection'),setScreenDirection:direction=>libraryCommand('setScreenDirection',{direction})});
+  Object.assign(window.GuluNative,{setSettingsPortrait:enabled=>libraryCommand('setSettingsPortrait',{enabled}),getScreenDirection:()=>libraryCommand('getScreenDirection'),setScreenDirection:direction=>libraryCommand('setScreenDirection',{direction}),getAppVersion:()=>libraryCommand('getAppVersion')});
   Object.assign(window.GuluNative,{organizeLibrary:payload=>libraryCommand('organizeLibrary',payload),configureQwen:()=>libraryCommand('configureQwen'),importImage:(image,kind)=>libraryCommand('importImage',{image,kind}),translateTexts:(texts,onProgress)=>libraryCommand('translateTexts',{texts},onProgress),exportLibrary:text=>libraryCommand('exportLibrary',{text})});
   class NativeRecognition {
     start(){this.id=++serial;sessions.set(this.id,this);post('start',this.id);}

@@ -174,10 +174,12 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     var ranPerformanceQA = false
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if ProcessInfo.processInfo.arguments.contains("--live-perf") {
-            self.web.evaluateJavaScript("window.__guluLivePerf=true")
+            let muted=ProcessInfo.processInfo.arguments.contains("--live-perf-muted")
+            self.web.evaluateJavaScript("window.__guluLivePerf=true;"+(muted ? "soundscape.setEnabled(false);" : ""))
             DispatchQueue.main.asyncAfter(deadline: .now() + 90) {
                 self.web.evaluateJavaScript("JSON.stringify(window.GuluLivePerf?.snapshot() || {})") { result, error in
-                    let path=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("live-performance.json")
+                    let name=muted ? "live-performance-muted.json" : "live-performance.json"
+                    let path=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent(name)
                     try? String(describing:result ?? error as Any).write(to:path,atomically:true,encoding:.utf8)
                 }
             }
@@ -412,6 +414,10 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
             if let gain=(data["gain"] as? NSNumber)?.floatValue,gain.isFinite { setEffectGain(gain) }
         case "stopEffects": stopEffects()
         case "getScreenDirection": send(["type":"nativeReply", "id":id, "ok":true, "result":preferredScreenDirection])
+        case "getAppVersion":
+            let version=Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "?"
+            let build=Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "?"
+            send(["type":"nativeReply", "id":id, "ok":true, "result":["version":version,"build":build]])
         case "setSettingsPortrait":
             guard let enabled = data["enabled"] as? Bool, let scene = view.window?.windowScene else { send(["type":"nativeReply", "id":id, "ok":false, "error":"无法切换设置方向"]); return }
             let previous = settingsPortrait

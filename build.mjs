@@ -3,6 +3,10 @@ import {createHash} from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 execFileSync(process.execPath, ['build-dialogues.mjs'], { stdio: 'inherit' });
 for (const script of ['zombie-recorder.js', 'performance.js', 'custom-library.js', 'library-ui.js', 'speech-review.js', 'mode-copy.js', 'mobile.js', 'dialogues.js', 'build-dialogues.mjs', 'speech-bridge.mjs', 'press-to-talk.js', 'pcm-capture.js', 'system-speech.js', 'launch.mjs', 'game-ui.js', 'vocabulary.js', 'engine.js', 'save.js', 'sound.js', 'game.js', 'adventure.js', 'duel.cjs', 'lan-server.mjs', 'duel-client.js']) execFileSync(process.execPath, ['--check', script], { stdio: 'inherit' });
+// The iPhone app embeds these exact browser files. Sync and verify them here
+// so an App build cannot silently use an older game engine than the web build.
+const nativeCore=['custom-library.js','engine.js','game.js','save.js','sound.js','library-ui.js','library.css','performance.js','performance.css','mobile.js','mobile.css','game-ui.js','system-speech.js','press-to-talk.js','speech-review.js','mode-copy.js','vocabulary.js','dialogues.js','styles.css','immersive.css','index.html'];
+for(const file of nativeCore){const target=`ios/GuluGarden/Web/${file}`;await cp(file,target,{recursive:true});const [source,embedded]=await Promise.all([readFile(file),readFile(target)]);if(!source.equals(embedded))throw new Error(`iPhone embedded file is stale: ${file}`);}
 // Hosting uploads the complete dist directory, so always remove files left by
 // older builds before assembling the deployable bundle.
 await rm('dist', { recursive: true, force: true });

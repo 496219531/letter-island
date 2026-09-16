@@ -68,6 +68,8 @@ async function enableSpeech(){
 }
 try { best = Math.max(0, Number(localStorage.getItem('gulu-shooter-best')) || 0); } catch {}
 $('#bestScore').textContent = best;
+const buildVersion=document.createElement('small');buildVersion.id='buildVersion';buildVersion.textContent='网页版';$('[id="saveHint"]').after(buildVersion);
+if(window.GuluNative?.getAppVersion)GuluNative.getAppVersion().then(info=>{buildVersion.textContent='版本 '+info.version+' · build '+info.build;}).catch(()=>{buildVersion.textContent='App 版本读取失败';});
 
 function tone(...args){soundscape.tone(...args);}
 function toast(text, time = 2200) {
