@@ -59,6 +59,15 @@
     });exportButton.className='library-utility-button';
     const file=input(body,'恢复词句库备份','','input');file.parentElement.className='library-utility-field';file.type='file';file.accept='.json,application/json';file.onchange=async()=>{try{if(file.files[0].size>8000000)throw Error('文件过大');const data=JSON.parse(await file.files[0].text());const items=data.groups;if(!Array.isArray(items)||items.some(g=>!C.validate(g)))throw Error('不是有效的词句库文件');const current=groups();if(current.length+items.length>100)throw Error('导入后超过100个分类');repo.importGroups(items);render();refresh();}catch(e){note(body,'导入失败：'+e.message);}};
     const shareCode=input(body,'领取临时发送码');shareCode.parentElement.className='library-utility-field';shareCode.autocapitalize='none';shareCode.spellcheck=false;const receiveStatus=note(body,'领取后立即保存到本机。');receiveStatus.setAttribute('role','status');const receive=button(body,'领取并保存',async()=>{receive.disabled=true;try{const result=await libraryRequest('library/share/claim',{code:shareCode.value}),data=JSON.parse(result.payload),items=data.groups;if(!Array.isArray(items)||!items.length||items.some(group=>!C.validate(group)))throw Error('分享内容无效，未写入本机。');if(groups().length+items.length>100)throw Error('导入后超过100个分类，请先整理已有词句库。');repo.importGroups(items);shareCode.value='';receiveStatus.textContent='已保存到本机词句库。';render();refresh();}catch(error){receiveStatus.textContent=error.message;}finally{receive.disabled=false;}});receive.className='library-utility-button';
+    const disclosure=(label,nodes)=>{const section=document.createElement('details');section.className='library-tool-row';const summary=document.createElement('summary');summary.textContent=label;section.append(summary);for(const node of nodes)section.append(node);body.append(section);return section;};
+    const sharing=disclosure('分享词库',[]);
+    sharing.addEventListener('toggle',()=>{if(!sharing.open)return;sharing.querySelectorAll('button,p').forEach(node=>node.remove());const current=families();for(const family of current)button(sharing,family.name,()=>shareFamily(family));if(!current.length)note(sharing,'先录入词句，再分享给朋友。');});
+    body.append(exportButton);
+    disclosure('恢复词句库备份',[file.parentElement]);
+    disclosure('领取临时发送码',[shareCode.parentElement,receiveStatus,receive]);
+    const help=body.querySelector('.library-info');if(help)d.querySelector('header').insertBefore(help,d.querySelector('header button'));
+    const pipelineHelp=pipelineLabel.nextElementSibling;if(pipelineHelp?.classList.contains('library-info'))pipelineLabel.append(pipelineHelp);
+
   }
   function viewFamily(id,onSave){
     const {d,body}=modal('查看词句');

@@ -330,3 +330,33 @@ body.native-iphone .library-dialog .library-more[open]>button{display:block;min-
 body.native-iphone .library-dialog .library-utility-button{display:block;width:100%;min-height:46px;margin:10px 0 0;background:#fff;color:var(--app-ink);border-color:var(--app-line);text-align:left}
 body.native-iphone .library-dialog .library-utility-field{margin:12px 0 0;font-size:14px;color:var(--app-text)}
 body.native-iphone .library-dialog .library-utility-field input{min-height:46px;background:#fff}
+/* Shared card geometry for the approved portrait reference. */
+body.native-iphone #mobileSettingsDialog .mobile-settings-tabs{flex:none}
+body.native-iphone #mobileSettingsDialog .mobile-settings-page{display:flex;flex-direction:column;padding:0;border:0;background:transparent;width:100%;min-width:0;gap:9px}
+body.native-iphone #mobileSettingsDialog .mobile-settings-page>*{padding:12px;margin:0;border:1px solid #deded0;border-radius:13px;background:#faf9f3;min-width:0}
+body.native-iphone #mobileSettingsDialog .mobile-settings-page>*:before{display:none}
+body.native-iphone #mobileSettingsDialog .mobile-settings-page>*{flex:none;width:100%;box-sizing:border-box}
+body.native-iphone #mobileSettingsDialog .mobile-settings-page>button{color:#173629;text-align:left;justify-content:flex-start;min-height:48px}
+body.native-iphone #mobileSettingsDialog .mobile-settings-page label{margin:0;font-size:14px;line-height:1.4}
+body.native-iphone #mobileSettingsDialog .mobile-settings-page select{min-height:38px;margin:6px 0 0;padding:7px;font-size:14px;border:1px solid #9aa393}
+body.native-iphone #mobileSettingsDialog .settings-card{display:flex;flex-direction:column;gap:8px}
+body.native-iphone #mobileSettingsDialog .settings-card button{background:transparent;color:#173629;min-height:40px;margin:0}
+body.native-iphone #mobileSettingsDialog .settings-link{display:block;min-height:48px;text-decoration:none;font-size:14px}
+body.native-iphone #mobileSettingsDialog .settings-link:after{content:' ›';float:right}
+body.native-iphone #mobileSettingsDialog .settings-card small:empty{display:none}
+body.native-iphone #mobileSettingsDialog input[type=range]{height:28px;margin:3px 0}
+body.native-iphone #mobileSettingsDialog .learning-load-control small{display:block;max-width:none;width:100%}
+body.native-iphone .library-dialog header h2{margin-right:auto}
+body.native-iphone .library-dialog header .library-info{flex:none;margin:0}
+body.native-iphone .library-dialog header>button{background:#fff;color:#173629;border:1px solid #a5af9d}
+body.native-iphone .library-dialog .library-tool-row{padding:0;margin-top:9px;border:1px solid var(--app-line);border-radius:12px;background:#faf9f3}
+body.native-iphone .library-dialog .library-tool-row>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:10px 13px;font-size:14px;font-weight:600;color:#173629;cursor:pointer}
+body.native-iphone .library-dialog .library-tool-row>summary::-webkit-details-marker{display:none}
+body.native-iphone .library-dialog .library-tool-row>summary:after{content:'›';font-size:22px}
+body.native-iphone .library-dialog .library-tool-row[open]>summary:after{content:'⌄'}
+body.native-iphone .library-dialog .library-tool-row>label,body.native-iphone .library-dialog .library-tool-row>p{margin:8px 12px}
+body.native-iphone .library-dialog .library-tool-row>button{width:calc(100% - 24px);margin:8px 12px}
+body.native-iphone .library-dialog .library-pipeline{position:relative}
+body.native-iphone .library-dialog .library-pipeline>.library-info{margin-top:6px}
+body.native-iphone .library-dialog .library-group-actions{justify-content:center}
+body.native-iphone .library-dialog .library-group-actions>button{flex:0 1 180px}

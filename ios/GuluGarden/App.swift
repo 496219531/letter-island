@@ -315,6 +315,15 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
             }
             return
         }
+        #if DEBUG
+        if let flag = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--portrait-preview=") }) {
+            let page = String(flag.dropFirst("--portrait-preview=".count))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                let script = page == "library" ? "GuluLibraryUI.open();" : "document.querySelector('#settingsPanel').open=true;" + (page == "sound" ? "document.querySelectorAll('.mobile-settings-tabs button')[1].click();" : "")
+                self.web.evaluateJavaScript(script)
+            }
+        }
+        #endif
         if let flag = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--layout-qa=") }) {
             let mode = String(flag.dropFirst("--layout-qa=".count))
             guard ["english", "sentences", "speaking", "ready", "settings", "settings-check", "battle", "home-check", "colors-check", "settings-focus", "speech-target-check", "ending-check", "review-check", "diff-preview", "audio-check", "library-editor", "library-check"].contains(mode) else { return }

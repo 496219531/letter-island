@@ -78,7 +78,17 @@
     const learningTab=document.createElement('button'),soundTab=document.createElement('button');learningTab.type=soundTab.type='button';learningTab.textContent='📖 学习';soundTab.textContent='🔊 声音与性能';tabs.append(learningTab,soundTab);
     const learning=document.createElement('section'),sound=document.createElement('section');learning.className=sound.className='mobile-settings-page';learning.dataset.page='learning';sound.dataset.page='sound';
     const items=[...controls.children];for(const item of items){const isSound=item.classList.contains('audio-volume-control')||Boolean(item.querySelector('#renderQuality'));item.dataset.settingIcon=item.querySelector('#renderQuality')?'⚡':item.querySelector('#soundVolume')?'🔊':item.querySelector('#fireStrength')?'🎯':item.querySelector('#englishLevel')?'📚':item.querySelector('#maxLearningLoad')?'🔁':item.querySelector('#magicSlowButton')?'🐢':item.textContent.includes('口语复盘')?'🎙️':'';(isSound?sound:learning).append(item);}controls.replaceChildren(learning,sound);
-    const selectPage=page=>{for(const [name,node] of [['learning',learning],['sound',sound]])node.hidden=name!==page;learningTab.classList.toggle('active',page==='learning');soundTab.classList.toggle('active',page==='sound');learningTab.setAttribute('aria-selected',String(page==='learning'));soundTab.setAttribute('aria-selected',String(page==='sound'));};
+    // Move existing controls, preserving their handlers and current values.
+    const audio=sound.querySelector('.audio-volume-control');
+    if(audio){
+      const readout=audio.querySelector('#learningReadout')?.parentElement,preview=audio.querySelector('#soundPreviewKind')?.parentElement,link=audio.querySelector('a');
+      const readoutTest=readout?.nextElementSibling,readoutStatus=audio.querySelector('#learningReadoutStatus');
+      const soundTest=audio.querySelector('#soundTestButton'),soundStatus=audio.querySelector('#soundStatus');
+      function card(nodes){const box=document.createElement('section');box.className='settings-card';for(const node of nodes)if(node)box.append(node);sound.append(box);}
+      card([readout,readoutStatus,readoutTest]);if(link){link.classList.add('settings-link');sound.append(link);}card([preview,soundTest,soundStatus]);
+    }
+    learningTab.textContent='学习';soundTab.textContent='声音与性能';
+    const selectPage=page=>{for(const [name,node] of [['learning',learning],['sound',sound]])node.hidden=name!==page;learningTab.classList.toggle('active',page==='learning');soundTab.classList.toggle('active',page==='sound');learningTab.setAttribute('aria-selected',String(page==='learning'));soundTab.setAttribute('aria-selected',String(page==='sound'));controls.scrollTop=0;};
     learningTab.onclick=()=>selectPage('learning');soundTab.onclick=()=>selectPage('sound');selectPage('learning');
     dialog.append(header,tabs,controls);document.body.append(dialog);
     const trigger=settings.querySelector('summary');
