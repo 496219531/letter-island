@@ -15,3 +15,8 @@ test('missing words are underlined; changing spell or prompt clears visible resu
  s.context.game.typing=1;s.update();assert.equal(s.context.speechResult,null);assert.equal(s.nodes.get('#speechDiff').hidden,true);
  const t=setup();t.context.game.skills[0].code='NEW SENTENCE';t.update();assert.equal(t.context.speechResult,null);
 });
+test('whole recording surface reflects press, recording, recognition and cancellation immediately',()=>{
+ const s=setup();for(const [phase,held] of [['preparing',true],['recording',true],['recognizing',false],['idle',false]]){
+  Object.assign(s.context.microphone,{phase,held});s.update();const surface=s.nodes.get('#speechControl');assert.equal(surface.dataset.speechPhase,phase);assert.equal(surface.dataset.held,String(held));assert.equal(s.nodes.get('#speechDiff').hidden,false);
+ }
+});

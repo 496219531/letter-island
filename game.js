@@ -279,13 +279,15 @@ function updateSpeechControl(){
   const selected=game.learningMode==='speaking'&&game.typing>=0?game.skills[game.typing]:null;
   const ready=game.status==='playing'&&selected&&selected.cd<=0,phase=microphone.phase;
   const granting=['microphone','system'].includes(permissionPhase);
+  $('#speechControl').dataset.speechPhase=granting?'authorizing':phase;
+  $('#speechControl').dataset.held=String(microphone.held);
   $('#speechSkip').disabled=!ready||phase!=='idle';
   $('#speechEnable').hidden=true;$('#speechEnable').disabled=granting;
   $('#speechEnable').textContent=permissionPhase==='microphone'?(nativeSpeech?'请允许本 App 使用麦克风…':'请允许浏览器使用麦克风…'):permissionPhase==='system'?'正在授权／准备英文语音资源…':permissionPhase==='error'?'重新申请语音权限':'启用语音权限';
   $('#speechButton').disabled=!ready||granting||phase==='recognizing';
   $('#speechButton').classList.toggle('listening',phase==='recording');$('#speechButton').setAttribute('aria-pressed',String(microphone.held));
   $('#speechExample').hidden=true;$('#speechReview').hidden=true;$('#speechExample').disabled=!ready||granting||phase!=='idle'||!localSpeech.available();
-  $('#speechButtonLabel').textContent=phase==='preparing'?'正在准备／等待系统授权…':phase==='recording'?'正在录音 · 松开识别':phase==='recognizing'?'录音已停止 · 正在识别':!speechAuthorized?'先启用语音权限':!ready?(phoneSpeech&&selected?'当前大招充能中':'先选择一张大招卡'):'按住麦克风说话';
+  $('#speechButtonLabel').textContent=granting?'请允许语音权限':phase==='preparing'?'已按住 · 正在开启麦克风':phase==='recording'?'正在录音 · 松开识别':phase==='recognizing'?'已松开 · 正在识别':!speechAuthorized?'点击开启语音':!ready?(phoneSpeech&&selected?'当前大招充能中':'先选择一张大招卡'):'按住麦克风说话';
   $('#speechTranscript').textContent=permissionPhase==='microphone'?(nativeSpeech?'正在申请本 App 的麦克风权限。此步骤不录制、不上传语音。':'正在申请麦克风权限。此步骤不录制、不上传语音。'):permissionPhase==='system'?(nativeSpeech?'麦克风权限已通过。请允许本 App 使用系统英语语音识别；首次可能需要下载 Apple 英文识别资源，请保持页面打开。':'麦克风权限已通过。请允许系统识别；首次可能需要下载 Apple 英文识别资源，请保持页面打开。'):phase==='recording'?'麦克风已开启，松开后立即停止录音，最多30秒。':phase==='recognizing'?(nativeSpeech?'正在用本 App 的系统语音识别，匹配成功后自动放招。':phoneSpeech?'正在用手机语音服务识别，匹配成功后自动放招。':'正在用 Mac 系统识别，匹配成功后自动放招。'):phase==='preparing'?(nativeSpeech?'首次使用请允许本 App 使用麦克风和系统语音识别；授权后重新按住按钮。':'首次使用请允许系统语音识别和麦克风权限；授权后重新按住按钮。'):speechFeedback||(nativeSpeech?'朗读当前卡片 → 按住录音 → 松开识别；点上方技能可切换。':phoneSpeech?'朗读当前卡片 → 按住录音 → 松开识别；点上方技能可切换。':'选一句 → 按住录音 → 松开停止并自动识别。');
   if(speechResult&&(!selected||speechResult.index!==game.typing||speechResult.code!==selected.code))speechResult=null;
   const result=speechResult;
