@@ -85,6 +85,12 @@
 .solo-app:not(.mobile-game) .sentence-card .skill-info{min-height:0;max-height:none;overflow:auto;align-self:stretch;overflow-wrap:anywhere}
 .solo-app:not(.mobile-game) .sentence-card .skill-info strong{display:block;-webkit-line-clamp:unset;overflow:visible;white-space:normal;line-height:1.5}
 .solo-app:not(.mobile-game) .sentence-card .word-meaning:not([hidden]){display:block;-webkit-line-clamp:unset;overflow:visible;white-space:normal;line-height:1.5}
+/* Reserve the same dock height for short and long words so changing a prompt
+   cannot resize the battlefield and make the fitted canvas zoom. */
+.solo-app:not(.mobile-game)[data-learning-mode=english] .skill-grid{grid-auto-rows:140px;align-items:stretch}
+.solo-app:not(.mobile-game)[data-learning-mode=english] .skill-card{height:140px;min-height:140px;max-height:140px;grid-template-rows:minmax(0,1fr) 18px}
+.solo-app:not(.mobile-game)[data-learning-mode=english] .skill-info{min-height:0;max-height:100%;overflow:auto;overflow-wrap:anywhere}
+@media(max-width:1000px){.solo-app:not(.mobile-game)[data-learning-mode=english] .skill-grid{grid-auto-rows:190px}.solo-app:not(.mobile-game)[data-learning-mode=english] .skill-card{height:190px;min-height:190px;max-height:190px;grid-template-columns:minmax(0,1fr);grid-template-areas:'info' 'keys' 'status';grid-template-rows:minmax(0,1fr) 68px 18px}}
 @media(max-width:1000px){.solo-app:not(.mobile-game) .skill-card.sentence-card{height:190px;min-height:190px;max-height:190px;grid-template-columns:minmax(0,1fr);grid-template-areas:'info' 'keys' 'status';grid-template-rows:minmax(0,1fr) 68px 18px}}
 
 .solo-app[data-learning-mode=speaking] #speechDiff{display:block;background:transparent;border:0;padding:0;line-height:1.7}
