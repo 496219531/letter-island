@@ -37,6 +37,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     var request: SFSpeechAudioBufferRecognitionRequest?
     var task: SFSpeechRecognitionTask?
     var activeID = 0
+    var speechModeEnabled = false
     var audioFile: AVAudioFile?
     var audioID: String?
     var player: AVAudioPlayer?
@@ -177,7 +178,12 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         guard activeID == 0 else { return }
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            let category: AVAudioSession.Category = speechModeEnabled ? .playAndRecord : .playback
+            let mode: AVAudioSession.Mode = speechModeEnabled ? .measurement : .default
+            let options: AVAudioSession.CategoryOptions = speechModeEnabled ? [.defaultToSpeaker] : [.mixWithOthers]
+            if session.category != category || session.mode != mode || session.categoryOptions != options {
+                try session.setCategory(category, mode: mode, options: options)
+            }
             try session.setActive(true)
             warmEffects()
             web?.evaluateJavaScript("document.dispatchEvent(new Event('gulu-audio-ready'))")
@@ -433,6 +439,9 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
               let data = message.body as? [String: Any], let command = data["command"] as? String else { return }
         let id = data["id"] as? Int ?? 0
         switch command {
+        case "speechMode":
+            let enabled = data["enabled"] as? Bool ?? false
+            if enabled != speechModeEnabled { speechModeEnabled = enabled; if !enabled { cancel() } else { restoreGameAudio() } }
         case "communityRequest": communityRequest(data, id: id)
         case "playEffect": playEffect(data)
         case "setEffectGain":
@@ -509,12 +518,15 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         }
     }
     func start(_ id: Int, contextualStrings: [String] = []) {
-        cancel(restorePlayback: false); player?.stop(); activeID = id
+        cancel(restorePlayback: false, deactivate: false); player?.stop(); activeID = id
+        let startedAt = ProcessInfo.processInfo.systemUptime
         guard SFSpeechRecognizer.authorizationStatus() == .authorized, AVAudioSession.sharedInstance().recordPermission == .granted else { fail(id, "请先允许麦克风和语音识别权限"); return }
         guard let recognizer = recognizer, recognizer.isAvailable else { fail(id, "系统英语语音识别当前不可用"); return }
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker])
+            if session.category != .playAndRecord || session.mode != .measurement {
+                try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker])
+            }
             try session.setActive(true)
             let req = SFSpeechAudioBufferRecognitionRequest()
             req.shouldReportPartialResults = false
@@ -532,7 +544,19 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
             let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("SpeechAttempts/" + key + ".wav")
             let recording = try AVAudioFile(forWriting: url, settings: [AVFormatIDKey:kAudioFormatLinearPCM, AVSampleRateKey:format.sampleRate, AVNumberOfChannelsKey:format.channelCount, AVLinearPCMBitDepthKey:16, AVLinearPCMIsFloatKey:false, AVLinearPCMIsBigEndianKey:false])
             audioID = key; audioFile = recording
-            input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in req.append(buffer); try? recording.write(from: buffer) }
+            var receivedFirstBuffer = false
+            input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+                req.append(buffer); try? recording.write(from: buffer)
+                if !receivedFirstBuffer {
+                    receivedFirstBuffer = true
+                    let elapsed = (ProcessInfo.processInfo.systemUptime - startedAt) * 1000
+                    DispatchQueue.main.async {
+                        guard let self = self, self.activeID == id, self.engine.isRunning else { return }
+                        NSLog("Speech first audio buffer: %.0f ms", elapsed)
+                        self.send(["type":"start", "id":id, "audioId":key])
+                    }
+                }
+            }
             tapped = true
             task = recognizer.recognitionTask(with: req) { [weak self] result, error in
                 DispatchQueue.main.async {
@@ -542,11 +566,10 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
                 }
             }
             engine.prepare(); try engine.start()
-            send(["type":"start", "id":id, "audioId":key])
         } catch { fail(id, error.localizedDescription) }
     }
     func stopAudio() { engine.stop(); if tapped { engine.inputNode.removeTap(onBus: 0); tapped = false }; audioFile = nil }
-    func cancel(restorePlayback: Bool = true) { activeID = 0; audioID = nil; timeout?.cancel(); timeout = nil; stopAudio(); request?.endAudio(); task?.cancel(); task = nil; request = nil; try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation); if restorePlayback && UIApplication.shared.applicationState == .active { restoreGameAudio() } }
+    func cancel(restorePlayback: Bool = true, deactivate: Bool = true) { activeID = 0; audioID = nil; timeout?.cancel(); timeout = nil; stopAudio(); request?.endAudio(); task?.cancel(); task = nil; request = nil; if deactivate && (!speechModeEnabled || !restorePlayback) { try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }; if restorePlayback && UIApplication.shared.applicationState == .active { restoreGameAudio() } }
     func fail(_ id: Int, _ text: String) { stopAudio(); send(["type":"error", "id":id, "error":text, "audioId":audioID ?? ""]); cancel() }
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = action.request.url else { decisionHandler(.cancel); return }

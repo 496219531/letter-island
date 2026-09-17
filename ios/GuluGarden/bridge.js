@@ -32,6 +32,9 @@
   document.addEventListener('DOMContentLoaded',()=>{
     if(!document.getElementById('gameCanvas'))return;
     document.body.classList.add('native-iphone');
+    let preparedSpeechMode=false;
+    const syncSpeechMode=()=>{const enabled=document.body.dataset.learningMode==='speaking'&&['playing','paused','upgrade'].includes(document.body.dataset.gameState);if(enabled===preparedSpeechMode)return;preparedSpeechMode=enabled;window.webkit.messageHandlers.gulu.postMessage({command:'speechMode',enabled});};
+    if(window.GuluNative){new MutationObserver(syncSpeechMode).observe(document.body,{attributes:true,attributeFilter:['data-learning-mode','data-game-state']});syncSpeechMode();}
     const editable=target=>target instanceof Element&&Boolean(target.closest('input,textarea,select,[contenteditable=true]'));
     document.addEventListener('selectstart',event=>{if(!editable(event.target))event.preventDefault();});
     document.addEventListener('contextmenu',event=>{if(!editable(event.target))event.preventDefault();});
