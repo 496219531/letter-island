@@ -78,6 +78,18 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         } catch { effectLastError=error.localizedDescription }
     }
     func warmEffects() { effectQueue.async { [weak self] in self?.warmEffectsNow() } }
+    @objc func rebuildEffectOutput() {
+        effectQueue.async { [weak self] in
+            guard let self=self else { return }
+            self.effectEngine.stop()
+            for voice in self.effectVoices { voice.token+=1;voice.until=0;voice.node.stop() }
+            self.effectEngine.disconnectNodeOutput(self.effectEngine.mainMixerNode)
+            self.effectEngine.connect(self.effectEngine.mainMixerNode,to:self.effectEngine.outputNode,format:nil)
+            self.effectEngine.mainMixerNode.outputVolume=self.effectGain
+            do { try self.effectEngine.start() }
+            catch { self.effectLastError=error.localizedDescription;NSLog("Effect output recovery failed: %@",self.effectLastError) }
+        }
+    }
     func playEffect(_ data:[String:Any]) {
         effectQueue.async { [weak self] in self?.playEffectNow(data) }
     }
@@ -179,10 +191,13 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         do {
             let session = AVAudioSession.sharedInstance()
             let category: AVAudioSession.Category = speechModeEnabled ? .playAndRecord : .playback
-            let mode: AVAudioSession.Mode = speechModeEnabled ? .measurement : .default
+            let mode: AVAudioSession.Mode = .default
             let options: AVAudioSession.CategoryOptions = speechModeEnabled ? [.defaultToSpeaker] : [.mixWithOthers]
             if session.category != category || session.mode != mode || session.categoryOptions != options {
+                effectQueue.sync { effectEngine.stop() }
                 try session.setCategory(category, mode: mode, options: options)
+                try session.setActive(true)
+                rebuildEffectOutput()
             }
             try session.setActive(true)
             warmEffects()
@@ -524,8 +539,11 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         guard let recognizer = recognizer, recognizer.isAvailable else { fail(id, "系统英语语音识别当前不可用"); return }
         do {
             let session = AVAudioSession.sharedInstance()
-            if session.category != .playAndRecord || session.mode != .measurement {
-                try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker])
+            if session.category != .playAndRecord || session.mode != .default {
+                effectQueue.sync { effectEngine.stop() }
+                try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
+                try session.setActive(true)
+                rebuildEffectOutput()
             }
             try session.setActive(true)
             let req = SFSpeechAudioBufferRecognitionRequest()
