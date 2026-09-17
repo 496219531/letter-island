@@ -36,8 +36,12 @@ await writeFile('dist/mobile-app.js', '(function(){\n'+mobileShell+'\n})();\n');
 let phoneCSS=await readFile('ios/GuluGarden/iphone.css','utf8');
 const landscapeStart=phoneCSS.indexOf('@media(orientation:landscape){');
 if(landscapeStart<0||!phoneCSS.trimEnd().endsWith('}'))throw new Error('Landscape style block missing');
-const landscapeCSS=phoneCSS.slice(landscapeStart+'@media(orientation:landscape){'.length).trimEnd().slice(0,-1);
-phoneCSS=phoneCSS.slice(0,landscapeStart)+landscapeCSS.replaceAll('body.native-iphone','body.native-iphone[data-web-direction="landscape"]');
+const landscapeBody=landscapeStart+'@media(orientation:landscape){'.length;
+let landscapeEnd=landscapeBody,depth=1;
+for(;landscapeEnd<phoneCSS.length&&depth;landscapeEnd++){if(phoneCSS[landscapeEnd]==='{')depth++;else if(phoneCSS[landscapeEnd]==='}')depth--;}
+if(depth)throw new Error('Unclosed landscape style block');
+const landscapeCSS=phoneCSS.slice(landscapeBody,landscapeEnd-1);
+phoneCSS=phoneCSS.slice(0,landscapeStart)+landscapeCSS.replaceAll('body.native-iphone','body.native-iphone[data-web-direction="landscape"]')+phoneCSS.slice(landscapeEnd);
 await writeFile('dist/iphone.css',phoneCSS+'\n'+await readFile('web-layout.css','utf8'));
 await cp('web-runtime.js','dist/web-runtime.js');
 await cp('community.js','dist/community.js');
