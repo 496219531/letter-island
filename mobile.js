@@ -11,7 +11,7 @@
     function start(next){
       if(phase!=='idle')return;
       if(!Recognition){onError('当前手机浏览器不支持语音识别，请使用支持语音识别的系统浏览器。');return;}
-      target=next;words=[];held=true;const r=new Recognition();recognizer=r;r.lang='en-US';r.continuous=true;r.interimResults=false;state('preparing');
+      target=next;words=[];held=true;const r=new Recognition();recognizer=r;r.lang='en-US';r.continuous=true;r.interimResults=false;r.contextualStrings=next.contextualStrings||[next.code].filter(Boolean);state('preparing');
       r.onstart=()=>{if(recognizer!==r)return;if(!held){cancel();return;}state('recording');timer=setTimeout(release,30000);};
       r.onresult=e=>{if(recognizer!==r)return;for(let i=e.resultIndex;i<e.results.length;i++)if(e.results[i].isFinal)words[i]=e.results[i][0].transcript;};
       r.onerror=e=>{if(recognizer!==r)return;cancel();onError(['not-allowed','service-not-allowed'].includes(e.error)?'语音权限被拒绝，请在手机浏览器设置中允许麦克风与语音识别。':'手机语音识别未成功：'+e.error,target,{audioId:r.audioId||null});};

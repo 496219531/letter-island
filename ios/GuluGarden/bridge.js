@@ -15,7 +15,7 @@
   Object.assign(window.GuluNative,{setSettingsPortrait:enabled=>libraryCommand('setSettingsPortrait',{enabled}),getScreenDirection:()=>libraryCommand('getScreenDirection'),setScreenDirection:direction=>libraryCommand('setScreenDirection',{direction}),getAppVersion:()=>libraryCommand('getAppVersion')});
   Object.assign(window.GuluNative,{organizeLibrary:payload=>libraryCommand('organizeLibrary',payload),configureQwen:()=>libraryCommand('configureQwen'),importImage:(image,kind)=>libraryCommand('importImage',{image,kind}),translateTexts:(texts,onProgress)=>libraryCommand('translateTexts',{texts},onProgress),exportLibrary:text=>libraryCommand('exportLibrary',{text}),speakLearning:payload=>libraryCommand('speakLearning',payload),stopLearningSpeech:()=>libraryCommand('stopLearningSpeech')});
   class NativeRecognition {
-    start(){this.id=++serial;sessions.set(this.id,this);post('start',this.id);}
+    start(){this.id=++serial;sessions.set(this.id,this);window.webkit.messageHandlers.gulu.postMessage({command:'start',id:this.id,contextualStrings:this.contextualStrings||[]});}
     stop(){post('stop',this.id);}
     abort(){sessions.delete(this.id);post('cancel',this.id);}
   }

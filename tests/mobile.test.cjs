@@ -19,6 +19,9 @@ test('phone speech stops on release and delivers final text to the original skil
  assert.equal(s.results.length,0);s.mic.release();assert.equal(s.r.stopped,true);s.r.onend();
  assert.deepEqual(s.results,[['Hello there',target,{audioId:null}]]);assert.equal(s.mic.phase,'idle');
 });
+test('recognition receives the current answer as context but submits only recognized speech',()=>{
+ const s=setup(),target={index:0,code:'MY NAME IS ZHANG KANGKANG',contextualStrings:['My name is Zhang Kangkang.']};s.mic.start(target);assert.deepEqual(s.r.contextualStrings,target.contextualStrings);s.r.onstart();s.r.onresult({resultIndex:0,results:[Object.assign([{transcript:'My name is John'}],{isFinal:true})]});s.mic.release();s.r.onend();assert.equal(s.results[0][0],'My name is John');
+});
 test('release during permission preparation and cancellation suppress late recognition',()=>{
  const s=setup();s.mic.start({index:0});const old=s.r;s.mic.release();assert.equal(old.aborted,true);old.onstart();old.onend();assert.equal(s.results.length,0);
  s.mic.start({index:2});s.r.onstart();s.mic.cancel();s.r.onend();assert.equal(s.results.length,0);assert.equal(s.mic.held,false);

@@ -311,7 +311,7 @@ function startListening(event){
   if(!speechAuthorized){event?.preventDefault();enableSpeech();return;}
   if(!nativeSpeechReady)return;
   event?.preventDefault();if(event?.pointerId!==undefined)$('#speechButton').setPointerCapture(event.pointerId);
-  localSpeech.cancel();speechFeedback='';microphone.start({index:game.typing,code:game.skills[game.typing].code});
+  localSpeech.cancel();speechFeedback='';const code=game.skills[game.typing].code,text=lookupSentence(code)?.text||code;microphone.start({index:game.typing,code,contextualStrings:[text]});
 }
 function saveTypingSettings(){
   try{localStorage.setItem('gulu-typing-settings',JSON.stringify({maxSpellLength:game.maxSpellLength,maxLearningLoad:game.maxLearningLoad,magicSlow:game.magicSlow,englishLevel:game.englishLevel}));}catch{}

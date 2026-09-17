@@ -502,13 +502,13 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
                 if command == "stopAudio" { player?.stop() }
                 send(["type":"nativeReply", "id":id, "ok":true])
             } catch { send(["type":"nativeReply", "id":id, "ok":false, "error":error.localizedDescription]) }
-        case "start": start(id)
+        case "start": start(id, contextualStrings: data["contextualStrings"] as? [String] ?? [])
         case "stop": if id == activeID { stopAudio(); request?.endAudio(); let work = DispatchWorkItem { [weak self] in self?.fail(id, "识别超时，请重试") }; timeout = work; DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: work) }
         case "cancel": if id == activeID { cancel() }
         default: break
         }
     }
-    func start(_ id: Int) {
+    func start(_ id: Int, contextualStrings: [String] = []) {
         cancel(restorePlayback: false); player?.stop(); activeID = id
         guard SFSpeechRecognizer.authorizationStatus() == .authorized, AVAudioSession.sharedInstance().recordPermission == .granted else { fail(id, "请先允许麦克风和语音识别权限"); return }
         guard let recognizer = recognizer, recognizer.isAvailable else { fail(id, "系统英语语音识别当前不可用"); return }
@@ -519,6 +519,11 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
             let req = SFSpeechAudioBufferRecognitionRequest()
             req.shouldReportPartialResults = false
             req.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
+            req.contextualStrings = Array(contextualStrings.prefix(10))
+                .flatMap { String($0.prefix(500)).components(separatedBy: .whitespacesAndNewlines) }
+                .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+                .filter { !$0.isEmpty }
+            req.taskHint = .dictation
             request = req
             let input = engine.inputNode
             let format = input.outputFormat(forBus: 0)
