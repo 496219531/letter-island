@@ -86,3 +86,7 @@
 .solo-app:not(.mobile-game) .sentence-card .skill-info strong{display:block;-webkit-line-clamp:unset;overflow:visible;white-space:normal;line-height:1.5}
 .solo-app:not(.mobile-game) .sentence-card .word-meaning:not([hidden]){display:block;-webkit-line-clamp:unset;overflow:visible;white-space:normal;line-height:1.5}
 @media(max-width:1000px){.solo-app:not(.mobile-game) .skill-card.sentence-card{height:190px;min-height:190px;max-height:190px;grid-template-columns:minmax(0,1fr);grid-template-areas:'info' 'keys' 'status';grid-template-rows:minmax(0,1fr) 68px 18px}}
+
+.solo-app[data-learning-mode=speaking] #speechDiff{display:block;background:transparent;border:0;padding:0;line-height:1.7}
+.solo-app[data-learning-mode=speaking] #speechDiff span{padding:0;background:transparent}
+.solo-app[data-learning-mode=speaking] #speechDiff .speech-result-error{text-decoration:underline;text-decoration-color:#ff5757;text-decoration-thickness:2px;text-underline-offset:4px}

@@ -386,3 +386,8 @@ body.native-iphone[data-learning-mode=speaking] .speech-feedback-panel>*{flex-sh
 body.native-iphone[data-learning-mode=speaking] #speechDiff[hidden]{display:none!important}
 body.native-iphone[data-learning-mode=speaking] #speechControl{margin:0}
 body.native-iphone[data-learning-mode=speaking] #speechButton{flex-direction:column}
+
+body.native-iphone[data-learning-mode=speaking] #speechDiff{display:block;background:transparent;border:0;padding:0;color:#fff1bd;font-size:16px;line-height:1.7}
+body.native-iphone[data-learning-mode=speaking] #speechDiff span{background:transparent;padding:0}
+body.native-iphone[data-learning-mode=speaking] #speechDiff .speech-result-error{text-decoration:underline;text-decoration-color:#ff5757;text-decoration-thickness:2px;text-underline-offset:4px}
+@media(orientation:portrait){body.native-iphone[data-learning-mode=speaking] #speechDiff{color:#173629}}

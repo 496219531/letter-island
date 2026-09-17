@@ -26,7 +26,6 @@
     if(e.type==='permission'){const p=waiting.get(e.id);waiting.delete(e.id);if(p)e.ok?p.resolve():p.reject(new Error('请在 iPhone 设置中允许麦克风与语音识别。'));return;}
     const r=sessions.get(e.id);if(!r)return;if(e.audioId)r.audioId=e.audioId;
     if(e.type==='start')r.onstart?.();
-    if(e.type==='partial'){r.onresult?.({resultIndex:0,results:[Object.assign([{transcript:e.text}],{isFinal:false})]});return;}
     if(e.type==='result'){r.onresult?.({resultIndex:0,results:[Object.assign([{transcript:e.text}],{isFinal:true})]});sessions.delete(e.id);r.onend?.();}
     if(e.type==='error'){sessions.delete(e.id);r.onerror?.({error:e.error});}
   };
