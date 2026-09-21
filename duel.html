@@ -2,19 +2,23 @@
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#eff3ea"><title>后院对决 · 咕噜游乐场</title><link rel="icon" href="data:,"><link rel="stylesheet" href="duel.css"><link rel="stylesheet" href="immersive.css"><link rel="stylesheet" href="mobile.css"><link rel="stylesheet" href="performance.css"></head>
 <body class="game-app duel-app" data-duel-state="lobby">
-<header class="topbar"><a href="./" class="brand">✳ 咕噜游乐场</a><span class="pill">局域网 · 双人对战</span><a href="./" class="back">返回单人模式 ↗</a></header>
+<header class="topbar"><a href="./" class="brand">✳ 咕噜游乐场</a><span class="pill" id="connectionMode">正在连接对战服务…</span><a href="./" class="back">返回单人模式 ↗</a></header>
 <main>
   <section id="lobby" class="lobby">
     <div class="intro"><div class="eyebrow">BACKYARD BATTLE / 01</div><h1>我的后院，<br><em>我来守。</em></h1><p>和另一台设备上的朋友来一场后院对决。<br>从自家后院派出僵尸，相遇互啃，突破敌方防线。</p><div class="rules"><span>🌻 各守一座小院</span><span>🧟 僵尸进攻对方</span><span>⌨ 大招题目独立</span></div></div>
     <div class="lobby-card">
-      <h2>约朋友开一局</h2><p class="muted">手机或电脑连接同一局域网，电脑启动游戏服务。</p>
+      <header class="lobby-card-heading"><span class="lobby-mode-badge" id="lobbyModeBadge">对战房间</span><h2 id="lobbyTitle">约朋友开一局</h2><p class="muted" id="lobbyDescription">正在确认连接方式…</p></header>
+      <section class="lan-guide" id="lanGuide" hidden aria-label="局域网组局说明"><h3>局域网组局</h3><ol><li>房主在电脑游戏目录运行 <code>npm run lan</code>。</li><li>两台设备连接同一 Wi‑Fi，并打开下方显示的地址。</li><li>房主设置题目并创建房间，再把邀请链接发给朋友。</li></ol><p class="muted small">电脑需保持运行；关闭房主浏览器会让该玩家离场。</p></section>
+      <section class="duel-setup" aria-label="房主设置"><h3><span>1</span> 房主设置题目</h3>
       <label>你的名字<input id="playerName" maxlength="16" placeholder="小院守卫" autocomplete="nickname"></label>
       <div class="mode-row"><label>大招题目<select id="mode"><option value="letters">字母组合</option><option value="english">英语单词</option><option value="sentences">英语句子</option></select></label><label id="levelLabel" hidden><span id="levelTitle">词汇学段</span><select id="level"><option value="0">1 级 · 入门</option><option value="1">2 级 · 基础</option><option value="2">3 级 · 进阶</option><option value="3">4 级 · 提升</option><option value="4">5 级 · 挑战</option></select></label></div>
+      <label>对战词句来源<select id="duelSource"><option value="">系统标准词句库</option><option value="public">公共分享榜</option></select></label>
+      <section id="publicPicker" hidden aria-label="选择公共对战词句"><label>榜单排序<select id="publicSort"><option value="popular">下载最多</option><option value="newest">最新发布</option></select></label><label>选择词组<select id="publicGroup"></select></label><p id="publicStatus" role="status" class="muted small"></p><div class="join-row"><button id="publicPrev" type="button">上一页</button><button id="publicNext" type="button">下一页</button><button id="publicReload" type="button">刷新</button></div></section>
       <button id="create" class="primary">创建房间 →</button>
-      <div class="divider">或加入朋友的房间</div>
+      </section><section class="duel-join" aria-label="加入已有房间"><div class="divider">或</div><h3><span>2</span> 加入朋友的房间</h3>
       <p id="inviteStatus" class="muted small" role="status" aria-live="polite" hidden></p>
       <form id="joinForm" class="join-row"><input id="roomCode" maxlength="6" pattern="[A-Fa-f0-9]{6}" required placeholder="6 位房间码" aria-label="房间码" autocomplete="off"><button id="join" type="submit">加入</button></form>
-      <p class="muted small">加入时使用房主设置的题目模式与难度。<a href="vocabulary-guide.html" target="_blank" rel="noopener">词库与课标依据 ↗</a></p>
+      <p class="muted small">加入后使用房主设置的题目和词组。<a href="vocabulary-guide.html" target="_blank" rel="noopener">词库与课标依据 ↗</a></p></section>
     </div>
     <div class="network-note" id="networkNote">正在检查局域网服务…</div>
   </section>

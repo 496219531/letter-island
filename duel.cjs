@@ -42,8 +42,8 @@ class DuelGarden extends GardenGame {
     for(const [z,speed] of stopped)z.speed=speed;
     this.bullets=this.bullets.filter(b=>b.x<=430);
   }
-  prepare(mode,level) {
-    this.learningMode=mode;this.englishLevel=level;this.reset();this.status='playing';
+  prepare(mode,level,customBank) {
+    this.learningMode=mode;this.englishLevel=level;this.setCustomBank(customBank);this.reset();this.status='playing';
     this.auto=true;this.fireStrength=.3;this.magicSlow=false;this.maxSpellLength=6;this.maxLearningLoad=2;
     this.quota=0;this.spawnIn=Infinity;
     for(let i=0;i<3;i++)this.skills[i].code=this.nextCode(i);
@@ -51,9 +51,9 @@ class DuelGarden extends GardenGame {
 }
 
 class DuelMatch {
-  constructor({mode='letters',level=0,random=Math.random}={}) {
+  constructor({mode='letters',level=0,customBank=null,publicResource=null,random=Math.random}={}) {
     if(!MODES.includes(mode)||!Number.isInteger(level)||level<0||level>4)throw new Error('请选择有效的题目模式和等级');
-    this.config={mode,level};this.random=random;this.round=0;
+    this.customBank=customBank?JSON.parse(JSON.stringify(customBank)):null;this.config={mode,level,...(publicResource?{publicResource}: {})};this.random=random;this.round=0;
     this.players=[null,null];this.status='waiting';this.elapsed=0;this.winner=null;this.reason='';
     this.promptHistories=[{},{}];
   }
@@ -76,7 +76,7 @@ class DuelMatch {
   }
   begin() {
     this.round++;this.status='playing';this.elapsed=0;this.waveIn=.7;this.winner=null;this.reason='';
-    this.games=[0,1].map(side=>{const g=new DuelGarden(side,{random:this.random});g.promptHistory=this.promptHistories[side];g.prepare(this.config.mode,this.config.level);return g;});
+    this.games=[0,1].map(side=>{const g=new DuelGarden(side,{random:this.random});g.promptHistory=this.promptHistories[side];g.prepare(this.config.mode,this.config.level,this.customBank);return g;});
     this.players.forEach(p=>Object.assign(p,{sun:24,sent:0,dispatchCd:0,ready:false,offline:0}));
 
   }
@@ -186,7 +186,7 @@ class DuelMatch {
       wordSeen:own?.promptHistory[`english:${this.config.level}`]?.length||0,
       fields,auto:own?.auto,typing:own?.typing,feedback:own?.feedback,
       skills:own?.skills.map(s=>{
-        const entry=own.learningMode==='english'?findWordEntry(s.code):own.learningMode==='letters'?null:findSentenceEntry(s.code);
+        const entry=own.customBank?own.learningEntry(s.code):own.learningMode==='english'?findWordEntry(s.code):own.learningMode==='letters'?null:findSentenceEntry(s.code);
         return {...s,meaning:entry?.meaning,scene:entry?.scene,goal:entry?.goal,grammar:entry?.grammar,reference:entry?.reference};
       }),
       learningLoad:own?.learningLoad,units:UNITS};

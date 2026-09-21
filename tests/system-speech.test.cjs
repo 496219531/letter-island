@@ -38,3 +38,32 @@ test('engine emits immutable learning text once per completed pass, before chang
  const sentence=new GardenGame({emit:(type,data)=>{if(type==='practice-complete')events.push(data);}});sentence.learningMode='sentences';sentence.start();sentence.select(1);
  const code=sentence.skills[1].code;for(const c of code)sentence.input(c);assert.equal(events.length,4);assert.equal(events[3].code,code);assert.ok(events[3].meaning);
 });
+test('library previews read Chinese independently and skip blank text',()=>{
+ const spoken=[],voices=[{lang:'zh-CN',localService:true}];let cancelled=0;
+ const service=createLocalSpeech({getVoices:()=>voices,cancel(){cancelled++;},speak(u){spoken.push(u);}},class{constructor(text){this.text=text;}});
+ assert.equal(service.speak('苹果',()=>{},'zh'),true);
+ assert.equal(spoken[0].text,'苹果');assert.equal(spoken[0].lang,'zh-CN');
+ assert.equal(service.speak('  ',()=>{},'zh'),false);assert.equal(spoken.length,1);assert.equal(cancelled,1);
+ assert.equal(service.speak('apple'),false);
+});
+test('library preview reports synchronous speech failures',()=>{
+ const errors=[],service=createLocalSpeech({getVoices:()=>[{lang:'en-US',localService:true}],cancel(){},speak(){throw Error('failed');}},class{});
+ assert.equal(service.speak('apple',error=>errors.push(error)),false);assert.deepEqual(errors,['unavailable']);
+});
+test('Chinese readout never substitutes Cantonese when Mandarin is missing',()=>{
+ const spoken=[],errors=[],voices=[{lang:'en-US',localService:true},{lang:'zh-HK',name:'Sin-ji',localService:true},{lang:'yue-CN',localService:true}];
+ const service=createLocalSpeech({getVoices:()=>voices,cancel(){},speak:u=>spoken.push(u)},class{constructor(text){this.text=text;}});
+ service.enqueueLearning('Apple','苹果',{onError:e=>errors.push(e)});assert.deepEqual(spoken.map(u=>u.lang),['en-US']);assert.deepEqual(errors,['missing-chinese']);assert.equal(service.speak('苹果',()=>{},'zh'),false);
+ voices.push({lang:'zh_CN',name:'Tingting',localService:true});service.enqueueLearning('Apple','苹果');assert.equal(spoken.at(-1).voice,voices.at(-1));
+});
+test('Mandarin script tags are supported without allowing Hong Kong Chinese fallback',()=>{
+ const spoken=[];const service=createLocalSpeech({getVoices:()=>[{lang:'zh-HK',localService:true},{lang:'zh-Hans-CN',localService:true}],cancel(){},speak:u=>spoken.push(u)},class{});
+ assert.ok(service.speak('苹果',()=>{},'zh'));assert.equal(spoken[0].lang,'zh-Hans-CN');
+});
+test('a stalled synthesizer cannot accumulate unlimited speech and completion frees capacity',()=>{
+ const spoken=[],errors=[];const service=createLocalSpeech({getVoices:()=>[{lang:'en-US',localService:true},{lang:'zh-CN',localService:true}],cancel(){},speak:u=>spoken.push(u)},class{});
+ for(let i=0;i<10000;i++)service.enqueueLearning('Apple','苹果',{onError:e=>errors.push(e)});
+ assert.equal(spoken.length,10);assert.ok(errors.includes('queue-full'));
+ spoken[0].onend();spoken[1].onend();service.enqueueLearning('Pear','梨');assert.equal(spoken.length,12);
+ service.cancel();assert.ok(spoken.every(u=>u.onend===null&&u.onerror===null));service.enqueueLearning('Next','下一个');assert.equal(spoken.length,14);
+});

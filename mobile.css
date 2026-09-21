@@ -53,6 +53,7 @@
 .mobile-game.duel-app #units button{padding:8px 4px;font-size:12px;display:flex;flex-wrap:wrap}
 .mobile-game.duel-app .scoreboard{min-height:54px;padding:8px;font-size:12px}.mobile-game.duel-app .skills{flex:none}
 .mobile-game.duel-app .keyboard-hint{display:none}.mobile-game.duel-app .room-heading{flex-wrap:wrap;gap:8px}
+.phone-duel .duel-keyboard-toggle{width:100%;margin:4px 0;padding:7px 10px;color:#fff1bd;background:#294534;border:1px solid #64734a}
 .mobile-game.duel-app .room-tools{flex-wrap:wrap}.mobile-game.duel-app .waiting{display:block;padding:16px}
 .mobile-game.duel-app .ready-box{border:0;padding:12px 0}.mobile-game.duel-app .connection{position:static!important}
 @media(orientation:landscape){.mobile-game .skill-card,.mobile-game .skill{flex-basis:45%}.mobile-game .battlefield,.mobile-game.duel-app .yard{height:65dvh;min-height:230px}.mobile-game .start-panel{max-width:560px}}

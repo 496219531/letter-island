@@ -81,7 +81,9 @@ async function enter(code) {
   $('#create').disabled=true;$('#join').disabled=true;
   if(code){$('#inviteStatus').hidden=false;$('#inviteStatus').textContent=`正在加入房间 ${code}…`;}
   try {
-    session=await request('/api/rooms',{method:'POST',body:JSON.stringify({mobile:Boolean(window.GuluMobile?.active),name:$('#playerName').value,code,mode:$('#mode').value,level:Number($('#level').value)})});
+    if(!code&&$('#duelSource').value==='public'&&!$('#publicGroup').value)throw Error('请先选择公共榜中的词组');
+    const publicSelection=!code&&$('#duelSource').value==='public'?JSON.parse($('#publicGroup').value):{};
+    session=await request('/api/rooms',{method:'POST',body:JSON.stringify({mobile:Boolean(window.GuluMobile?.active),...publicSelection,name:$('#playerName').value,code,mode:$('#mode').value,level:Number($('#level').value)})});
     try{sessionStorage.setItem(sessionKey,JSON.stringify(session));}catch{}
     attach();
   }catch(e){
@@ -98,7 +100,19 @@ function updateLevels(){
  const labels=mode==='english'?stages.map(s=>s.name+' · '+s.count+'词'):dialogueStages.map(s=>s.name+' · '+s.groups+'组 / '+s.sentences+'句');
  if(labels.length)Array.from($('#level').options).forEach((o,i)=>o.textContent=labels[i]);
 }
-$('#mode').onchange=updateLevels;
+let publicPage=0,publicRevision=0;
+async function loadPublicGroups(){
+  const revision=++publicRevision;$('#publicGroup').replaceChildren();$('#publicStatus').textContent='正在加载…';$('#publicPrev').disabled=true;$('#publicNext').disabled=true;
+  try{const result=await request('/api/library/public/list',{method:'POST',body:JSON.stringify({sort:$('#publicSort').value,page:publicPage,kind:$('#mode').value==='sentences'?'sentence':'word'})});if(revision!==publicRevision)return;
+    $('#publicGroup').add(new Option('请选择公共词组',''));
+    for(const resource of result.rows)for(const group of resource.groups){if(group.kind!==($('#mode').value==='sentences'?'sentence':'word'))continue;$('#publicGroup').add(new Option(resource.title+' · '+resource.author+' / '+group.name+' · '+group.count+'条 · 下载'+resource.downloads+'次',JSON.stringify({publicResourceId:resource.id,publicGroupId:group.id})));}
+    $('#publicStatus').textContent=result.total?'第 '+(publicPage+1)+' 页 · 共 '+result.total+' 份资源，双方使用房主选择的词组。':'暂无可用资源，可先从单人模式的词句库公开发布。';$('#publicPrev').disabled=publicPage===0;$('#publicNext').disabled=(publicPage+1)*20>=result.total;
+  }catch(e){if(revision===publicRevision)$('#publicStatus').textContent=e.message;}
+}
+function updatePublicSource(){const active=$('#duelSource').value==='public';if(active&&$('#mode').value==='letters')$('#mode').value='english';updateLevels();$('#levelLabel').hidden=active||$('#mode').value==='letters';$('#publicPicker').hidden=!active;if(active){publicPage=0;loadPublicGroups();}}
+$('#duelSource').onchange=updatePublicSource;
+$('#mode').onchange=()=>{if($('#mode').value==='letters')$('#duelSource').value='';updatePublicSource();};
+$('#publicSort').onchange=()=>{publicPage=0;loadPublicGroups();};$('#publicPrev').onclick=()=>{publicPage--;loadPublicGroups();};$('#publicNext').onclick=()=>{publicPage++;loadPublicGroups();};$('#publicReload').onclick=loadPublicGroups;
 $('#ready').onclick=()=>action({type:'ready'});
 $('#copy').onclick=async()=>{
   const text=invitation();
@@ -128,7 +142,15 @@ for(let i=0;i<3;i++){
   const button=document.createElement('button');button.className='skill';button.innerHTML='<div class="skill-top"><strong></strong><small></small></div><div class="dialogue-context" hidden></div><div class="skill-code"></div><div class="skill-meaning"></div><div class="skill-bar"></div>';
   button.onclick=()=>{action({type:'select',index:i});$('#myCanvas').focus({preventScroll:true});};$('#skills').append(button);skillCards.push(button);
 }
-let phoneSkill=0,phoneTabs=null;
+let phoneSkill=0,phoneTabs=null,duelKeyboard=null,duelKeyboardToggle=null,duelHardwareKeyboard=Boolean(window.GuluNativeHardwareKeyboard),duelManualKeyboard=false;
+function syncDuelHardwareKeyboard(){
+  duelHardwareKeyboard=Boolean(window.GuluNativeHardwareKeyboard);duelManualKeyboard=false;
+  document.body.dataset.hardwareKeyboard=String(duelHardwareKeyboard);
+  if(!duelKeyboard)return;
+  duelKeyboard.hidden=duelHardwareKeyboard;
+  if(duelKeyboardToggle){duelKeyboardToggle.hidden=!duelHardwareKeyboard;duelKeyboardToggle.setAttribute('aria-expanded',String(!duelKeyboard.hidden));}
+}
+window.addEventListener('gulu-hardware-keyboard',syncDuelHardwareKeyboard);
 function showPhoneSkill(index){
   phoneSkill=index;skillCards.forEach((card,i)=>card.classList.toggle('phone-visible',i===index));
   if(phoneTabs)[...phoneTabs.children].forEach((button,i)=>button.setAttribute('aria-pressed',String(i===index)));
@@ -144,7 +166,7 @@ if(window.GuluMobile?.active){
     for(const key of keys){const b=document.createElement('button');b.type='button';b.className='touch-key'+(key.length>1||key===' '?' wide':'');b.textContent=key===' '?'空格':key==='Backspace'?'退格':key==='Escape'?'取消':key;b.setAttribute('aria-label','输入 '+b.textContent);b.dataset.key=key;b.onclick=()=>{if(!connected||state?.status!=='playing'||state.paused)return;action(key==='Backspace'?{type:'backspace'}:key==='Escape'?{type:'cancel'}:{type:'key',key});};row.append(b);}
     keyboard.append(row);
   }
-  $('#skills').after(keyboard);
+  duelKeyboard=keyboard;duelKeyboardToggle=document.createElement('button');duelKeyboardToggle.type='button';duelKeyboardToggle.className='duel-keyboard-toggle';duelKeyboardToggle.textContent='⌨ 触屏键盘';duelKeyboardToggle.hidden=true;duelKeyboardToggle.setAttribute('aria-controls','duelTouchKeyboard');duelKeyboardToggle.onclick=()=>{duelManualKeyboard=!duelManualKeyboard;duelKeyboard.hidden=!duelManualKeyboard;duelKeyboardToggle.setAttribute('aria-expanded',String(duelManualKeyboard));};keyboard.id='duelTouchKeyboard';$('#skills').before(duelKeyboardToggle);$('#skills').after(keyboard);syncDuelHardwareKeyboard();
 }
 const unitButtons={};
 for(const [unit,icon,name,cost] of [['runner','⚡','疾跑僵尸',18],['armor','🪣','铁桶僵尸',28],['bomber','💣','爆破僵尸',38]]){
@@ -156,12 +178,13 @@ function render() {
   const s=state,me=s.players[s.side],other=s.players[1-s.side],playing=s.status==='playing',finished=s.status==='finished',live=playing&&!s.paused&&connected;
   if(s.feedback?.text&&feedbackId!==`${s.code}:${s.round}:${s.feedback.id}`){feedbackId=`${s.code}:${s.round}:${s.feedback.id}`;notice(s.feedback.text);}
   $('#connection').classList.toggle('error',s.paused);
-  $('#connection').textContent=s.paused?`等待${s.players.filter(p=>p&&!p.connected).map(p=>p.name).join('、')}重连 · 剩余 ${Math.max(0,Math.ceil(30-Math.max(...s.players.map(p=>p?.offline||0))))} 秒`:`已连接 · ${s.config.mode==='letters'?'字母组合':s.config.mode==='english'?'英语单词':'英语句子'}${s.config.mode==='letters'?'':s.stage?` · ${s.stage.name} · ${s.stage.count}词`:s.dialogueStage?` · ${s.dialogueStage.name} · ${s.dialogueStage.groups}组`:` · ${s.config.level+1} 级`} · 双方题目与技能进度独立`;
+  $('#connection').textContent=s.paused?`等待${s.players.filter(p=>p&&!p.connected).map(p=>p.name).join('、')}重连 · 剩余 ${Math.max(0,Math.ceil(30-Math.max(...s.players.map(p=>p?.offline||0))))} 秒`:`已连接 · ${s.config.mode==='letters'?'字母组合':s.config.mode==='english'?'英语单词':'英语句子'}${s.config.mode==='letters'?'':s.config.publicResource?` · 公共词组：${s.config.publicResource.title}`:s.stage?` · ${s.stage.name} · ${s.stage.count}词`:s.dialogueStage?` · ${s.dialogueStage.name} · ${s.dialogueStage.groups}组`:` · ${s.config.level+1} 级`} · 双方题目与技能进度独立`;
   $('#roundLabel').textContent=s.round?`第 ${s.round} 局`:'';
   $('#waiting').hidden=playing;$('#battle').hidden=!s.fields;
   if(!playing){
     $('#waitingTitle').textContent=finished?(s.winner===null?'平局':s.winner===s.side?'你守住了后院！':'这次后院失守了'):(other?'两位守卫已到齐':'等待朋友入场');
     $('#waitingDetail').textContent=finished?`${s.winner===null?s.reason:s.reason.startsWith('对方')?(s.winner===s.side?s.reason:s.reason.replace('对方','你的')):s.reason}。双方准备后可再来一局。`:'双方点击准备后自动开战。题目由房主设置，每个人独立作答。';
+    if(s.config.publicResource)$('#waitingDetail').textContent+=' 公共词组：'+s.config.publicResource.title;
     if(s.ranking)$('#waitingDetail').textContent+=' 上一局：'+s.ranking.reason;
     $('#playerList').replaceChildren();
     s.players.forEach((p,i)=>{const row=document.createElement('p'),name=document.createElement('strong'),status=document.createElement('span');name.textContent=p?`${p.name}${i===s.side?'（我）':''}`:'等待朋友…';status.textContent=p?(p.connected?(p.ready?'已准备 ✓':'未准备'):'未连接'):'';row.append(name,status);$('#playerList').append(row);});
@@ -267,7 +290,12 @@ async function boot(){
     const info=await request('/api/lan');if(!Array.isArray(info.addresses))throw new Error();addresses=info.addresses;stages=info.stages||[];dialogueStages=info.dialogueStages||[];updateLevels();
     const note=$('#networkNote');note.replaceChildren(document.createTextNode('手机或电脑打开：'));
     const url=addresses[0]||new URL('duel.html',location.href).href;const a=document.createElement('a');a.href=url;a.textContent=url;note.append(a,document.createTextNode(info.hosted?' · 分享房间邀请即可联网对战，无需连接同一 Wi-Fi。':' · 房主电脑保持运行。'));
-    if(info.hosted){document.querySelector('.topbar .pill').textContent='在线 · 双人对战';document.querySelector('.lobby-card>p').textContent='手机与电脑均可加入，创建房间后把邀请发给朋友。';}
+    const mode=$('#connectionMode'),badge=$('#lobbyModeBadge'),title=$('#lobbyTitle'),description=$('#lobbyDescription'),guide=$('#lanGuide');
+    if(info.hosted){
+      mode.textContent='在线 · 双人对战';badge.textContent='在线房间';title.textContent='任何网络都能开战';description.textContent='无需同一 Wi‑Fi。设置题目后创建房间，把邀请链接发给朋友即可。';guide.hidden=true;
+    }else{
+      mode.textContent='局域网 · 双人对战';badge.textContent='局域网房间';title.textContent='和同一 Wi‑Fi 的朋友开战';description.textContent='这台电脑运行同步服务；手机或另一台电脑通过局域网地址加入。';guide.hidden=false;
+    }
     try{session=JSON.parse(sessionStorage.getItem(sessionKey));}catch{}
     if(session?.code&&session?.token&&(!invited||session.code===code)){
       try{await request(`/api/room/${session.code}/state`);attach();return;}

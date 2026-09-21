@@ -56,7 +56,7 @@
 .game-app .speech-diff span{padding:3px 6px;background:#51362c;border-radius:5px}
 .solo-app[data-learning-mode=speaking] .keyboard-toggle-row,.solo-app[data-learning-mode=speaking] #touchKeyboard{display:none!important}
 .solo-app[data-learning-mode=speaking] .speech-control{padding:10px;border:1px solid #d9cb8655;border-radius:12px;background:#102b1d}
-.solo-app[data-learning-mode=speaking] #speechEnable,.solo-app[data-learning-mode=speaking] #speechExample,.solo-app[data-learning-mode=speaking] #speechReview{display:none!important}
+.solo-app[data-learning-mode=speaking] #speechEnable,.solo-app[data-learning-mode=speaking] #speechReview{display:none!important}
 .solo-app[data-learning-mode=speaking] #speechButton,.solo-app[data-learning-mode=speaking] #speechSkip{background:transparent;border:1px solid #d9cb8655;box-shadow:none}
 .solo-app[data-learning-mode=speaking] #speechTranscript{font-size:12px;line-height:1.5;text-align:left}
 .solo-app[data-learning-mode=speaking] .speech-diff.has-issues{max-height:130px;padding:8px;border:1px solid #cf806c;border-radius:9px;background:#442c25;color:#ffe1d6}
@@ -106,3 +106,50 @@ body.solo-app[data-learning-mode=speaking] #speechControl[data-held=true] #speec
 body.solo-app[data-learning-mode=speaking] #speechControl:not([data-speech-phase=idle]) #speechButton{opacity:1;color:#fff!important;background:transparent!important;text-shadow:0 1px 2px #173629}
 body.solo-app[data-learning-mode=speaking] #speechControl:not([data-speech-phase=idle]) #speechButton strong{color:#fff!important}
 body.solo-app[data-learning-mode=speaking] #speechControl[data-speech-phase=recording] #speechButton strong:before{content:'● ';color:#ffd1be}
+
+body.solo-app[data-learning-mode=speaking] .speech-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;order:2;margin-top:auto;flex-shrink:0}
+body.solo-app[data-learning-mode=speaking] #speechActions #speechExample{display:inline-flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;height:44px;min-height:44px;padding:6px;font-size:20px;background:transparent;border:1px solid currentColor;border-radius:10px;color:inherit;box-shadow:none}
+body.solo-app[data-learning-mode=speaking] #speechActions #speechSkip{order:0;margin:0;align-self:center;flex-shrink:0;white-space:nowrap}
+body.solo-app[data-learning-mode=speaking] #speechExample:disabled{opacity:.45}
+/* The skip button must share the row instead of inheriting full-width speech controls. */
+body.solo-app[data-learning-mode=speaking] .speech-feedback-panel{min-width:0;max-width:100%}
+body.solo-app[data-learning-mode=speaking] .speech-actions{width:100%;min-width:0;box-sizing:border-box}
+body.solo-app[data-learning-mode=speaking] #speechActions #speechSkip{width:auto;max-width:calc(100% - 52px);min-width:0;flex:0 1 auto;padding-inline:8px}
+
+/* Desktop home follows the phone's two choices and grouped start actions. */
+body.web-home .start-screen{padding:24px;gap:24px;grid-template-columns:minmax(0,580px) minmax(120px,1fr);align-items:center;overflow:auto}
+body.web-home .start-panel{box-sizing:border-box;width:100%;max-width:580px;max-height:none;padding:22px 26px;border:1px solid #d8dfce;border-radius:22px;background:#f7f5ec;color:#173629}
+body.web-home .start-stamp{display:none}
+body.web-home .start-panel h2{margin:0 0 8px;font-size:30px;text-align:center;color:#173629;text-shadow:none}
+body.web-home .start-panel>p{margin:6px 0 12px;font-size:13px;line-height:1.5;color:#60745c;text-align:center}
+body.web-home .start-panel #buildVersion{display:block;margin:4px 0 10px;color:#60745c;text-align:center}
+body.web-home .web-home-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0}
+body.web-home .web-home-option{min-width:0;padding:16px;border:1px solid #d5dfca;border-radius:15px;background:#fff}
+body.web-home .web-home-option>strong{display:block;margin-bottom:12px;color:#60745c;font-size:14px}
+body.web-home .web-home-option .difficulty-label,body.web-home .web-home-option .custom-source{display:block;margin:0;padding:0;font-size:0}
+body.web-home .web-home-option select{width:100%;max-width:100%;min-width:0;min-height:40px;margin:0;padding:6px 0;border:0;background:transparent;color:#173629;font-size:17px;font-weight:700}
+body.web-home .web-home-option select:disabled{opacity:.55}
+body.web-home .web-home-library{display:block;width:100%;min-height:46px;margin:0 0 12px;padding:10px 14px;border:1px solid #d5dfca;border-radius:12px;background:#eaf1e5;color:#24533c;text-align:left;font-size:15px;font-weight:600}
+body.web-home .web-home-library:after{content:'›';float:right;font-size:20px}
+body.web-home .web-home-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+body.web-home .start-panel .web-home-action{display:flex;justify-content:center;align-items:center;box-sizing:border-box;width:100%;min-height:48px;margin:0;padding:10px;border:1px solid #829477;border-radius:13px;background:#fff;color:#173629;font-size:16px;font-weight:700;text-decoration:none;box-shadow:none;white-space:normal}
+body.web-home .start-panel #startButton{grid-column:1/-1;background:#efd06e;border-color:#b88c26;font-size:19px}
+body.web-home .start-panel .community-home{min-height:44px;background:#eaf1e5;border-color:#d5dfca;color:#24533c}
+@media(max-width:800px){body.web-home .start-screen{grid-template-columns:1fr;padding:14px}body.web-home .start-panel{margin:auto;padding:18px}body.web-home .start-screen>.zombie-intro{display:none}}
+body.web-home .start-panel{background:rgba(247,245,236,.78)}
+body.web-home .web-home-option{background:rgba(255,255,255,.64)}
+body.web-home .web-home-library,body.web-home .start-panel .community-home{background:rgba(234,241,229,.68)}
+body.web-home .start-panel .web-home-action{background:rgba(255,255,255,.64)}
+body.web-home .start-panel #startButton{background:rgba(239,208,110,.82)}
+body.web-home .web-home-actions #continueButton{margin:0}
+body.web-home .web-home-actions .web-home-action{transform:none}
+body.web-home[data-game-state=ready] .arsenal{display:none}
+body.web-home[data-game-state=ready] .battle-toast{display:none!important}
+/* Transparent garden home, without white panels or white button fills. */
+body.web-home .start-panel{background:rgba(16,43,29,.48);border-color:#d8dfaa66;color:#fff1bd}
+body.web-home .start-panel h2,body.web-home .web-home-option select{color:#fff1bd}
+body.web-home .start-panel>p,body.web-home .start-panel #buildVersion,body.web-home .web-home-option>strong{color:#e0e6c7}
+body.web-home .web-home-option{background:rgba(26,62,39,.35);border-color:#d8dfaa66}
+body.web-home .web-home-library,body.web-home .start-panel .community-home,body.web-home .start-panel .web-home-action{background:rgba(32,72,44,.4);border-color:#d8dfaa88;color:#fff1bd}
+body.web-home .start-panel #startButton{background:rgba(182,147,53,.42);border-color:#ebcc7b;color:#fff1bd}
+body.web-home .web-home-option select option{background:#173629;color:#fff1bd}

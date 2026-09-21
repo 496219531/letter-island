@@ -20,3 +20,16 @@ test('whole recording surface reflects press, recording, recognition and cancell
   Object.assign(s.context.microphone,{phase,held});s.update();const surface=s.nodes.get('#speechControl');assert.equal(surface.dataset.speechPhase,phase);assert.equal(surface.dataset.held,String(held));assert.equal(s.nodes.get('#speechDiff').hidden,false);
  }
 });
+test('example stays visible and is disabled during recording and recognition',()=>{
+ const s=setup();s.update();assert.equal(s.nodes.get('#speechExample').hidden,false);assert.equal(s.nodes.get('#speechExample').disabled,false);
+ for(const phase of ['preparing','recording','recognizing']){s.context.microphone.phase=phase;s.update();assert.equal(s.nodes.get('#speechExample').disabled,true);}
+});
+test('example reads the current target in English without selecting or skipping it',()=>{
+ const calls=[],context={game:{learningMode:'speaking',status:'playing',typing:0,skills:[{code:'HELLO',cd:0},{code:'GOODBYE',cd:0}]},microphone:{phase:'idle'},permissionPhase:'idle',lookupSentence:code=>({text:code==='HELLO'?'Hello there.':'Goodbye.'}),pendingLearningReadout:[{}],window:{},localSpeech:{speak:text=>{calls.push(text);return true;},cancel(){}},updateSpeechControl(){}};
+ vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function playSpeechExample(event){'),source.indexOf("$('#speechExample').addEventListener('click',playSpeechExample);")),context);
+ let stopped=0;context.playSpeechExample({stopPropagation(){stopped++;}});assert.deepEqual(calls,['Hello there.']);assert.equal(stopped,1);assert.equal(context.game.typing,0);assert.equal(context.pendingLearningReadout.length,0);
+ context.game.typing=1;context.playSpeechExample();assert.equal(calls.at(-1),'Goodbye.');
+ context.microphone.phase='recording';context.playSpeechExample();assert.equal(calls.length,2);
+ context.microphone.phase='idle';const native=[];context.window.GuluNative=context.GuluNative={speakLearning:payload=>{native.push(payload);return Promise.resolve();}};
+ context.playSpeechExample();assert.equal(native[0].text,'Goodbye.');assert.equal(native[0].chinese,false);assert.equal(native[0].language,'en');
+});

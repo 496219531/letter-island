@@ -4,7 +4,7 @@
   const post=(command,id)=>window.webkit.messageHandlers.gulu.postMessage({command,id});
   window.GuluNative={authorize(){return new Promise((resolve,reject)=>{const id=++serial;waiting.set(id,{resolve,reject});post('authorize',id);});}};
   Object.assign(window.GuluNative,{
-    communityRequest:(path,data)=>new Promise((resolve,reject)=>{const id=++serial;const timer=setTimeout(()=>{waiting.delete(id);reject(new Error('连接小院超时，请检查网络后重试'));},path==='library/organize'?135000:15000);waiting.set(id,{resolve:value=>{clearTimeout(timer);resolve(value);},reject:error=>{clearTimeout(timer);reject(error);}});window.webkit.messageHandlers.gulu.postMessage({command:'communityRequest',id,path,...(data===undefined?{}:{data})});}),
+    communityRequest:(path,data)=>new Promise((resolve,reject)=>{const id=++serial;const timer=setTimeout(()=>{waiting.delete(id);reject(new Error('连接小院超时，请检查网络后重试'));},path==='library/organize'?135000:path==='library/ocr/upload'?65000:15000);waiting.set(id,{resolve:value=>{clearTimeout(timer);resolve(value);},reject:error=>{clearTimeout(timer);reject(error);}});window.webkit.messageHandlers.gulu.postMessage({command:'communityRequest',id,path,...(data===undefined?{}:{data})});}),
     playEffect:(kind,variant,volume,pan)=>window.webkit.messageHandlers.gulu.postMessage({command:'playEffect',kind,variant,volume,pan}),
     setEffectGain:gain=>window.webkit.messageHandlers.gulu.postMessage({command:'setEffectGain',gain}),
     stopEffects:()=>window.webkit.messageHandlers.gulu.postMessage({command:'stopEffects'})
@@ -13,7 +13,7 @@
   Object.assign(window.GuluNative,{retainAudio:ids=>audioCommand('retainAudio',ids),playAudio:id=>audioCommand('playAudio',[id]),deleteAudio:ids=>audioCommand('deleteAudio',ids).catch(()=>{}),stopAudio:()=>audioCommand('stopAudio').catch(()=>{})});
   function libraryCommand(command,payload={},onProgress){return new Promise((resolve,reject)=>{const id=++serial;waiting.set(id,{resolve,reject,onProgress});window.webkit.messageHandlers.gulu.postMessage({command,id,...payload});});}
   Object.assign(window.GuluNative,{setSettingsPortrait:enabled=>libraryCommand('setSettingsPortrait',{enabled}),getScreenDirection:()=>libraryCommand('getScreenDirection'),setScreenDirection:direction=>libraryCommand('setScreenDirection',{direction}),getAppVersion:()=>libraryCommand('getAppVersion')});
-  Object.assign(window.GuluNative,{organizeLibrary:payload=>libraryCommand('organizeLibrary',payload),configureQwen:()=>libraryCommand('configureQwen'),importImage:(image,kind)=>libraryCommand('importImage',{image,kind}),translateTexts:(texts,onProgress)=>libraryCommand('translateTexts',{texts},onProgress),exportLibrary:text=>libraryCommand('exportLibrary',{text}),speakLearning:payload=>libraryCommand('speakLearning',payload),stopLearningSpeech:()=>libraryCommand('stopLearningSpeech')});
+  Object.assign(window.GuluNative,{pickLibraryImages:limit=>libraryCommand('pickLibraryImages',{limit}),organizeLibrary:payload=>libraryCommand('organizeLibrary',payload),configureQwen:()=>libraryCommand('configureQwen'),importImage:(image,kind)=>libraryCommand('importImage',{image,kind}),translateTexts:(texts,onProgress)=>libraryCommand('translateTexts',{texts},onProgress),exportLibrary:text=>libraryCommand('exportLibrary',{text}),speakLearning:payload=>libraryCommand('speakLearning',payload),stopLearningSpeech:()=>libraryCommand('stopLearningSpeech')});
   class NativeRecognition {
     start(){this.id=++serial;sessions.set(this.id,this);window.webkit.messageHandlers.gulu.postMessage({command:'start',id:this.id,contextualStrings:this.contextualStrings||[]});}
     stop(){post('stop',this.id);}
@@ -49,7 +49,7 @@
       card('练习方式',difficulty,'mode');
       const manage=source?.querySelector('button');if(manage)manage.remove();
       if(source)card('练习题库',source,'library');
-      if(manage){manage.className='native-home-library';manage.textContent='管理我的词句库';options.after(manage);}
+      if(manage){manage.className='native-home-library';manage.textContent='词句库';options.after(manage);const pending=source?.querySelector('.ocr-pending-entry');if(pending){pending.classList.add('native-home-library');manage.after(pending);}}
       const actions=document.createElement('nav');actions.className='native-home-actions';actions.setAttribute('aria-label','开始游玩');start.before(actions);
       start.textContent='🌱 开始新冒险';actions.append(start);if(resume){resume.textContent='▶ 继续冒险';actions.append(resume);}if(duel){duel.textContent='和朋友对战';actions.append(duel);}
       for(const action of actions.children){action.classList.remove('primary-button','new-run-button','build-button');action.classList.add('native-home-action');}

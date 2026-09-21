@@ -18,3 +18,8 @@ node_modules/
 
 # Local browser automation traces
 /.playwright-cli/
+
+# Deployment artifacts and Python test caches
+/output/deploy/
+/output/playwright/
+**/__pycache__/

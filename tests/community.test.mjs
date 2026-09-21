@@ -14,7 +14,7 @@ test('accounts, recovery rotation, logout and scores survive a restart',async()=
   assert.throws(()=>s.finishSolo(b.user,{runId:run.runId,score:100,wave:1,kills:2,casts:1,seconds:50}));
   s.finishSolo(a.user,{runId:run.runId,score:100,wave:1,kills:2,casts:1,seconds:50});
   assert.equal(s.finishSolo(a.user,{runId:run.runId,score:999999}).duplicate,true);
-  assert.equal(s.leaderboard('solo','english',2,a.user).me.score,100);
+  const soloBoard=s.leaderboard('solo','english',2,a.user);assert.equal(soloBoard.me.score,100);assert.equal(soloBoard.me.practice,1);assert.equal(soloBoard.me.casts,1);assert.deepEqual({...soloBoard.overview.practice},{players:1,runs:1,casts:1});
   assert.equal(s.leaderboard('solo','english',0).rows.length,0);
   const suspicious=s.startSolo(a.user,{mode:'letters',level:0});assert.throws(()=>s.finishSolo(a.user,{runId:suspicious.runId,score:1000000,wave:50,kills:100,casts:10,seconds:1000}));
   assert.throws(()=>s.startSolo(a.user,{mode:'english',level:0,custom:true}));
@@ -30,12 +30,13 @@ test('duel results are idempotent, disallow self-farming, and cap daily repeated
   assert.equal(s.recordDuel('short',[a.id,b.id],0,29).counted,false);
   assert.equal(s.recordDuel('self',[a.id,a.id],0,60).counted,false);
   assert.equal(s.recordDuel('guest',[a.id,null],0,60).counted,false);
-  s.recordDuel('one',[a.id,b.id],0,60);s.recordDuel('one',[a.id,b.id],0,60);
+  s.recordDuel('one',[a.id,b.id],0,60,[2,4]);s.recordDuel('one',[a.id,b.id],0,60,[99,99]);
   assert.equal(s.leaderboard('duel').rows[0].points,3);
-  s.recordDuel('two',[b.id,a.id],null,60);s.recordDuel('three',[a.id,b.id],1,60);
-  assert.equal(s.recordDuel('four',[a.id,b.id],0,60).counted,false);
-  assert.equal(s.leaderboard('duel').rows[0].played,3);
-  clock+=86400000;assert.equal(s.recordDuel('next-day',[a.id,b.id],0,60).counted,true);
+  s.recordDuel('two',[b.id,a.id],null,60,[1,0]);s.recordDuel('three',[a.id,b.id],1,60,[3,5]);
+  assert.equal(s.recordDuel('four',[a.id,b.id],0,60,[6,7]).counted,false);
+  const total=s.leaderboard('duel').rows.find(row=>row.id===a.id);assert.equal(total.played,6);assert.equal(total.casts,11);
+  clock+=86400000;assert.equal(s.recordDuel('next-day',[a.id,b.id],0,60,[1,1]).counted,true);
+  assert.deepEqual({...s.leaderboard('duel').overview.duel},{players:2,matches:7,casts:30});
  }finally{s.close();}
 });
 test('HTTP account ownership, score submission, cache validators, compression, and server-settled duels',async t=>{

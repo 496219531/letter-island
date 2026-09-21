@@ -2,10 +2,10 @@ import { mkdir, cp, readFile, writeFile, rm, readdir } from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 execFileSync(process.execPath, ['build-dialogues.mjs'], { stdio: 'inherit' });
-for (const script of ['zombie-recorder.js', 'performance.js', 'custom-library.js', 'library-ui.js', 'speech-review.js', 'mode-copy.js', 'mobile.js', 'dialogues.js', 'build-dialogues.mjs', 'speech-bridge.mjs', 'press-to-talk.js', 'pcm-capture.js', 'system-speech.js', 'launch.mjs', 'game-ui.js', 'vocabulary.js', 'engine.js', 'save.js', 'sound.js', 'game.js', 'adventure.js', 'duel.cjs', 'lan-server.mjs', 'duel-client.js']) execFileSync(process.execPath, ['--check', script], { stdio: 'inherit' });
+for (const script of ['zombie-recorder.js', 'performance.js', 'custom-library.js', 'ocr-client.js', 'library-ui.js', 'speech-review.js', 'mode-copy.js', 'mobile.js', 'dialogues.js', 'build-dialogues.mjs', 'speech-bridge.mjs', 'press-to-talk.js', 'pcm-capture.js', 'system-speech.js', 'launch.mjs', 'game-ui.js', 'vocabulary.js', 'engine.js', 'save.js', 'sound.js', 'game.js', 'adventure.js', 'duel.cjs', 'lan-server.mjs', 'ocr-queue.mjs', 'duel-client.js']) execFileSync(process.execPath, ['--check', script], { stdio: 'inherit' });
 // The iPhone app embeds these exact browser files. Sync and verify them here
 // so an App build cannot silently use an older game engine than the web build.
-const nativeCore=['custom-library.js','engine.js','game.js','save.js','sound.js','library-ui.js','library.css','performance.js','performance.css','mobile.js','mobile.css','game-ui.js','system-speech.js','press-to-talk.js','speech-review.js','mode-copy.js','vocabulary.js','dialogues.js','styles.css','immersive.css','index.html'];
+const nativeCore=['custom-library.js','engine.js','game.js','save.js','sound.js','ocr-client.js', 'library-ui.js','library.css','performance.js','performance.css','mobile.js','mobile.css','game-ui.js','system-speech.js','press-to-talk.js','speech-review.js','mode-copy.js','vocabulary.js','dialogues.js','styles.css','immersive.css','index.html'];
 for(const file of nativeCore){const target=`ios/GuluGarden/Web/${file}`;await cp(file,target,{recursive:true});const [source,embedded]=await Promise.all([readFile(file),readFile(target)]);if(!source.equals(embedded))throw new Error(`iPhone embedded file is stale: ${file}`);}
 // The native shell loads this stylesheet from its embedded Web directory.
 // Keep it in the same verified sync path as the game code.
@@ -16,7 +16,7 @@ if(!nativePhoneCSS.equals(embeddedPhoneCSS))throw new Error('iPhone embedded sty
 // older builds before assembling the deployable bundle.
 await rm('dist', { recursive: true, force: true });
 await mkdir('dist', { recursive: true });
-for (const file of ['zombie-recorder.html', 'zombie-recorder.js', 'performance.js', 'performance.css', 'library.css', 'custom-library.js', 'library-ui.js', 'speech-review.js', 'mode-copy.js', 'mobile.js', 'mobile.css', 'index.html', 'dialogues.js', 'dialogue-guide.html', 'press-to-talk.js', 'pcm-capture.js', 'system-speech.js', 'immersive.css', 'game-ui.js', 'vocabulary.js', 'vocabulary-guide.html', 'licenses', 'styles.css', 'engine.js', 'save.js', 'sound.js', 'game.js', 'adventure.html', 'adventure.css', 'adventure.js', 'duel.html', 'duel.css', 'duel-client.js', 'assets']) {
+for (const file of ['zombie-recorder.html', 'zombie-recorder.js', 'performance.js', 'performance.css', 'library.css', 'custom-library.js', 'ocr-client.js', 'library-ui.js', 'speech-review.js', 'mode-copy.js', 'mobile.js', 'mobile.css', 'index.html', 'dialogues.js', 'dialogue-guide.html', 'press-to-talk.js', 'pcm-capture.js', 'system-speech.js', 'immersive.css', 'game-ui.js', 'vocabulary.js', 'vocabulary-guide.html', 'licenses', 'styles.css', 'engine.js', 'save.js', 'sound.js', 'game.js', 'adventure.html', 'adventure.css', 'adventure.js', 'duel.html', 'duel.css', 'duel-client.js', 'assets']) {
   await cp(file, `dist/${file}`, { recursive: true });
 }
 // Reuse the tested App UI on phones; native-only controls stay hidden on the web.

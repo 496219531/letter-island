@@ -29,3 +29,51 @@
 .game-app .library-info p{margin:0;padding-right:30px}
 .game-app .library-dialog .library-info[open] p{color:#173629;font-size:14px;line-height:1.65;font-weight:500;opacity:1;text-shadow:none}
 .game-app .library-dialog .library-info[open] summary{background:#e0ead5;color:#173629;border-color:#819776;opacity:1}
+
+.game-app .library-entry-line{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0}
+.game-app .library-entry-line>strong,.game-app .library-entry-line>span{min-width:0;overflow-wrap:anywhere;white-space:normal;line-height:1.5}
+.game-app .library-entry-line>span{font-size:14px;color:inherit}
+.game-app .library-dialog .library-entry-line button{flex:none;min-width:44px;min-height:44px;margin:0;font-size:18px}
+.game-app .library-speech-status:empty{display:none}
+
+/* Explanation text stays readable in both the game and the phone's light theme. */
+body.game-app .library-dialog .library-info,
+body.game-app .library-dialog .library-info summary,
+body.game-app .library-dialog .library-info[open],
+body.game-app .library-dialog .library-info[open] p{background:#fff!important;color:#000!important;opacity:1!important;text-shadow:none!important;box-shadow:none!important}
+body.game-app .library-dialog .library-info summary{border-color:#000!important}
+body.game-app .library-dialog .library-info[open]{border:1px solid #000;box-sizing:border-box}
+body.game-app .library-dialog .library-info[open] p{font-size:16px;line-height:1.7;font-weight:400;overflow-wrap:anywhere}
+body.game-app .library-dialog header{flex-wrap:wrap}
+body.game-app .library-dialog header .library-info[open]{order:3;flex:0 0 100%;width:100%;min-width:0;margin:0}
+
+/* The information control is a plain glyph; the explanatory card keeps its own surface. */
+body.game-app .library-dialog .library-info summary,
+body.game-app .library-dialog .library-info[open] summary{
+  background:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+}
+body.game-app .library-dialog .library-info summary:focus-visible{
+  outline:2px solid currentColor;
+  outline-offset:2px;
+}
+body.game-app .library-dialog .library-info:not([open]){
+  background:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+}
+
+.game-app .library-entry-text{display:flex;flex-direction:column;gap:6px;min-width:0;overflow-wrap:anywhere;white-space:normal;line-height:1.5}
+.game-app .library-entry-text>span{font-size:14px;color:inherit}
+
+.game-app .library-main-tabs{flex:none;margin:0;padding:10px 14px;border-bottom:1px solid #72895c;overflow:visible}
+.game-app .library-main-tabs button{min-width:0;min-height:44px}
+.game-app .library-dialog [role=tabpanel][hidden]{display:none!important}
+.game-app .library-main-tabs button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+
+.game-app .ocr-pending-entry[hidden]{display:none!important}
+.game-app .ocr-submitted{margin-top:14px;padding:12px;border:1px solid #a5b69b;border-radius:10px;background:#29452f;color:#ffebba}
+.game-app .ocr-submitted strong{display:block;font-size:15px}
+.game-app .ocr-submitted p{margin:5px 0 8px;padding:0;color:inherit}
+.game-app .ocr-submitted button{margin:0}
