@@ -1,6 +1,26 @@
 'use strict';
 const {GardenGame, ENGLISH_WORDS, ENGLISH_STAGES, DIALOGUE_STAGES, findWordEntry, findSentenceEntry} = require('./engine.js');
-const UNITS = {runner:{name:'疾跑僵尸',cost:18}, armor:{name:'铁桶僵尸',cost:28}, bomber:{name:'爆破僵尸',cost:38}};
+const UNITS = {
+  walker:{name:'普通僵尸',cost:12},runner:{name:'疾跑僵尸',cost:18},
+  armor:{name:'铁桶僵尸',cost:28},shield:{name:'护盾僵尸',cost:32},
+  healer:{name:'治疗僵尸',cost:34},bomber:{name:'爆破僵尸',cost:38}
+};
+const LANES=[140,215,290,365,430];
+const PHASES=[
+  {name:'交锋',interval:.9,sunRate:2,types:['walker','walker','walker','runner','armor']},
+  {name:'增援',interval:.68,sunRate:2.5,types:['walker','walker','runner','armor','shield','healer']},
+  {name:'激战',interval:.5,sunRate:3,types:['walker','runner','armor','shield','healer','bomber']},
+  {name:'决战',interval:.38,sunRate:3.5,types:['runner','armor','shield','healer','bomber','splitter']}
+];
+function seededRandom(seed){
+  let state=seed>>>0;
+  return ()=>{
+    state=(state+0x6D2B79F5)|0;
+    let value=Math.imul(state^(state>>>15),1|state);
+    value^=value+Math.imul(value^(value>>>7),61|value);
+    return ((value^(value>>>14))>>>0)/4294967296;
+  };
+}
 const MODES = ['letters','english','sentences'];
 
 class DuelGarden extends GardenGame {
@@ -21,32 +41,58 @@ class DuelGarden extends GardenGame {
     return code;
   }
   spawn(...args) {
-    if(this.enemies.length>=70)return null;
+    if(this.enemies.length>=85)return null;
     const zombie=super.spawn(...args);
     zombie.owner=1-this.side;
     return zombie;
   }
   // Only the match may send troops. Disable solo waves and upgrade screens.
   offerCards() {}
+  canCastWithoutEnemies(index){return ['ward','mend'].includes(this.skills[index]?.kind);}
   skillTarget(){return this.target();}
-  canBiteDefense(z) {return !z.engaged;}
+  canBiteDefense(z) {return !z.engaged&&this.siegeLeaders?.has(z.id);}
+  damageDefense(amount,y){super.damageDefense(amount*.25,y);}
   shoot() {
     if(this.auto&&!this.enemies.some(z=>z.hp>0&&z.x<=390))return;
     super.shoot();
   }
   hitBullet(b,z) {if(z.x<=430)super.hitBullet(b,z);}
+  cast(index,completedPractice=false){
+    const skill=this.skills[index],permanent=['lightning','ward','mend'].includes(skill.kind);
+    if(permanent)skill.remainingUses=Infinity;
+    try{return super.cast(index,completedPractice);}finally{if(permanent)delete skill.remainingUses;}
+  }
+  damage(z,amount,kind='pea') {
+    super.damage(z,z.wardTime>0?amount*.6:amount,kind);
+  }
   update(dt) {
+    // One frontliner per lane can reach the garden fence at a time. The rest
+    // keep the push alive without multiplying siege damage into an instant win.
+    const front=new Map();
+    for(const z of this.enemies)if(z.hp>0&&!z.charmed&&!z.engaged){
+      const lane=LANES.reduce((best,_,i)=>Math.abs(LANES[i]-z.y)<Math.abs(LANES[best]-z.y)?i:best,0);
+      if(!front.has(lane)||z.x<front.get(lane).x)front.set(lane,z);
+    }
+    this.siegeLeaders=new Set([...front.values()].map(z=>z.id));
+    for(const z of this.enemies){z.wardTime=Math.max(0,(z.wardTime||0)-dt);z.mendTime=Math.max(0,(z.mendTime||0)-dt);}
     const stopped=this.enemies.filter(z=>z.engaged).map(z=>[z,z.speed]);
     for(const [z] of stopped)z.speed=0;
     super.update(dt);
+    for(const z of this.enemies)if(z.hp>0&&z.mendTime>0)z.hp=Math.min(z.maxHp,z.hp+z.maxHp*.025*dt);
     for(const [z,speed] of stopped)z.speed=speed;
     this.bullets=this.bullets.filter(b=>b.x<=430);
   }
   prepare(mode,level,customBank) {
     this.learningMode=mode;this.englishLevel=level;this.setCustomBank(customBank);this.reset();this.status='playing';
     this.auto=true;this.fireStrength=.3;this.magicSlow=false;this.maxSpellLength=6;this.maxLearningLoad=2;
+    this.maxHealth=56;this.health=56;
     this.quota=0;this.spawnIn=Infinity;
-    for(let i=0;i<3;i++)this.skills[i].code=this.nextCode(i);
+    this.skills.push(
+      {kind:'lightning',name:'连锁闪电',code:'F',typed:0,repeatsDone:0,cd:0,duration:12,uses:0,icon:'⚡'},
+      {kind:'ward',name:'护送结界',code:'G',typed:0,repeatsDone:0,cd:0,duration:16,uses:0,icon:'🛡️'},
+      {kind:'mend',name:'再生脉冲',code:'H',typed:0,repeatsDone:0,cd:0,duration:18,uses:0,icon:'💚'}
+    );
+    for(let i=0;i<this.skills.length;i++)this.skills[i].code=this.nextCode(i);
   }
 }
 
@@ -60,7 +106,7 @@ class DuelMatch {
   join(name) {
     if(this.players.every(Boolean))throw new Error('房间已满，请创建另一个房间');
     const side=this.players[0]?1:0;
-    this.players[side]={name:String(name||'小院守卫').trim().slice(0,16)||'小院守卫',connected:false,offline:0,ready:false,sun:24,sent:0,dispatchCd:0};
+    this.players[side]={name:String(name||'小院守卫').trim().slice(0,16)||'小院守卫',connected:false,offline:0,ready:false,sun:24,sent:0,dispatchCd:0,wardUntil:0,mendUntil:0};
     return side;
   }
   leave(side) {
@@ -75,23 +121,38 @@ class DuelMatch {
     if(this.games)this.games[side].shooting=false;
   }
   begin() {
-    this.round++;this.status='playing';this.elapsed=0;this.waveIn=.7;this.winner=null;this.reason='';
-    this.games=[0,1].map(side=>{const g=new DuelGarden(side,{random:this.random});g.promptHistory=this.promptHistories[side];g.prepare(this.config.mode,this.config.level,this.customBank);return g;});
-    this.players.forEach(p=>Object.assign(p,{sun:24,sent:0,dispatchCd:0,ready:false,offline:0}));
+    this.round++;this.status='playing';this.elapsed=0;this.waveIn=.7;this.autoSerial=0;this.winner=null;this.reason='';
+    const seed=Math.floor(this.random()*4294967296)>>>0;
+    this.games=[0,1].map(side=>{const g=new DuelGarden(side,{random:seededRandom(seed)});g.promptHistory=this.promptHistories[side];g.prepare(this.config.mode,this.config.level,this.customBank);return g;});
+    this.players.forEach(p=>Object.assign(p,{sun:24,sent:0,dispatchCd:0,ready:false,offline:0,wardUntil:0,mendUntil:0}));
 
   }
   end(winner,reason) {this.status='finished';this.winner=winner;this.reason=reason;this.players.forEach(p=>{if(p)p.ready=false;});}
   send(side,type,paid=false,laneY=null) {
     const target=this.games[1-side];
-    if(target.enemies.length>=60)return false;
+    target.enemies=target.enemies.filter(z=>z.hp>0);
+    if(target.enemies.length>=75)return false;
     // Each garden stores enemy coordinates with its own yard on the left.
     // Mirroring the other garden gives one shared, symmetric battlefield.
     const zombie=target.spawn(800,laneY,type,false);
     if(!zombie)return false;
     // Faster crossing keeps two-player rounds lively without changing solo rules.
     zombie.speed*=1.65;this.players[side].sent++;
-    if(paid){this.players[side].sun-=UNITS[type].cost;this.players[side].dispatchCd=2;}
+    zombie.wardTime=Math.max(0,this.players[side].wardUntil-this.elapsed);
+    zombie.mendTime=Math.max(0,this.players[side].mendUntil-this.elapsed);
+    if(paid){this.players[side].sun-=UNITS[type].cost;this.players[side].dispatchCd=.8;}
     return true;
+  }
+  get phase(){return Math.min(PHASES.length-1,Math.floor(this.elapsed/60));}
+  support(side,kind){
+    const p=this.players[side],army=this.games[1-side].enemies.filter(z=>z.hp>0&&z.owner===side);
+    if(kind==='ward'){
+      p.wardUntil=this.elapsed+5;
+      for(const z of army)z.wardTime=5;
+    }else if(kind==='mend'){
+      p.mendUntil=this.elapsed+5;
+      for(const z of army){z.hp=Math.min(z.maxHp,z.hp+z.maxHp*.2);z.mendTime=5;}
+    }
   }
   clash(dt) {
     const armies=this.games.map(g=>g.enemies.filter(z=>z.hp>0));
@@ -130,10 +191,10 @@ class DuelMatch {
     }
     if(action.type==='surrender') {if(this.status==='playing')this.end(1-side,'对方认输');return;}
     if(this.status!=='playing'||!this.players.every(q=>q&&q.connected))throw new Error('对局尚未开始或正在等待重连');
-    const g=this.games[side];
+    const g=this.games[side],castsBefore=g.casts,usesBefore=g.skills.map(s=>s.uses);
     switch(action.type) {
       case 'key': if(typeof action.key==='string'&&/^[a-z .'-]$/i.test(action.key))g.input(action.key);else throw new Error('无效按键');break;
-      case 'select': if(Number.isInteger(action.index)&&action.index>=0&&action.index<3)g.select(action.index);else throw new Error('无效技能');break;
+      case 'select': if(Number.isInteger(action.index)&&action.index>=0&&action.index<g.skills.length)g.select(action.index);else throw new Error('无效技能');break;
       case 'backspace':g.backspace();break;
       case 'cancel':g.cancelTyping();break;
       case 'aim':if(Number.isFinite(action.x)&&Number.isFinite(action.y))g.setAim(action.x,action.y);else throw new Error('无效坐标');break;
@@ -148,6 +209,7 @@ class DuelMatch {
       }
       default:throw new Error('不支持的操作');
     }
+    if(g.casts>castsBefore){const index=g.skills.findIndex((s,i)=>s.uses>usesBefore[i]);if(index>=0)this.support(side,g.skills[index].kind);}
   }
   tick(dt) {
     if(this.status!=='playing')return;
@@ -161,12 +223,14 @@ class DuelMatch {
     this.elapsed+=dt;this.waveIn-=dt;
     const wave=Math.min(8,1+Math.floor(this.elapsed/40));
     this.games.forEach(g=>{g.wave=wave;});
-    this.players.forEach(p=>{p.sun=Math.min(100,p.sun+dt*2);p.dispatchCd=Math.max(0,p.dispatchCd-dt);});
+    const phase=PHASES[this.phase];
+    this.players.forEach(p=>{p.sun=Math.min(100,p.sun+dt*phase.sunRate);p.dispatchCd=Math.max(0,p.dispatchCd-dt);});
     if(this.waveIn<=0) {
-      const lane=[140,215,290,365,430][Math.floor(this.random()*5)];
-      this.send(0,'walker',false,lane);this.send(1,'walker',false,lane);
-      // Solo wave five emits one zombie about every 1.26 seconds.
-      this.waveIn=2.1*Math.pow(.88,4);
+      const type=phase.types[this.autoSerial%phase.types.length];
+      const lane=LANES[(this.autoSerial*3)%LANES.length];this.autoSerial++;
+      this.send(0,type,false,this.phase===3?LANES[Math.floor(this.random()*LANES.length)]:lane);
+      this.send(1,type,false,this.phase===3?LANES[Math.floor(this.random()*LANES.length)]:lane);
+      this.waveIn=phase.interval;
     }
     this.clash(dt);
     this.games.forEach(g=>g.update(dt));
@@ -175,10 +239,10 @@ class DuelMatch {
   }
   snapshot(side,sharedFields) {
     const fields=sharedFields??this.games?.map(g=>({health:g.health,maxHealth:g.maxHealth,flowers:g.flowerHealth,breach:g.breachElapsed,
-      enemies:g.enemies.map(z=>({id:z.id,owner:z.owner,type:z.type,x:z.x,y:z.y,hp:z.hp,maxHp:z.maxHp,shield:z.shield,gait:z.gait,hit:z.hit,engaged:!!z.engaged})),
+      enemies:g.enemies.map(z=>({id:z.id,owner:z.owner,type:z.type,x:z.x,y:z.y,hp:z.hp,maxHp:z.maxHp,shield:z.shield,gait:z.gait,hit:z.hit,engaged:!!z.engaged,wardTime:z.wardTime||0,mendTime:z.mendTime||0})),
       bullets:g.bullets.map(b=>({x:b.x,y:b.y})),effects:g.effects.map(e=>({...e})),freeze:g.freeze,shotKick:g.shotKick,hero:g.hero,target:g.target(),kills:g.kills,casts:g.casts}));
     const own=this.games?.[side];
-    return {status:this.status,round:this.round,side,config:this.config,elapsed:this.elapsed,winner:this.winner,reason:this.reason,
+    return {status:this.status,round:this.round,side,config:this.config,elapsed:this.elapsed,winner:this.winner,reason:this.reason,phase:this.phase,phaseName:PHASES[this.phase].name,nextWave:Math.max(0,this.waveIn),
       paused:this.status==='playing'&&this.players.some(p=>!p?.connected),
       players:this.players.map(p=>p?{name:p.name,connected:p.connected,ready:p.ready,sun:Math.floor(p.sun),sent:p.sent,dispatchCd:p.dispatchCd,offline:p.offline}:null),
       stage:this.config.mode==='english'?ENGLISH_STAGES[this.config.level]:null,

@@ -458,7 +458,7 @@
       if(skill.typed===skill.code.length){
         if(['english','sentences'].includes(this.learningMode)){const entry=this.learningEntry(skill.code);this.emit('practice-complete',{index,code:skill.code,text:entry?.text||skill.code.toLowerCase(),meaning:entry?.meaning||'',repeat:skill.repeatsDone+1});}
         if(this.learningMode==='english'&&skill.repeatsDone+1<this.learningLoad){skill.repeatsDone++;skill.typed=0;this.emit('repeat',{index,done:skill.repeatsDone,total:this.learningLoad});return true;}
-        if(!this.enemies.some(z=>z.hp>0&&!z.charmed)){skill.typed=0;this.typing=-1;this.emit('empty');return true;}
+        if(!this.enemies.some(z=>z.hp>0&&!z.charmed)&&!this.canCastWithoutEnemies?.(index)){skill.typed=0;this.typing=-1;this.emit('empty');return true;}
         this.cast(index,true);
       }
       return true;
@@ -478,7 +478,7 @@
       const match=speechMatch(this.learningEntry(skill.code)?.text||skill.code,transcript),{heard,expected}=match;
       this.typing=index;this.emit('speech',{index,heard,expected,matched:match.matched,nameTolerated:match.nameTolerated});
       if(!match.matched)return false;
-      if(!this.enemies.some(z=>z.hp>0&&!z.charmed)){this.typing=-1;this.emit('empty');return true;}
+      if(!this.enemies.some(z=>z.hp>0&&!z.charmed)&&!this.canCastWithoutEnemies?.(index)){this.typing=-1;this.emit('empty');return true;}
       this.correct+=expected.replace(/ /g,'').length;this.cast(index,true);return true;
     }
     backspace() { if(this.typing>=0){const s=this.skills[this.typing];s.typed=Math.max(0,s.typed-1);} }

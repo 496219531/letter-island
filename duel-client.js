@@ -19,7 +19,7 @@ function playDuelSounds(s){
     if(field.shotKick>0&&audioPrevious.shotKick<=0)duelAudio.play('shot');
     if(field.kills>audioPrevious.kills)duelAudio.play('kill');
     if(field.health<audioPrevious.health)duelAudio.play('nibble');
-    s.skills.forEach((skill,i)=>{if(skill.uses>audioPrevious.uses[i])duelAudio.play(['laser','freeze','melon'][i]);});
+    s.skills.forEach((skill,i)=>{if(skill.uses>audioPrevious.uses[i])duelAudio.play(({lightning:'laser',ward:'shield',mend:'shield'})[skill.kind]||skill.kind);});
     if(field.enemies.some(z=>z.hit>0))duelAudio.play('flesh');
   }
   audioPrevious={key,elapsed:s.elapsed,shotKick:field.shotKick,kills:field.kills,health:field.health,uses:s.skills.map(skill=>skill.uses)};
@@ -138,7 +138,7 @@ $('#auto').onchange=()=>{localAuto=$('#auto').checked;action({type:'auto',value:
 let lastPing=0;setInterval(()=>{const gap=state?.status==='playing'?2000:15000;if(session&&connected&&Date.now()-lastPing>=gap){lastPing=Date.now();action({type:'ping'});}},2000);
 
 const skillCards=[];
-for(let i=0;i<3;i++){
+for(let i=0;i<6;i++){
   const button=document.createElement('button');button.className='skill';button.innerHTML='<div class="skill-top"><strong></strong><small></small></div><div class="dialogue-context" hidden></div><div class="skill-code"></div><div class="skill-meaning"></div><div class="skill-bar"></div>';
   button.onclick=()=>{action({type:'select',index:i});$('#myCanvas').focus({preventScroll:true});};$('#skills').append(button);skillCards.push(button);
 }
@@ -158,7 +158,7 @@ function showPhoneSkill(index){
 if(window.GuluMobile?.active){
   document.body.classList.add('phone-duel');
   phoneTabs=document.createElement('div');phoneTabs.className='duel-skill-tabs';phoneTabs.setAttribute('aria-label','选择大招');
-  ['🌈 激光','❄️ 冰冻','🍉 西瓜'].forEach((label,index)=>{const button=document.createElement('button');button.type='button';button.dataset.skill=index;button.textContent=label;button.onclick=()=>{showPhoneSkill(index);skillCards[index].click();};phoneTabs.append(button);skillCards[index].dataset.skill=index;});
+  ['🌈 激光','❄️ 冰冻','🍉 西瓜','⚡ 闪电','🛡️ 护送','💚 再生'].forEach((label,index)=>{const button=document.createElement('button');button.type='button';button.dataset.skill=index;button.textContent=label;button.onclick=()=>{showPhoneSkill(index);skillCards[index].click();};phoneTabs.append(button);skillCards[index].dataset.skill=index;});
   $('#skills').before(phoneTabs);showPhoneSkill(0);
   const keyboard=document.createElement('div');keyboard.className='duel-touch-keyboard';keyboard.setAttribute('aria-label','对战触屏键盘');
   for(const keys of ['QWERTYUIOP'.split(''),'ASDFGHJKL'.split(''),'ZXCVBNM'.split(''),["'",'-','.',' ','Backspace','Escape']]){
@@ -169,7 +169,7 @@ if(window.GuluMobile?.active){
   duelKeyboard=keyboard;duelKeyboardToggle=document.createElement('button');duelKeyboardToggle.type='button';duelKeyboardToggle.className='duel-keyboard-toggle';duelKeyboardToggle.textContent='⌨ 触屏键盘';duelKeyboardToggle.hidden=true;duelKeyboardToggle.setAttribute('aria-controls','duelTouchKeyboard');duelKeyboardToggle.onclick=()=>{duelManualKeyboard=!duelManualKeyboard;duelKeyboard.hidden=!duelManualKeyboard;duelKeyboardToggle.setAttribute('aria-expanded',String(duelManualKeyboard));};keyboard.id='duelTouchKeyboard';$('#skills').before(duelKeyboardToggle);$('#skills').after(keyboard);syncDuelHardwareKeyboard();
 }
 const unitButtons={};
-for(const [unit,icon,name,cost] of [['runner','⚡','疾跑僵尸',18],['armor','🪣','铁桶僵尸',28],['bomber','💣','爆破僵尸',38]]){
+for(const [unit,icon,name,cost] of [['walker','🧟','普通僵尸',12],['runner','⚡','疾跑僵尸',18],['armor','🪣','铁桶僵尸',28],['shield','🛡️','护盾僵尸',32],['healer','💚','治疗僵尸',34],['bomber','💣','爆破僵尸',38]]){
   const b=document.createElement('button');b.innerHTML=`<span>${icon} ${name}</span><small>☀ ${cost}</small>`;b.onclick=()=>{action({type:'send',unit});$('#myCanvas').focus({preventScroll:true});};$('#units').append(b);unitButtons[unit]=b;
 }
 function render() {
@@ -204,22 +204,23 @@ function render() {
   $('#myName').textContent=me.name+'（我）';$('#theirName').textContent=other.name;
   $('#myHealth').textContent=`🌻 ${mine.health.toFixed(1)} / ${mine.maxHealth}`;$('#theirHealth').textContent=`🌻 ${theirs.health.toFixed(1)} / ${theirs.maxHealth}`;
   $('#timer').textContent=`${String(Math.floor(s.elapsed/60)).padStart(2,'0')}:${String(Math.floor(s.elapsed%60)).padStart(2,'0')}`;
+  $('#battlePhase').textContent=s.phaseName+' · 自动兵潮 '+(s.phase+1)+' / 4';
   $('#sun').textContent=me.sun;$('#sentLabel').textContent=`我方 ${theirs.enemies.length} 只 · 敌方 ${mine.enemies.length} 只 · 交战 ${theirs.enemies.filter(z=>z.engaged).length+mine.enemies.filter(z=>z.engaged).length} 只`;
   $('#auto').checked=s.auto;localAuto=s.auto;$('#auto').disabled=!live;$('#surrender').disabled=!playing;
-  for(const [unit,b] of Object.entries(unitButtons))b.disabled=!live||me.sun<s.units[unit].cost||me.dispatchCd>0||theirs.enemies.length>=60;
+  for(const [unit,b] of Object.entries(unitButtons))b.disabled=!live||me.sun<s.units[unit].cost||me.dispatchCd>0||theirs.enemies.length>=75;
   $('#overlay').hidden=live;
   $('#overlay').textContent=finished?(s.winner===null?'势均力敌 · 平局':s.winner===s.side?'胜利！小院守住了':'后院失守 · 再来一局吧'):'对局暂停 · 等待重连';
-  $('#skillHint').textContent=s.config.mode==='english'?`已见 ${s.wordSeen} / ${s.stage.count} 词 · 优先未练词 · 每题 ${s.learningLoad} 遍`:'点击卡片选技能，输入题目施放。只伤害敌方僵尸。';
+  $('#skillHint').textContent=s.config.mode==='english'?`已见 ${s.wordSeen} / ${s.stage.count} 词 · 优先未练词 · 每题 ${s.learningLoad} 遍`:'双方实时施法：攻击敌兵，或给己方兵潮护盾与治疗。';
   const sig=JSON.stringify([s.skills,s.typing,live]);
   if(sig!==skillSignature){skillSignature=sig;s.skills.forEach((skill,i)=>{
     const b=skillCards[i];b.disabled=!live||skill.cd>0;b.classList.toggle('active',s.typing===i);
-    b.querySelector('strong').textContent=['🌈 彩虹激光','❄ 冰冻派对','🍉 西瓜轰轰'][i];
+    b.querySelector('strong').textContent=skill.icon+' '+skill.name;
     b.querySelector('small').textContent=skill.cd>0?`${skill.cd.toFixed(1)} 秒`:(s.config.mode==='english'&&s.learningLoad>1?`${skill.repeatsDone}/${s.learningLoad} 遍`:'就绪');
     const code=b.querySelector('.skill-code');code.replaceChildren();
     const typed=document.createElement('span');typed.className='typed';typed.textContent=skill.code.slice(0,skill.typed);code.append(typed);
     const next=document.createElement('span');next.className='next';next.textContent=skill.code[skill.typed]===' '?'␣':skill.code[skill.typed]||'';code.append(next);code.append(document.createTextNode(skill.code.slice(skill.typed+1)));code.scrollTop=Math.max(0,next.offsetTop-code.clientHeight+24);
     b.querySelector('.dialogue-context').hidden=!skill.scene;b.querySelector('.dialogue-context').textContent=skill.scene||'';b.title=skill.scene?[skill.reference,skill.goal,skill.grammar].join(' · '):'';
-    b.querySelector('.skill-meaning').textContent=skill.meaning||['直线范围伤害','敌方移动减速50%','瞄准区域爆炸'][i];
+    b.querySelector('.skill-meaning').textContent=skill.meaning||['直线范围伤害','敌方移动减速50%','瞄准区域爆炸','连锁打击多名敌兵','己方兵潮减伤40%，持续5秒','己方兵潮治疗并持续回血5秒'][i];
     b.querySelector('.skill-bar').style.width=`${100*(1-skill.cd/skill.duration)}%`;
   });}
   drawBattle($('#myCanvas'),s);
@@ -256,12 +257,14 @@ function drawBattle(canvas,s) {
   yard(mine,false);yard(other,true);
   const units=[...mine.enemies.map(z=>({...z,friendly:false,frozen:mine.freeze>0})),...other.enemies.map(z=>({...z,x:1000-z.x,friendly:true,frozen:other.freeze>0}))].sort((a,b)=>a.y-b.y||a.x-b.x);
   for(const z of units){
-    const size=z.type==='mini'?45:z.type==='boss'?100:68,bob=reducedMotion||z.frozen?0:Math.sin(z.gait)*(z.engaged?1:2);
+    const size=z.type==='mini'?35:z.type==='boss'?84:54,bob=reducedMotion||z.frozen?0:Math.sin(z.gait)*(z.engaged?1:2);
     c.fillStyle=z.friendly?'#416c4b55':'#a45e3955';c.beginPath();c.ellipse(z.x,z.y+size*.4,size*.3,8,0,0,Math.PI*2);c.fill();
     c.save();c.translate(z.x,z.y+bob);if(z.friendly)c.scale(-1,1);
     if(zombie.complete&&zombie.naturalWidth)c.drawImage(zombie,-size/2,-size*.55,size,size);else{c.font=`${size*.7}px system-ui`;c.fillText('🧟',-size*.4,size*.3);}c.restore();
-    if(z.frozen){c.fillStyle='#b4ecff80';c.fillRect(z.x-size*.45,z.y-size*.55,size*.9,size);c.font='20px system-ui';c.fillText('❄',z.x-10,z.y-size*.75);}
-    const icon={runner:'⚡',armor:'🪣',bomber:'💣',mini:'🍬',boss:'👑',healer:'💚',shield:'🛡️'}[z.type];if(icon){c.font='22px system-ui';c.fillText(icon,z.x-12,z.y-size*.45);}
+    if(z.frozen){c.fillStyle='#b4ecff80';c.fillRect(z.x-size*.45,z.y-size*.55,size*.9,size);c.font='16px system-ui';c.fillText('❄',z.x-8,z.y-size*.75);}
+    if(z.wardTime>0){c.strokeStyle=z.friendly?'#8cefd4':'#ffc584';c.lineWidth=3;c.beginPath();c.arc(z.x,z.y,size*.52,0,Math.PI*2);c.stroke();}
+    if(z.mendTime>0){c.fillStyle='#72ef9877';c.beginPath();c.arc(z.x,z.y+size*.3,Math.max(4,size*.19),0,Math.PI*2);c.fill();}
+    const icon={runner:'⚡',armor:'🪣',bomber:'💣',mini:'🍬',boss:'👑',healer:'💚',shield:'🛡️'}[z.type];if(icon){c.font='17px system-ui';c.fillText(icon,z.x-9,z.y-size*.45);}
     c.fillStyle='#384932';c.fillRect(z.x-24,z.y-size*.63,48,6);c.fillStyle=z.friendly?'#40845a':'#c57545';c.fillRect(z.x-24,z.y-size*.63,48*Math.max(0,z.hp/z.maxHp),6);
     if(z.engaged){c.font='bold 14px system-ui';c.fillStyle=z.friendly?'#27573a':'#864024';c.textAlign='center';c.fillText(z.frozen?'冰霜中互啃':'互啃中',z.x,z.y+size*.65);c.textAlign='left';if(z.hit>0){c.strokeStyle='#fff5ba';c.lineWidth=3;c.beginPath();c.arc(z.x+(z.friendly?22:-22),z.y,13,0,Math.PI*2);c.stroke();}}
   }
@@ -270,6 +273,7 @@ function drawBattle(canvas,s) {
     c.fillStyle=flipped?'#ffdc9e':'#f3f7a0';for(const b of field.bullets){c.beginPath();c.arc(b.x,b.y,5,0,Math.PI*2);c.fill();}
     for(const e of field.effects){
       if(e.kind==='laser'){c.save();c.translate(field.hero.x,field.hero.y);c.rotate(e.angle);c.globalAlpha=.4;for(const [i,color] of ['#ffe968','#99ffaf','#8ee8ff'].entries()){c.fillStyle=color;c.fillRect(0,(i-1)*22-12,900,24);}c.restore();}
+      if(e.kind==='lightning'&&e.points?.length){c.save();c.strokeStyle='#9cefff';c.lineWidth=5;c.shadowColor='#6bdcff';c.shadowBlur=18;c.beginPath();c.moveTo(field.hero.x,field.hero.y);for(const point of e.points)c.lineTo(point.x,point.y);c.stroke();c.restore();}
       if(e.kind==='melon'){c.font='45px system-ui';c.fillText('🍉',e.x-22,e.y-30-e.life*70);}
       if(e.kind==='explosion'){c.fillStyle='#ffe49366';c.beginPath();c.arc(e.x,e.y,100*(1-e.life/e.fullLife)+30,0,Math.PI*2);c.fill();}
     }

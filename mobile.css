@@ -140,8 +140,8 @@ body.phone-duel[data-duel-state=playing]{height:100dvh;min-height:0;overflow:hid
 .phone-duel[data-duel-state=playing] .dispatch-title small{display:none}
 .phone-duel[data-duel-state=playing] #units{flex:1;margin:0;gap:3px}
 .phone-duel[data-duel-state=playing] #units button{min-height:34px;padding:2px;font-size:10px;gap:1px}
-.phone-duel .duel-skill-tabs{display:flex;gap:4px;flex:none}
-.phone-duel .duel-skill-tabs button{flex:1;min-width:0;height:36px;min-height:36px;padding:3px;font-size:12px;color:var(--skill-color);background:var(--skill-wash);border:1px solid var(--skill-color)}
+.phone-duel .duel-skill-tabs{display:flex;gap:4px;flex:none;overflow-x:auto;scrollbar-width:thin}
+.phone-duel .duel-skill-tabs button{flex:0 0 auto;min-width:78px;height:36px;min-height:36px;padding:3px 7px;font-size:12px;color:var(--skill-color);background:var(--skill-wash);border:1px solid var(--skill-color)}
 .phone-duel .duel-skill-tabs button[aria-pressed=true]{background:var(--skill-color);color:#152b24}
 .phone-duel[data-duel-state=playing] .skills-heading{display:none}
 .phone-duel[data-duel-state=playing] #skills{flex:1;min-height:0;display:block;overflow:hidden;padding:0}
