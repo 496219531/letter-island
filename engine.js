@@ -438,7 +438,7 @@
     }
     select(index) {
       if(this.status!=='playing')return;
-      if(this.skills[index].cd>0){this.emit('cooldown',{index});return;}
+      if(this.skills[index].cd>0||this.skills[index].held){this.emit('cooldown',{index});return;}
       if(this.typing!==index){ if(this.typing>=0)this.skills[this.typing].typed=0;this.typing=index; }
       this.emit('typing',{index});
     }
@@ -448,10 +448,10 @@
       if(this.status!=='playing'||!((/^[a-z]$/i).test(key)||(key===' '&&learning)||(learning&&/^[.'-]$/.test(key))))return false;
       key=key.toUpperCase();
       let index=this.typing;
-      if(index<0)index=this.skills.findIndex(s=>s.cd<=0&&s.code[0]===key);
+      if(index<0)index=this.skills.findIndex(s=>s.cd<=0&&!s.held&&s.code[0]===key);
       if(index<0){this.emit('wrong',{expected:this.skills.filter(s=>s.cd<=0).map(s=>s.code[0]).join(' / ')});return false;}
       const skill=this.skills[index];
-      if(skill.cd>0)return false;
+      if(skill.cd>0||skill.held)return false;
       this.typing=index;
       if(skill.code[skill.typed]!==key){this.emit('wrong',{expected:skill.code[skill.typed]});return false;}
       skill.typed++;this.correct++;this.emit('letter',{index});

@@ -21,3 +21,9 @@
 .duel-app #units{grid-template-columns:repeat(2,minmax(0,1fr))}
 .duel-app #units button{min-width:0;padding:8px;font-size:11px;gap:4px}
 .duel-app #units button span{min-width:0}
+.duel-app .spell-reserve{display:grid;grid-template-columns:1fr;gap:5px;margin:8px 0;padding:8px;border:1px solid #bccd8b66;border-radius:9px;background:#183525}
+.duel-app .spell-reserve button{min-height:40px;padding:7px 9px;font-size:12px;color:#fff0bc;background:#35533a;border:1px solid #90a46f}
+.duel-app .spell-reserve button[aria-pressed=true]{background:#d9b962;color:#23321b}
+.duel-app #releaseSpell:not(:disabled){background:#cfb559;color:#142d20;border-color:#f9e29b;font-weight:800}
+.duel-app .spell-reserve p{margin:0;color:#d0dbb3;font-size:11px;line-height:1.4}
+@media(max-width:760px){.duel-app .spell-reserve{grid-template-columns:1fr 1.5fr;padding:5px}.duel-app .spell-reserve p{grid-column:1/-1}}

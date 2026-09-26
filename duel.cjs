@@ -48,7 +48,7 @@ class DuelGarden extends GardenGame {
   }
   // Only the match may send troops. Disable solo waves and upgrade screens.
   offerCards() {}
-  canCastWithoutEnemies(index){return ['ward','mend'].includes(this.skills[index]?.kind);}
+  canCastWithoutEnemies(index){return this.reserveNext||['ward','mend'].includes(this.skills[index]?.kind);}
   skillTarget(){return this.target();}
   canBiteDefense(z) {return !z.engaged&&this.siegeLeaders?.has(z.id);}
   damageDefense(amount,y){super.damageDefense(amount*.25,y);}
@@ -57,13 +57,42 @@ class DuelGarden extends GardenGame {
     super.shoot();
   }
   hitBullet(b,z) {if(z.x<=430)super.hitBullet(b,z);}
-  cast(index,completedPractice=false){
+  cast(index,completedPractice=false,releasing=false){
+    if(completedPractice&&this.reserveNext&&!releasing){
+      if(this.heldSpell)return;
+      this.heldSpell={index,id:++this.chargeSerial};this.reserveNext=false;
+      this.skills[index].held=true;this.skills[index].typed=0;this.typing=-1;
+      this.feedback.id++;this.feedback.text=this.skills[index].name+'已蓄好 · 点释放把握时机';
+      return;
+    }
     const skill=this.skills[index],permanent=['lightning','ward','mend'].includes(skill.kind);
+    const shattering=skill.kind==='lightning'&&this.freeze>0;
     if(permanent)skill.remainingUses=Infinity;
-    try{return super.cast(index,completedPractice);}finally{if(permanent)delete skill.remainingUses;}
+    try{
+      const result=super.cast(index,completedPractice);
+      if(shattering){this.freeze=0;this.feedback.id++;this.feedback.text='碎冰连锁！闪电伤害 +35%，消耗剩余冰霜';}
+      return result;
+    }finally{if(permanent)delete skill.remainingUses;}
+  }
+  releaseSpell(id){
+    if(!this.heldSpell||id!==this.heldSpell.id)throw Error('这张大招已释放或已改变');
+    const {index}=this.heldSpell;
+    if(!this.enemies.some(z=>z.hp>0&&!z.charmed)&&!['ward','mend'].includes(this.skills[index].kind))throw Error('当前没有敌兵，大招继续保留');
+    const typing=this.typing;
+    this.heldSpell=null;this.skills[index].held=false;this.cast(index,true,true);
+    if(typing>=0&&typing!==index)this.typing=typing;
   }
   damage(z,amount,kind='pea') {
-    super.damage(z,z.wardTime>0?amount*.6:amount,kind);
+    if(z.hp<=0||z.charmed||amount<=0)return;
+    if(kind==='lightning'&&this.freeze>0){amount*=1.35;this.effects.push({kind:'shatter',x:z.x,y:z.y,life:.65,fullLife:.65});}
+    if(z.wardTime>0){
+      z.wardAbsorbed=(z.wardAbsorbed||0)+amount*.4;amount*=.6;
+      if(z.wardAbsorbed>=z.maxHp*.3){
+        z.wardTime=0;this.pendingWardBreaks.push({x:z.x,y:z.y});
+        this.effects.push({kind:'wardBurst',x:z.x,y:z.y,life:.6,fullLife:.6});
+      }
+    }
+    super.damage(z,amount,kind);
   }
   update(dt) {
     // One frontliner per lane can reach the garden fence at a time. The rest
@@ -86,6 +115,7 @@ class DuelGarden extends GardenGame {
     this.learningMode=mode;this.englishLevel=level;this.setCustomBank(customBank);this.reset();this.status='playing';
     this.auto=true;this.fireStrength=.3;this.magicSlow=false;this.maxSpellLength=6;this.maxLearningLoad=2;
     this.maxHealth=56;this.health=56;
+    this.reserveNext=false;this.heldSpell=null;this.chargeSerial=0;this.pendingWardBreaks=[];
     this.quota=0;this.spawnIn=Infinity;
     this.skills.push(
       {kind:'lightning',name:'连锁闪电',code:'F',typed:0,repeatsDone:0,cd:0,duration:12,uses:0,icon:'⚡'},
@@ -139,6 +169,7 @@ class DuelMatch {
     // Faster crossing keeps two-player rounds lively without changing solo rules.
     zombie.speed*=1.65;this.players[side].sent++;
     zombie.wardTime=Math.max(0,this.players[side].wardUntil-this.elapsed);
+    zombie.wardAbsorbed=0;
     zombie.mendTime=Math.max(0,this.players[side].mendUntil-this.elapsed);
     if(paid){this.players[side].sun-=UNITS[type].cost;this.players[side].dispatchCd=.8;}
     return true;
@@ -148,11 +179,23 @@ class DuelMatch {
     const p=this.players[side],army=this.games[1-side].enemies.filter(z=>z.hp>0&&z.owner===side);
     if(kind==='ward'){
       p.wardUntil=this.elapsed+5;
-      for(const z of army)z.wardTime=5;
+      for(const z of army){z.wardTime=5;z.wardAbsorbed=0;}
     }else if(kind==='mend'){
       p.mendUntil=this.elapsed+5;
       for(const z of army){z.hp=Math.min(z.maxHp,z.hp+z.maxHp*.2);z.mendTime=5;}
     }
+  }
+  resolveWardBreaks(){
+    const pushed=new Set();
+    this.games.forEach((garden,index)=>{
+      const bursts=garden.pendingWardBreaks.splice(0);
+      if(!bursts.length)return;
+      for(const burst of bursts)for(const foe of this.games[1-index].enemies){
+        if(foe.hp<=0||foe.charmed||pushed.has(foe)||Math.abs(foe.y-burst.y)>35||Math.abs(foe.x-(1000-burst.x))>120)continue;
+        foe.x=Math.max(foe.x,Math.min(800,foe.x+45));foe.engaged=false;pushed.add(foe);
+      }
+      const owner=this.games[1-index];owner.feedback.id++;owner.feedback.text='护盾反震！附近敌兵被推退';
+    });
   }
   clash(dt) {
     const armies=this.games.map(g=>g.enemies.filter(z=>z.hp>0));
@@ -193,6 +236,11 @@ class DuelMatch {
     if(this.status!=='playing'||!this.players.every(q=>q&&q.connected))throw new Error('对局尚未开始或正在等待重连');
     const g=this.games[side],castsBefore=g.casts,usesBefore=g.skills.map(s=>s.uses);
     switch(action.type) {
+      case 'reserve':
+        if(typeof action.value!=='boolean')throw Error('无效蓄招状态');
+        if(g.heldSpell)throw Error('只能保留一张大招，请先释放');
+        g.reserveNext=action.value;break;
+      case 'release':if(action.round!==this.round)throw Error('这张大招属于上一局');g.releaseSpell(action.id);break;
       case 'key': if(typeof action.key==='string'&&/^[a-z .'-]$/i.test(action.key))g.input(action.key);else throw new Error('无效按键');break;
       case 'select': if(Number.isInteger(action.index)&&action.index>=0&&action.index<g.skills.length)g.select(action.index);else throw new Error('无效技能');break;
       case 'backspace':g.backspace();break;
@@ -210,6 +258,7 @@ class DuelMatch {
       default:throw new Error('不支持的操作');
     }
     if(g.casts>castsBefore){const index=g.skills.findIndex((s,i)=>s.uses>usesBefore[i]);if(index>=0)this.support(side,g.skills[index].kind);}
+    this.resolveWardBreaks();
   }
   tick(dt) {
     if(this.status!=='playing')return;
@@ -234,6 +283,7 @@ class DuelMatch {
     }
     this.clash(dt);
     this.games.forEach(g=>g.update(dt));
+    this.resolveWardBreaks();
     const lost=this.games.map((g,i)=>g.status==='lost'?i:-1).filter(i=>i>=0);
     if(lost.length)this.end(lost.length===2?null:1-lost[0],lost.length===2?'双方后院同时被攻破':'对方后院已被攻破');
   }
@@ -248,7 +298,8 @@ class DuelMatch {
       stage:this.config.mode==='english'?ENGLISH_STAGES[this.config.level]:null,
       dialogueStage:this.config.mode==='sentences'?DIALOGUE_STAGES[this.config.level]:null,
       wordSeen:own?.promptHistory[`english:${this.config.level}`]?.length||0,
-      fields,auto:own?.auto,typing:own?.typing,feedback:own?.feedback,
+      fields,auto:own?.auto,typing:own?.typing,feedback:own?.feedback,reserveNext:!!own?.reserveNext,
+      heldSpell:own?.heldSpell?{...own.heldSpell,name:own.skills[own.heldSpell.index].name,icon:own.skills[own.heldSpell.index].icon}:null,
       skills:own?.skills.map(s=>{
         const entry=own.customBank?own.learningEntry(s.code):own.learningMode==='english'?findWordEntry(s.code):own.learningMode==='letters'?null:findSentenceEntry(s.code);
         return {...s,meaning:entry?.meaning,scene:entry?.scene,goal:entry?.goal,grammar:entry?.grammar,reference:entry?.reference};
