@@ -496,7 +496,7 @@
       }
       this.typing=-1;skill.typed=0;skill.repeatsDone=0;skill.cd=skill.duration;skill.uses++;this.casts++;
       if(this.stack('barrier')&&this.casts%3===0)this.health=Math.min(this.maxHealth,this.health+this.stack('barrier'));
-      if(kind==='laser'){
+      if(kind==='laser'&&!this.queueLaser?.(target)){
         const angle=Math.atan2(target.y-this.hero.y,target.x-this.hero.x);
         this.effects.push({kind:'laser',angle,width:85+35*this.stack('beam'),life:.65,fullLife:.65});
         for(const z of this.enemies){const dx=z.x-this.hero.x,dy=z.y-this.hero.y;const d=Math.abs(dx*Math.sin(angle)-dy*Math.cos(angle));if(d<85+35*this.stack('beam')+z.radius)this.damage(z,this.laserDamage,'laser');}

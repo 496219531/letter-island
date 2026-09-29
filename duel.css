@@ -26,4 +26,7 @@
 .duel-app .spell-reserve button[aria-pressed=true]{background:#d9b962;color:#23321b}
 .duel-app #releaseSpell:not(:disabled){background:#cfb559;color:#142d20;border-color:#f9e29b;font-weight:800}
 .duel-app .spell-reserve p{margin:0;color:#d0dbb3;font-size:11px;line-height:1.4}
+.duel-app .laser-report{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:4;max-width:94%;width:max-content;padding:8px 12px;border:1px solid #bafaff;border-radius:10px;background:#143c39eb;color:#fff5be;font-size:13px;font-weight:700;text-align:center;white-space:pre-line;pointer-events:none}
+.duel-app .laser-report[data-side=opponent]{background:#613b22eb;border-color:#ffd29a}
+@media(max-width:760px){.duel-app .laser-report{font-size:11px;padding:6px 8px;bottom:8px}}
 @media(max-width:760px){.duel-app .spell-reserve{grid-template-columns:1fr 1.5fr;padding:5px}.duel-app .spell-reserve p{grid-column:1/-1}}

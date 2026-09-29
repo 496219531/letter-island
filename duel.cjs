@@ -50,13 +50,44 @@ class DuelGarden extends GardenGame {
   offerCards() {}
   canCastWithoutEnemies(index){return this.reserveNext||['ward','mend'].includes(this.skills[index]?.kind);}
   skillTarget(){return this.target();}
-  canBiteDefense(z) {return !z.engaged&&this.siegeLeaders?.has(z.id);}
+  canBiteDefense(z) {return !z.engaged&&!(z.staggerTime>0)&&this.siegeLeaders?.has(z.id);}
   damageDefense(amount,y){super.damageDefense(amount*.25,y);}
   shoot() {
     if(this.auto&&!this.enemies.some(z=>z.hp>0&&z.x<=390))return;
     super.shoot();
   }
   hitBullet(b,z) {if(z.x<=430)super.hitBullet(b,z);}
+  queueLaser(target){
+    const lane=LANES.reduce((best,_,i)=>Math.abs(LANES[i]-target.y)<Math.abs(LANES[best]-target.y)?i:best,0);
+    this.pendingLasers.push({lane,remaining:.35,damage:this.laserDamage});
+    this.effects.push({kind:'laserCharge',x:75,y:LANES[lane],length:925,life:.35,fullLife:.35});
+    return true;
+  }
+  resolveLasers(dt){
+    const pending=[];
+    for(const shot of this.pendingLasers){
+      shot.remaining-=dt;
+      if(shot.remaining>1e-8){pending.push(shot);continue;}
+      const result={id:++this.laserSerial,lane:shot.lane+1,hits:0,kills:0,pushed:0,damage:0,time:this.time};
+      for(const z of [...this.enemies]){
+        if(z.hp<=0||z.charmed||z.owner!==1-this.side||Math.abs(z.y-LANES[shot.lane])>=35)continue;
+        const before=z.hp+z.shield;result.hits++;
+        this.damage(z,shot.damage,'laser');result.damage+=Math.max(0,before-Math.max(0,z.hp)-Math.max(0,z.shield));
+        const dead=z.hp<=0;
+        if(dead)result.kills++;
+        else{
+          z.knockbackLeft=Math.min(72,Math.max(0,800-z.x));
+          z.staggerTime=.9;z.engaged=false;
+          if(z.knockbackLeft>0)result.pushed++;
+        }
+        this.effects.push({kind:'laserHit',x:z.x,y:z.y,dead,life:.65,fullLife:.65});
+      }
+      this.pruneEnemies();this.laserResult=result;
+      this.effects.push({kind:'duelLaser',x:75,y:LANES[shot.lane],length:925,life:.65,fullLife:.65});
+      this.feedback.id++;this.feedback.text=result.hits?'激光命中 '+result.hits+' 只 · 消灭 '+result.kills+' · 击退 '+result.pushed:'激光扫过第 '+result.lane+' 路 · 敌兵已离开范围';
+    }
+    this.pendingLasers=pending;
+  }
   cast(index,completedPractice=false,releasing=false){
     if(completedPractice&&this.reserveNext&&!releasing){
       if(this.heldSpell)return;
@@ -103,19 +134,25 @@ class DuelGarden extends GardenGame {
       if(!front.has(lane)||z.x<front.get(lane).x)front.set(lane,z);
     }
     this.siegeLeaders=new Set([...front.values()].map(z=>z.id));
-    for(const z of this.enemies){z.wardTime=Math.max(0,(z.wardTime||0)-dt);z.mendTime=Math.max(0,(z.mendTime||0)-dt);}
-    const stopped=this.enemies.filter(z=>z.engaged).map(z=>[z,z.speed]);
+    for(const z of this.enemies){
+      z.wardTime=Math.max(0,(z.wardTime||0)-dt);z.mendTime=Math.max(0,(z.mendTime||0)-dt);
+      z.staggerTime=Math.max(0,(z.staggerTime||0)-dt);
+      if(z.hp>0&&z.knockbackLeft>0){const step=Math.min(z.knockbackLeft,dt*288,Math.max(0,800-z.x));z.x+=step;z.knockbackLeft=step>0?z.knockbackLeft-step:0;}
+    }
+    const stopped=this.enemies.filter(z=>z.engaged||z.staggerTime>0).map(z=>[z,z.speed]);
     for(const [z] of stopped)z.speed=0;
     super.update(dt);
     for(const z of this.enemies)if(z.hp>0&&z.mendTime>0)z.hp=Math.min(z.maxHp,z.hp+z.maxHp*.025*dt);
     for(const [z,speed] of stopped)z.speed=speed;
     this.bullets=this.bullets.filter(b=>b.x<=430);
+    this.resolveLasers(dt);
   }
   prepare(mode,level,customBank) {
     this.learningMode=mode;this.englishLevel=level;this.setCustomBank(customBank);this.reset();this.status='playing';
     this.auto=true;this.fireStrength=.3;this.magicSlow=false;this.maxSpellLength=6;this.maxLearningLoad=2;
     this.maxHealth=56;this.health=56;
     this.reserveNext=false;this.heldSpell=null;this.chargeSerial=0;this.pendingWardBreaks=[];
+    this.pendingLasers=[];this.laserSerial=0;this.laserResult=null;
     this.quota=0;this.spawnIn=Infinity;
     this.skills.push(
       {kind:'lightning',name:'连锁闪电',code:'F',typed:0,repeatsDone:0,cd:0,duration:12,uses:0,icon:'⚡'},
@@ -211,7 +248,7 @@ class DuelMatch {
         }
         if(!target)continue;
         z.engaged=true;z.duelTarget=target.id;
-        if(z.duelBiteIn<=0){
+        if(z.duelBiteIn<=0&&!(z.staggerTime>0)){
           const scale=Math.pow(1.19,this.games[index].wave-1);
           hits.push({garden:this.games[1-index],target,damage:(z.type==='armor'?13:z.type==='runner'?7:10)*scale});
           z.duelBiteIn=.65;
@@ -289,7 +326,8 @@ class DuelMatch {
   }
   snapshot(side,sharedFields) {
     const fields=sharedFields??this.games?.map(g=>({health:g.health,maxHealth:g.maxHealth,flowers:g.flowerHealth,breach:g.breachElapsed,
-      enemies:g.enemies.map(z=>({id:z.id,owner:z.owner,type:z.type,x:z.x,y:z.y,hp:z.hp,maxHp:z.maxHp,shield:z.shield,gait:z.gait,hit:z.hit,engaged:!!z.engaged,wardTime:z.wardTime||0,mendTime:z.mendTime||0})),
+      enemies:g.enemies.map(z=>({id:z.id,owner:z.owner,type:z.type,x:z.x,y:z.y,hp:z.hp,maxHp:z.maxHp,shield:z.shield,gait:z.gait,hit:z.hit,engaged:!!z.engaged,wardTime:z.wardTime||0,mendTime:z.mendTime||0,staggerTime:z.staggerTime||0})),
+      laserResult:g.laserResult?{...g.laserResult,age:g.time-g.laserResult.time}:null,
       bullets:g.bullets.map(b=>({x:b.x,y:b.y})),effects:g.effects.map(e=>({...e})),freeze:g.freeze,shotKick:g.shotKick,hero:g.hero,target:g.target(),kills:g.kills,casts:g.casts}));
     const own=this.games?.[side];
     return {status:this.status,round:this.round,side,config:this.config,elapsed:this.elapsed,winner:this.winner,reason:this.reason,phase:this.phase,phaseName:PHASES[this.phase].name,nextWave:Math.max(0,this.waveIn),

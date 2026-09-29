@@ -19,10 +19,11 @@ function playDuelSounds(s){
     if(field.shotKick>0&&audioPrevious.shotKick<=0)duelAudio.play('shot');
     if(field.kills>audioPrevious.kills)duelAudio.play('kill');
     if(field.health<audioPrevious.health)duelAudio.play('nibble');
-    s.skills.forEach((skill,i)=>{if(skill.uses>audioPrevious.uses[i])duelAudio.play(({lightning:'laser',ward:'shield',mend:'shield'})[skill.kind]||skill.kind);});
+    s.skills.forEach((skill,i)=>{if(skill.uses>audioPrevious.uses[i])duelAudio.play(({laser:'shield',lightning:'laser',ward:'shield',mend:'shield'})[skill.kind]||skill.kind);});
+    if(s.fields.some((f,i)=>f.laserResult?.id!==(audioPrevious.laserIds?.[i]||0)&&f.laserResult?.age<.5))duelAudio.play('laser');
     if(field.enemies.some(z=>z.hit>0))duelAudio.play('flesh');
   }
-  audioPrevious={key,elapsed:s.elapsed,shotKick:field.shotKick,kills:field.kills,health:field.health,uses:s.skills.map(skill=>skill.uses)};
+  audioPrevious={key,elapsed:s.elapsed,shotKick:field.shotKick,kills:field.kills,health:field.health,uses:s.skills.map(skill=>skill.uses),laserIds:s.fields.map(f=>f.laserResult?.id||0)};
 }
 const zombie=new Image();zombie.src='assets/zombie.png';
 const arenaArt=new Image();arenaArt.src='assets/duel-garden-v2.png';
@@ -203,6 +204,12 @@ function render() {
     });
   }
   const mine=s.fields[s.side],theirs=s.fields[1-s.side];
+  const recent=s.fields.map((f,i)=>f.laserResult?{...f.laserResult,own:i===s.side}:null).filter(r=>r&&r.age<2.4).sort((a,b)=>a.age-b.age)[0];
+  const report=$('#laserReport');report.hidden=!recent||!playing;
+  if(recent){
+    report.dataset.side=recent.own?'mine':'opponent';report.textContent=(recent.own?'我方':'敌方')+'激光 · 第'+recent.lane+'路\n命中 '+recent.hits+' · 消灭 '+recent.kills+' · 击退 '+recent.pushed;
+    if(/^彩虹激光！|^激光命中 |^激光扫过第 /.test($('#notice').textContent))$('#notice').hidden=true;
+  }
   $('#reserveNext').disabled=!live||Boolean(s.heldSpell);
   $('#reserveNext').setAttribute('aria-pressed',String(s.reserveNext));
   $('#reserveNext').textContent=s.reserveNext?'蓄招中 · 点此取消':'蓄下一招';
@@ -229,7 +236,7 @@ function render() {
     const typed=document.createElement('span');typed.className='typed';typed.textContent=skill.code.slice(0,skill.typed);code.append(typed);
     const next=document.createElement('span');next.className='next';next.textContent=skill.code[skill.typed]===' '?'␣':skill.code[skill.typed]||'';code.append(next);code.append(document.createTextNode(skill.code.slice(skill.typed+1)));code.scrollTop=Math.max(0,next.offsetTop-code.clientHeight+24);
     b.querySelector('.dialogue-context').hidden=!skill.scene;b.querySelector('.dialogue-context').textContent=skill.scene||'';b.title=skill.scene?[skill.reference,skill.goal,skill.grammar].join(' · '):'';
-    b.querySelector('.skill-meaning').textContent=skill.meaning||['直线范围伤害','敌方移动减速50%','瞄准区域爆炸','连锁打击多名敌兵','己方兵潮减伤40%，持续5秒','己方兵潮治疗并持续回血5秒'][i];
+    b.querySelector('.skill-meaning').textContent=skill.meaning||['聚光后贯穿一路，击退并打断幸存敌兵','敌方移动减速50%','瞄准区域爆炸','连锁打击多名敌兵','己方兵潮减伤40%，持续5秒','己方兵潮治疗并持续回血5秒'][i];
     b.querySelector('.skill-bar').style.width=`${100*(1-skill.cd/skill.duration)}%`;
   });}
   drawBattle($('#myCanvas'),s);
@@ -279,6 +286,7 @@ function drawBattle(canvas,s) {
     const size=z.type==='mini'?35:z.type==='boss'?84:54,bob=reducedMotion||z.frozen?0:Math.sin(z.gait)*(z.engaged?1:2);
     c.fillStyle=z.friendly?'#416c4b55':'#a45e3955';c.beginPath();c.ellipse(z.x,z.y+size*.4,size*.3,8,0,0,Math.PI*2);c.fill();
     c.save();c.translate(z.x,z.y+bob);if(z.friendly)c.scale(-1,1);
+    if(z.staggerTime>0&&!reducedMotion)c.rotate(.22);
     if(zombie.complete&&zombie.naturalWidth)c.drawImage(zombie,-size/2,-size*.55,size,size);else{c.font=`${size*.7}px system-ui`;c.fillText('🧟',-size*.4,size*.3);}c.restore();
     if(z.frozen){c.fillStyle='#b4ecff80';c.fillRect(z.x-size*.45,z.y-size*.55,size*.9,size);c.font='16px system-ui';c.fillText('❄',z.x-8,z.y-size*.75);}
     if(z.wardTime>0){c.strokeStyle=z.friendly?'#8cefd4':'#ffc584';c.lineWidth=3;c.beginPath();c.arc(z.x,z.y,size*.52,0,Math.PI*2);c.stroke();}
@@ -291,6 +299,25 @@ function drawBattle(canvas,s) {
     c.save();if(flipped){c.translate(1000,0);c.scale(-1,1);}
     c.fillStyle=flipped?'#ffdc9e':'#f3f7a0';for(const b of field.bullets){c.beginPath();c.arc(b.x,b.y,5,0,Math.PI*2);c.fill();}
     for(const e of field.effects){
+      if(e.kind==='laserCharge'){
+        const progress=1-e.life/e.fullLife;
+        c.save();c.fillStyle='#c0f4ff25';c.fillRect(e.x,e.y-35,e.length,70);
+        c.strokeStyle='#c1f8ff';c.lineWidth=2;c.setLineDash([8,8]);c.strokeRect(e.x,e.y-35,e.length,70);c.setLineDash([]);
+        c.fillStyle='#fff8c2';c.beginPath();c.arc(e.x,e.y,12+(reducedMotion?8:progress*18),0,Math.PI*2);c.fill();c.restore();
+      }
+      if(e.kind==='duelLaser'){
+        c.save();c.globalAlpha=Math.min(1,e.life/e.fullLife*1.7);c.shadowBlur=window.GuluPerformance?.current.glow===false?0:20;c.shadowColor='#abf7ff';
+        for(const [width,color] of [[62,'#8eeaff66'],[34,'#ffe674dd'],[12,'#fffef0']]){c.fillStyle=color;c.fillRect(e.x,e.y-width/2,e.length,width);}
+        c.restore();
+      }
+      if(e.kind==='laserHit'){
+        const progress=1-e.life/e.fullLife;
+        c.save();c.translate(e.x+(reducedMotion?0:progress*32),e.y);c.globalAlpha=1-progress;
+        if(e.dead&&zombie.complete&&zombie.naturalWidth){if(!reducedMotion)c.rotate(progress*.8);c.drawImage(zombie,-24,-30,48,48);}
+        c.strokeStyle='#fff6be';c.lineWidth=3;
+        for(let i=0;i<8;i++){const angle=i*Math.PI/4,r=10+(reducedMotion?8:progress*28);c.beginPath();c.moveTo(Math.cos(angle)*r*.45,Math.sin(angle)*r*.45);c.lineTo(Math.cos(angle)*r,Math.sin(angle)*r);c.stroke();}
+        c.restore();
+      }
       if(e.kind==='shatter'||e.kind==='wardBurst'){
         const progress=reducedMotion?.5:1-e.life/e.fullLife,radius=15+progress*(e.kind==='shatter'?40:65);
         c.save();c.globalAlpha=Math.max(.2,e.life/e.fullLife);c.strokeStyle=e.kind==='shatter'?'#b0efff':'#baffd6';c.lineWidth=3;

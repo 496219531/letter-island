@@ -12,7 +12,8 @@ test('a completed charge waits without damage or cooldown, then releases once',(
   assert.equal(g.casts,0);assert.equal(enemy.hp,hp);assert.equal(g.skills[0].cd,0);
   type(m,0);assert.equal(g.casts,0);assert.throws(()=>m.command(0,{type:'reserve',value:true}),/只能保留/);
   assert.equal(m.snapshot(1).heldSpell,null);
-  m.command(0,release);assert.equal(g.casts,1);assert.ok(enemy.hp<hp);assert.ok(g.skills[0].cd>0);
+  m.command(0,release);assert.equal(g.casts,1);assert.equal(enemy.hp,hp);assert.ok(g.skills[0].cd>0);
+  ticks(m,.4);assert.ok(enemy.hp<hp);
   assert.throws(()=>m.command(0,release),/已释放/);assert.equal(g.casts,1);
 });
 test('empty offensive release retains the charge, support may release onto future troops',()=>{

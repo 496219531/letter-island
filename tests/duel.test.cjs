@@ -51,12 +51,13 @@ test('a support spell may be prepared before the next automatic wave arrives',()
 });
 test('independent questions and typing: casting harms incoming enemies but never own troops or either yard',()=>{
   const m=match();const [a,b]=m.games;
-  a.spawn(500,282,'walker',false);b.spawn(500,282,'walker',false);
+  a.spawn(500,282,'walker',false);b.spawn(750,282,'walker',false);
   a.auto=false;b.auto=false;a.setAim(500,282);
   const theirCode=b.skills[0].code,ownCode=a.skills[0].code;
   for(const key of ownCode.slice(0,-1))m.command(0,{type:'key',key});
   assert.equal(a.skills[0].typed,ownCode.length-1);assert.equal(b.skills[0].typed,0);
   m.command(0,{type:'key',key:ownCode.at(-1)});
+  ticks(m,.4);
   assert.equal(a.enemies.length,0);assert.equal(a.casts,1);assert.equal(b.enemies[0].hp,b.enemies[0].maxHp);
   assert.equal(a.health,56);assert.equal(b.health,56);assert.equal(b.casts,0);assert.equal(b.skills[0].code,theirCode);assert.equal(b.skills[0].cd,0);
   assert.notEqual(a.skills,b.skills);assert.equal(m.snapshot(1).skills[0].code,theirCode);assert.equal(m.snapshot(1).fields[0].skills,undefined);
@@ -136,6 +137,7 @@ test('battlefield perspective mirrors the same units and ranged attacks remain e
   const a=m.snapshot(0),b=m.snapshot(1);assert.deepEqual(a.fields,b.fields);
   const allied=m.games[1].enemies[0],foe=m.games[0].enemies[0];
   m.games[0].setAim(foe.x,foe.y);for(const key of m.games[0].skills[0].code)m.command(0,{type:'key',key});
+  ticks(m,.4);
   assert.equal(m.games[0].enemies.length,0);assert.equal(allied.hp,allied.maxHp);
   assert.equal(m.games[0].health,56);assert.equal(m.games[1].health,56);
 });
