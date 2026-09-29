@@ -84,7 +84,7 @@ async function enter(code) {
   try {
     if(!code&&$('#duelSource').value==='public'&&!$('#publicGroup').value)throw Error('请先选择公共榜中的词组');
     const publicSelection=!code&&$('#duelSource').value==='public'?JSON.parse($('#publicGroup').value):{};
-    session=await request('/api/rooms',{method:'POST',body:JSON.stringify({mobile:Boolean(window.GuluMobile?.active),...publicSelection,name:$('#playerName').value,code,mode:$('#mode').value,level:Number($('#level').value)})});
+    session=await request('/api/rooms',{method:'POST',body:JSON.stringify({mobile:Boolean(window.GuluMobile?.active),...publicSelection,name:$('#playerName').value,code,mode:$('#mode').value,level:Number($('#level').value),battleMode:$('#battleMode').value,duration:Number($('#duration').value)})});
     try{sessionStorage.setItem(sessionKey,JSON.stringify(session));}catch{}
     attach();
   }catch(e){
@@ -95,6 +95,7 @@ async function enter(code) {
   finally{$('#create').disabled=false;$('#join').disabled=false;}
 }
 $('#create').onclick=()=>enter();
+$('#battleMode').onchange=()=>{const score=$('#battleMode').value==='score';$('#durationLabel').hidden=!score;$('#scoreRules').hidden=!score;};
 $('#joinForm').onsubmit=e=>{e.preventDefault();enter($('#roomCode').value.trim().toUpperCase());};
 function updateLevels(){
  const mode=$('#mode').value;$('#levelLabel').hidden=mode==='letters';$('#levelTitle').textContent=mode==='english'?'词汇学段':'句子难度';
@@ -179,6 +180,7 @@ function render() {
   playDuelSounds(state);
   document.body.dataset.duelState=state.status;
   const s=state,me=s.players[s.side],other=s.players[1-s.side],playing=s.status==='playing',finished=s.status==='finished',live=playing&&!s.paused&&connected;
+  const scoreRace=s.config.battleMode==='score';document.body.dataset.battleMode=s.config.battleMode||'siege';
   if(s.feedback?.text&&feedbackId!==`${s.code}:${s.round}:${s.feedback.id}`){feedbackId=`${s.code}:${s.round}:${s.feedback.id}`;notice(s.feedback.text);}
   $('#connection').classList.toggle('error',s.paused);
   $('#connection').textContent=s.paused?`等待${s.players.filter(p=>p&&!p.connected).map(p=>p.name).join('、')}重连 · 剩余 ${Math.max(0,Math.ceil(30-Math.max(...s.players.map(p=>p?.offline||0))))} 秒`:`已连接 · ${s.config.mode==='letters'?'字母组合':s.config.mode==='english'?'英语单词':'英语句子'}${s.config.mode==='letters'?'':s.config.publicResource?` · 公共词组：${s.config.publicResource.title}`:s.stage?` · ${s.stage.name} · ${s.stage.count}词`:s.dialogueStage?` · ${s.dialogueStage.name} · ${s.dialogueStage.groups}组`:` · ${s.config.level+1} 级`} · 双方题目与技能进度独立`;
@@ -188,6 +190,7 @@ function render() {
     $('#waitingTitle').textContent=finished?(s.winner===null?'平局':s.winner===s.side?'你守住了后院！':'这次后院失守了'):(other?'两位守卫已到齐':'等待朋友入场');
     $('#waitingDetail').textContent=finished?`${s.winner===null?s.reason:s.reason.startsWith('对方')?(s.winner===s.side?s.reason:s.reason.replace('对方','你的')):s.reason}。双方准备后可再来一局。`:'双方点击准备后自动开战。题目由房主设置，每个人独立作答。';
     if(s.config.publicResource)$('#waitingDetail').textContent+=' 公共词组：'+s.config.publicResource.title;
+    if(scoreRace){$('#waitingTitle').textContent=finished?(s.winner===null?'同分平局':s.winner===s.side?'本局获胜':'本局落败'):(other?'限时竞分 · 双方已到齐':'限时竞分 · 等待朋友');$('#waitingDetail').textContent+=(finished?' ':' 比赛 '+s.config.duration/60+' 分钟。')+'各自打相同波次的僵尸，只比较击杀分；漏怪不加分，同分平局。';}
     if(s.ranking)$('#waitingDetail').textContent+=' 上一局：'+s.ranking.reason;
     $('#playerList').replaceChildren();
     s.players.forEach((p,i)=>{const row=document.createElement('p'),name=document.createElement('strong'),status=document.createElement('span');name.textContent=p?`${p.name}${i===s.side?'（我）':''}`:'等待朋友…';status.textContent=p?(p.connected?(p.ready?'已准备 ✓':'未准备'):'未连接'):'';row.append(name,status);$('#playerList').append(row);});
@@ -196,6 +199,7 @@ function render() {
   }
   if(!s.fields)return;
   if(phoneTabs){
+    if(phoneSkill>=s.skills.length)showPhoneSkill(0);
     if(s.typing>=0&&s.typing!==phoneSkill)showPhoneSkill(s.typing);
     const hints=GuluMobile.keySkillHints(s.skills,s.typing,s.config.mode);
     document.querySelectorAll('.duel-touch-keyboard [data-key]').forEach(button=>{
@@ -204,7 +208,7 @@ function render() {
     });
   }
   const mine=s.fields[s.side],theirs=s.fields[1-s.side];
-  const recent=s.fields.map((f,i)=>f.laserResult?{...f.laserResult,own:i===s.side}:null).filter(r=>r&&r.age<2.4).sort((a,b)=>a.age-b.age)[0];
+  const recent=s.fields.map((f,i)=>f.laserResult?{...f.laserResult,own:i===s.side}:null).filter(r=>r&&r.age<2.4&&(!scoreRace||r.own)).sort((a,b)=>a.age-b.age)[0];
   const report=$('#laserReport');report.hidden=!recent||!playing;
   if(recent){
     report.dataset.side=recent.own?'mine':'opponent';report.textContent=(recent.own?'我方':'敌方')+'激光 · 第'+recent.lane+'路\n命中 '+recent.hits+' · 消灭 '+recent.kills+' · 击退 '+recent.pushed;
@@ -216,16 +220,21 @@ function render() {
   $('#releaseSpell').disabled=!live||!s.heldSpell;
   $('#releaseSpell').textContent=s.heldSpell?'释放 '+s.heldSpell.icon+' '+s.heldSpell.name:'尚未蓄招';
   $('#reserveHint').textContent=s.heldSpell?'已保留一张；其他大招仍可输入并直接施放。':s.reserveNext?'下一张输入完成的大招将保留，战斗持续进行。':'先点蓄下一招，再输入题目；最多保留一张。';
-  if(phoneTabs)[...phoneTabs.children].forEach((b,i)=>{b.disabled=!live||s.skills[i].cd>0||Boolean(s.skills[i].held);});
+  skillCards.forEach((b,i)=>{b.hidden=i>=s.skills.length;});
+  if(phoneTabs)[...phoneTabs.children].forEach((b,i)=>{b.hidden=i>=s.skills.length;b.disabled=!live||!s.skills[i]||s.skills[i].cd>0||Boolean(s.skills[i].held);});
   $('#myName').textContent=me.name+'（我）';$('#theirName').textContent=other.name;
   $('#myHealth').textContent=`🌻 ${mine.health.toFixed(1)} / ${mine.maxHealth}`;$('#theirHealth').textContent=`🌻 ${theirs.health.toFixed(1)} / ${theirs.maxHealth}`;
-  $('#timer').textContent=`${String(Math.floor(s.elapsed/60)).padStart(2,'0')}:${String(Math.floor(s.elapsed%60)).padStart(2,'0')}`;
+  const clock=scoreRace?Math.max(0,Math.ceil(s.config.duration-s.elapsed)):Math.floor(s.elapsed);
+  if(scoreRace){$('#myHealth').textContent=mine.score+' 分';$('#theirHealth').textContent=theirs.score+' 分';}
+  $('#timer').textContent=`${String(Math.floor(clock/60)).padStart(2,'0')}:${String(clock%60).padStart(2,'0')}`;
   $('#battlePhase').textContent=s.phaseName+' · 自动兵潮 '+(s.phase+1)+' / 4';
   $('#sun').textContent=me.sun;$('#sentLabel').textContent=`我方 ${theirs.enemies.length} 只 · 敌方 ${mine.enemies.length} 只 · 交战 ${theirs.enemies.filter(z=>z.engaged).length+mine.enemies.filter(z=>z.engaged).length} 只`;
+  if(scoreRace){$('#battlePhase').textContent='限时竞分 · 剩余时间';$('#sentLabel').textContent='击杀 '+mine.kills+' · 漏怪 '+mine.escaped+' · 对手 '+theirs.score+' 分';}
   $('#auto').checked=s.auto;localAuto=s.auto;$('#auto').disabled=!live;$('#surrender').disabled=!playing;
   for(const [unit,b] of Object.entries(unitButtons))b.disabled=!live||me.sun<s.units[unit].cost||me.dispatchCd>0||theirs.enemies.length>=75;
   $('#overlay').hidden=live;
   $('#overlay').textContent=finished?(s.winner===null?'势均力敌 · 平局':s.winner===s.side?'胜利！小院守住了':'后院失守 · 再来一局吧'):'对局暂停 · 等待重连';
+  if(scoreRace&&finished)$('#overlay').textContent=(s.winner===null?'平局':s.winner===s.side?'本局获胜':'本局落败')+'\n我 '+mine.score+' 分 · 对手 '+theirs.score+' 分';
   $('#skillHint').textContent=s.config.mode==='english'?`已见 ${s.wordSeen} / ${s.stage.count} 词 · 优先未练词 · 每题 ${s.learningLoad} 遍`:'冰冻接闪电触发碎冰；护送结界吸收伤害后破裂推敌。';
   const sig=JSON.stringify([s.skills,s.typing,live]);
   if(sig!==skillSignature){skillSignature=sig;s.skills.forEach((skill,i)=>{
@@ -258,7 +267,8 @@ window.addEventListener('pagehide',()=>{duelAudio.stop();stream?.close();});
 window.addEventListener('pageshow',e=>{if(e.persisted&&session)attach();});
 
 function drawBattle(canvas,s) {
-  const c=canvas.getContext('2d'),mine=s.fields[s.side],other=s.fields[1-s.side];
+  const scoreRace=s.config.battleMode==='score';
+  const c=canvas.getContext('2d'),mine=s.fields[s.side],other=scoreRace?{...s.fields[1-s.side],enemies:[],bullets:[],effects:[]}:s.fields[1-s.side];
   c.clearRect(0,0,1000,530);
   if(arenaArt.complete&&arenaArt.naturalWidth)c.drawImage(arenaArt,0,0,1000,530);
   else{c.fillStyle='#385a2b';c.fillRect(0,0,1000,530);}
@@ -272,7 +282,7 @@ function drawBattle(canvas,s) {
     c.fillStyle=danger?'#7c2c23e6':pushing?'#235c40e6':'#233c2ce6';c.fillRect(178,y-46,80,20);
     c.fillStyle='#fff3c5';c.font='12px system-ui';c.fillText((i+1)+'路 · '+label,184,y-32);
   }
-  canvas.setAttribute('aria-label','共同战场：'+laneSummaries.join('，'));
+  canvas.setAttribute('aria-label',(scoreRace?'我的竞分战场：':'共同战场：')+laneSummaries.join('，'));
   function yard(field,flipped){
     c.save();if(flipped){c.translate(1000,0);c.scale(-1,1);}
     drawDuelFlowers(c,field);
@@ -280,7 +290,7 @@ function drawBattle(canvas,s) {
     if(captainArt.complete&&captainArt.naturalWidth)c.drawImage(getDuelCaptain(),30-(field.shotKick>0?3:0),206,134,134);
     c.restore();
   }
-  yard(mine,false);yard(other,true);
+  yard(mine,false);if(!scoreRace)yard(other,true);
   const units=[...mine.enemies.map(z=>({...z,friendly:false,frozen:mine.freeze>0})),...other.enemies.map(z=>({...z,x:1000-z.x,friendly:true,frozen:other.freeze>0}))].sort((a,b)=>a.y-b.y||a.x-b.x);
   for(const z of units){
     const size=z.type==='mini'?35:z.type==='boss'?84:54,bob=reducedMotion||z.frozen?0:Math.sin(z.gait)*(z.engaged?1:2);
@@ -334,7 +344,7 @@ function drawBattle(canvas,s) {
   }
   weapons(mine,false);weapons(other,true);
   if(!localAuto){c.strokeStyle='#fff';c.lineWidth=2;c.beginPath();c.arc(mine.target.x,mine.target.y,15,0,Math.PI*2);c.moveTo(mine.target.x-23,mine.target.y);c.lineTo(mine.target.x+23,mine.target.y);c.stroke();}
-  c.font='bold 16px system-ui';c.shadowColor='#18321b';c.shadowBlur=window.GuluPerformance?.current.glow===false?0:4;c.fillStyle='#f0e5ac';c.fillText('我方僵尸 →',185,505);c.fillStyle='#f4d09d';c.textAlign='right';c.fillText('← 敌方僵尸',815,505);c.textAlign='left';c.shadowBlur=0;
+  c.font='bold 16px system-ui';c.shadowColor='#18321b';c.shadowBlur=window.GuluPerformance?.current.glow===false?0:4;c.fillStyle='#f0e5ac';c.fillText(scoreRace?'我的战场 · 击杀得分':'我方僵尸 →',185,505);c.fillStyle='#f4d09d';c.textAlign='right';c.fillText(scoreRace?'← 僵尸来袭':'← 敌方僵尸',815,505);c.textAlign='left';c.shadowBlur=0;
   if(mine.health<=0||other.health<=0){c.fillStyle='#993a26';c.font='bold 20px system-ui';c.textAlign='center';c.fillText(`${mine.health<=0?'我的':'对方'}后院告急 · ${Math.max(0,3-(mine.health<=0?mine.breach:other.breach)).toFixed(1)} 秒`,500,510);c.textAlign='left';}
 }
 async function boot(){

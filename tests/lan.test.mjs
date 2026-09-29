@@ -1,6 +1,15 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createLanServer} from '../lan-server.mjs';
+test('score race mode and duration belong to the host and cannot be replaced by a joiner',async t=>{
+ const app=createLanServer();await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));t.after(()=>app.stop());
+ const base=`http://127.0.0.1:${app.server.address().port}`;
+ const create=async data=>{const r=await fetch(base+'/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});return {status:r.status,data:await r.json()};};
+ const host=await create({name:'A',mode:'letters',battleMode:'score',duration:300});assert.equal(host.status,200);
+ const guest=await create({name:'B',code:host.data.code,battleMode:'siege',duration:60});assert.equal(guest.status,200);
+ const m=app.rooms.get(host.data.code).match;assert.equal(m.config.battleMode,'score');assert.equal(m.config.duration,300);
+ assert.equal((await create({battleMode:'score',duration:17})).status,400);
+});
 test('HTTP + two independent SSE clients: room lifecycle, commands, auth, reconnect and rematch',async t=>{
   const app=createLanServer();await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));t.after(()=>app.stop());
   const base=`http://127.0.0.1:${app.server.address().port}`;

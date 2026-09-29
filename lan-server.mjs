@@ -188,7 +188,7 @@ export function createLanServer(tlsOptions=null,options={}) {
           let code;do{code=randomBytes(3).toString('hex').toUpperCase();}while(rooms.has(code));
           let customBank=null,publicResource=null;
           if(data.publicResourceId){const resource=community.publicLibrary(data.publicResourceId);customBank=JSON.parse(resource.payload).groups.find(g=>g.id===data.publicGroupId);if(!customBank||data.mode!==(customBank.kind==='word'?'english':'sentences'))throw Error('请选择与对战模式匹配的公共词组');publicResource={id:resource.id,title:resource.title};}
-          room={code,match:new DuelMatch({mode:data.mode,level:data.level,customBank,publicResource}),tokens:[],streams:[],accounts:[],lastSeen:[],lastActive:Date.now(),rates:[[],[]]};
+          room={code,match:new DuelMatch({mode:data.mode,level:data.level,customBank,publicResource,battleMode:data.battleMode,duration:data.duration}),tokens:[],streams:[],accounts:[],lastSeen:[],lastActive:Date.now(),rates:[[],[]]};
           side=room.match.join(account?.name||data.name);rooms.set(code,room);
         }
         room.accounts[side]=account?.id||null;startRoomLoop();

@@ -50,7 +50,7 @@ class DuelGarden extends GardenGame {
   offerCards() {}
   canCastWithoutEnemies(index){return this.reserveNext||['ward','mend'].includes(this.skills[index]?.kind);}
   skillTarget(){return this.target();}
-  canBiteDefense(z) {return !z.engaged&&!(z.staggerTime>0)&&this.siegeLeaders?.has(z.id);}
+  canBiteDefense(z) {return !this.scoreRace&&!z.engaged&&!(z.staggerTime>0)&&this.siegeLeaders?.has(z.id);}
   damageDefense(amount,y){super.damageDefense(amount*.25,y);}
   shoot() {
     if(this.auto&&!this.enemies.some(z=>z.hp>0&&z.x<=390))return;
@@ -126,6 +126,7 @@ class DuelGarden extends GardenGame {
     super.damage(z,amount,kind);
   }
   update(dt) {
+    if(this.scoreRace){for(const z of this.enemies)if(z.hp>0&&z.x<=195){z.hp=0;this.escaped++;}this.pruneEnemies();}
     // One frontliner per lane can reach the garden fence at a time. The rest
     // keep the push alive without multiplying siege damage into an instant win.
     const front=new Map();
@@ -146,6 +147,7 @@ class DuelGarden extends GardenGame {
     for(const [z,speed] of stopped)z.speed=speed;
     this.bullets=this.bullets.filter(b=>b.x<=430);
     this.resolveLasers(dt);
+    if(this.scoreRace){for(const z of this.enemies)if(z.hp>0&&z.x<=195){z.hp=0;this.escaped++;}this.pruneEnemies();}
   }
   prepare(mode,level,customBank) {
     this.learningMode=mode;this.englishLevel=level;this.setCustomBank(customBank);this.reset();this.status='playing';
@@ -164,9 +166,10 @@ class DuelGarden extends GardenGame {
 }
 
 class DuelMatch {
-  constructor({mode='letters',level=0,customBank=null,publicResource=null,random=Math.random}={}) {
+  constructor({mode='letters',level=0,customBank=null,publicResource=null,battleMode='siege',duration=180,random=Math.random}={}) {
     if(!MODES.includes(mode)||!Number.isInteger(level)||level<0||level>4)throw new Error('请选择有效的题目模式和等级');
-    this.customBank=customBank?JSON.parse(JSON.stringify(customBank)):null;this.config={mode,level,...(publicResource?{publicResource}: {})};this.random=random;this.round=0;
+    if(!['siege','score'].includes(battleMode)||![60,180,300,600].includes(duration))throw Error('请选择有效的对战模式和时长');
+    this.customBank=customBank?JSON.parse(JSON.stringify(customBank)):null;this.config={mode,level,battleMode,duration,...(publicResource?{publicResource}: {})};this.random=random;this.round=0;
     this.players=[null,null];this.status='waiting';this.elapsed=0;this.winner=null;this.reason='';
     this.promptHistories=[{},{}];
   }
@@ -191,6 +194,7 @@ class DuelMatch {
     this.round++;this.status='playing';this.elapsed=0;this.waveIn=.7;this.autoSerial=0;this.winner=null;this.reason='';
     const seed=Math.floor(this.random()*4294967296)>>>0;
     this.games=[0,1].map(side=>{const g=new DuelGarden(side,{random:seededRandom(seed)});g.promptHistory=this.promptHistories[side];g.prepare(this.config.mode,this.config.level,this.customBank);return g;});
+    if(this.config.battleMode==='score')for(const g of this.games){g.scoreRace=true;g.escaped=0;g.skills=g.skills.slice(0,4);}
     this.players.forEach(p=>Object.assign(p,{sun:24,sent:0,dispatchCd:0,ready:false,offline:0,wardUntil:0,mendUntil:0}));
 
   }
@@ -286,6 +290,7 @@ class DuelMatch {
       case 'fire':if(typeof action.value!=='boolean')throw new Error('无效射击状态');g.shooting=action.value;break;
       case 'auto':if(typeof action.value!=='boolean')throw new Error('无效射击状态');g.auto=action.value;g.shooting=false;break;
       case 'send': {
+        if(this.config.battleMode==='score')throw Error('限时竞分模式不能向对手派兵');
         if(!Object.hasOwn(UNITS,action.unit))throw new Error('无效僵尸');
         if(p.dispatchCd>0)throw new Error('派兵正在冷却');
         if(p.sun<UNITS[action.unit].cost)throw new Error('阳光还不够');
@@ -306,6 +311,8 @@ class DuelMatch {
       if(missing.some(i=>this.players[i].offline>=30))this.end(missing.length===2?null:1-missing[0],missing.length===2?'双方断线，比赛结束':'对方断线超过 30 秒');
       return;
     }
+    const scoreRace=this.config.battleMode==='score';
+    if(scoreRace)dt=Math.min(dt,Math.max(0,this.config.duration-this.elapsed));
     this.elapsed+=dt;this.waveIn-=dt;
     const wave=Math.min(8,1+Math.floor(this.elapsed/40));
     this.games.forEach(g=>{g.wave=wave;});
@@ -314,18 +321,31 @@ class DuelMatch {
     if(this.waveIn<=0) {
       const type=phase.types[this.autoSerial%phase.types.length];
       const lane=LANES[(this.autoSerial*3)%LANES.length];this.autoSerial++;
-      this.send(0,type,false,this.phase===3?LANES[Math.floor(this.random()*LANES.length)]:lane);
-      this.send(1,type,false,this.phase===3?LANES[Math.floor(this.random()*LANES.length)]:lane);
+      if(scoreRace){
+        const gait=this.random()*Math.PI*2;
+        for(const g of this.games){
+          g.pruneEnemies();if(g.enemies.length>=75){g.enemies.shift();g.escaped++;}
+          const z=g.spawn(800,lane,type==='splitter'?'armor':type,false);
+          z.speed*=1.65;z.gait=gait;z.phase=gait;
+        }
+      }else{
+        this.send(0,type,false,this.phase===3?LANES[Math.floor(this.random()*LANES.length)]:lane);
+        this.send(1,type,false,this.phase===3?LANES[Math.floor(this.random()*LANES.length)]:lane);
+      }
       this.waveIn=phase.interval;
     }
-    this.clash(dt);
+    if(!scoreRace)this.clash(dt);
     this.games.forEach(g=>g.update(dt));
     this.resolveWardBreaks();
+    if(scoreRace){
+      if(this.elapsed>=this.config.duration-1e-8){this.elapsed=this.config.duration;const scores=this.games.map(g=>g.score-(g.practiceScore||0));this.end(scores[0]===scores[1]?null:scores[0]>scores[1]?0:1,'时间到 · '+this.players[0].name+' '+scores[0]+' 分 / '+this.players[1].name+' '+scores[1]+' 分');}
+      return;
+    }
     const lost=this.games.map((g,i)=>g.status==='lost'?i:-1).filter(i=>i>=0);
     if(lost.length)this.end(lost.length===2?null:1-lost[0],lost.length===2?'双方后院同时被攻破':'对方后院已被攻破');
   }
   snapshot(side,sharedFields) {
-    const fields=sharedFields??this.games?.map(g=>({health:g.health,maxHealth:g.maxHealth,flowers:g.flowerHealth,breach:g.breachElapsed,
+    const fields=sharedFields??this.games?.map(g=>({health:g.health,maxHealth:g.maxHealth,flowers:g.flowerHealth,breach:g.breachElapsed,score:g.score-(g.practiceScore||0),escaped:g.escaped||0,
       enemies:g.enemies.map(z=>({id:z.id,owner:z.owner,type:z.type,x:z.x,y:z.y,hp:z.hp,maxHp:z.maxHp,shield:z.shield,gait:z.gait,hit:z.hit,engaged:!!z.engaged,wardTime:z.wardTime||0,mendTime:z.mendTime||0,staggerTime:z.staggerTime||0})),
       laserResult:g.laserResult?{...g.laserResult,age:g.time-g.laserResult.time}:null,
       bullets:g.bullets.map(b=>({x:b.x,y:b.y})),effects:g.effects.map(e=>({...e})),freeze:g.freeze,shotKick:g.shotKick,hero:g.hero,target:g.target(),kills:g.kills,casts:g.casts}));
