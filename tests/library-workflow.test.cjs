@@ -39,3 +39,25 @@ test('phrases fill Chinese without looking up IPA, while single words still fill
  const rows=C.enrich(C.parse('take care\napple','word'),'word',vocabulary);assert.equal(rows[0].meaning,'保重');assert.equal(rows[0].ipa,'');assert.equal(rows[1].ipa,'æpəl');
  const supplied=C.enrich(C.parse('take care | 保重 | 已有音标','word'),'word',vocabulary);assert.equal(supplied[0].ipa,'已有音标');
 });
+
+test('recognition splits question and answer into separate natural sentences with aligned Chinese',async()=>{
+ for(const pipeline of ['staged','one-shot']){
+  const result=await C.prepare({kind:'auto',pipeline,organize:async()=>({entries:[{kind:'sentence',text:'How are you? I am fine. Thank you!',meaning:'你好吗？我很好。谢谢你！'}]})});
+  assert.deepEqual(result.entries.map(e=>e.text),['How are you?','I am fine.','Thank you!']);
+  assert.deepEqual(result.entries.map(e=>e.meaning),['你好吗？','我很好。','谢谢你！']);
+ }
+});
+test('sentence splitting preserves clauses, wrapped lines, contractions and abbreviations',()=>{
+ assert.deepEqual(C.naturalSentences("Dr. Smith said, I like apples,\n but I don't like pears. Do you agree?"),["Dr. Smith said, I like apples,\n but I don't like pears.",'Do you agree?']);
+ assert.deepEqual(C.naturalSentences('Mr. Brown lives in the U.S.A. today. He paid 3.50 dollars!'),['Mr. Brown lives in the U.S.A. today.','He paid 3.50 dollars!']);
+ assert.deepEqual(C.naturalSentences('I think... it is fine. Is it?Yes!'),['I think... it is fine.','Is it?','Yes!']);
+ const phrase={kind:'phrase',text:'e.g. take care',meaning:'例如保重'};assert.deepEqual(C.splitRecognizedEntries([phrase]).entries,[phrase]);
+});
+test('unmatched paragraph translation is preserved for review without being copied to each sentence',async()=>{
+ const result=await C.prepare({kind:'auto',pipeline:'one-shot',organize:async()=>({entries:[{kind:'sentence',text:'Are you ready? Yes, I am.',meaning:'你准备好了吗我准备好了',ipa:'原音标'}]})});
+ assert.equal(result.entries.length,2);assert.ok(result.entries.every(e=>e.meaning===''&&e.ipa===''&&e.uncertain));
+ assert.ok(result.notes.some(n=>n.includes('你准备好了吗我准备好了')));assert.ok(result.notes.some(n=>n.includes('原音标')));
+});
+test('sentence splitting refuses oversized batches instead of silently dropping later sentences',()=>{
+ assert.throws(()=>C.splitRecognizedEntries([{kind:'sentence',text:'Hello! '.repeat(301)}]),/300/);
+});

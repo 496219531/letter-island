@@ -46,11 +46,12 @@
   button(filters,'刷新榜单',()=>renderBoard(parent,kind,mode,level));
   const content=element('div');content.append(element('p','正在加载榜单…'));parent.append(content);
   const result=await request('leaderboards?'+new URLSearchParams({kind,mode,level}));if(!dialog?.open||serial!==mine)return;remember(result.user);content.replaceChildren();
-  const summary=result.me?'你的名次：第 '+result.me.rank+' 名'+(kind==='solo'?' · '+result.me.score+' 分':' · '+result.me.points+' 积分'):profile?'完成一局，留下你的小院足迹。':'加入账号后，你的成绩也能出现在这里。';
+  const summary=result.me?'你的名次：第 '+result.me.rank+' 名'+(kind==='solo'?' · '+result.me.score+' 分 · 累计练习 '+result.me.practice+' 局 · 累计大招 '+result.me.casts+' 次':' · '+result.me.points+' 积分 · 累计对战 '+result.me.played+' 局 · 累计大招 '+result.me.casts+' 次'):profile?'完成一局，留下你的小院足迹。':'加入账号后，你的成绩也能出现在这里。';
   content.append(element('p',summary,'community-mine'));
+  if(result.overview){const stats=kind==='solo'?result.overview.practice:result.overview.duel;const text=kind==='solo'?'练习汇总：'+stats.players+' 位守卫 · '+stats.runs+' 局练习 · '+stats.casts+' 次大招':'对战汇总：'+stats.players+' 位守卫 · '+stats.matches+' 局对战 · '+stats.casts+' 次大招';content.append(element('p',text,'community-board-summary'));}
   if(!result.rows.length){content.append(element('p','榜单还空着，来留下第一份成绩吧！','community-empty'));return;}
-  const table=element('table');const head=element('tr');for(const name of ['排名','小院守卫',kind==='solo'?'最高分':'积分',kind==='solo'?'波次':'战绩'])head.append(element('th',name));const thead=element('thead');thead.append(head);table.append(thead);const tbody=element('tbody');table.append(tbody);
-  for(const row of result.rows){const tr=element('tr');if(row.id===profile?.id)tr.className='is-me';for(const text of [row.rank,row.name,kind==='solo'?row.score:row.points,kind==='solo'?row.wave:row.wins+'胜 / '+row.played+'局'])tr.append(element('td',String(text)));tbody.append(tr);}content.append(table,element('small','展示前50名 · 只在打开或刷新时更新'));
+  const table=element('table');const head=element('tr');for(const name of kind==='solo'?['排名','小院守卫','最高分','波次','累计练习','累计大招']:['排名','小院守卫','积分','胜场','累计对战','累计大招'])head.append(element('th',name));const thead=element('thead');thead.append(head);table.append(thead);const tbody=element('tbody');table.append(tbody);
+  for(const row of result.rows){const tr=element('tr');if(row.id===profile?.id)tr.className='is-me';const cells=kind==='solo'?[row.rank,row.name,row.score,row.wave,row.practice+' 局',row.casts+' 次']:[row.rank,row.name,row.points,row.wins+' 胜',row.played+' 局',row.casts+' 次'];for(const text of cells)tr.append(element('td',String(text)));tbody.append(tr);}content.append(table,element('small',kind==='solo'?'累计练习和累计大招覆盖该账号所有完成的标准练习局 · 展示前50名':'累计对战和累计大招记录已完成的已登录对局；积分另按对战榜规则计算 · 展示前50名'));
  }
  function open(tab='solo'){
   if(dialog?.open){dialog.focus();return;}

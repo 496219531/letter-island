@@ -25,6 +25,7 @@
     ['fortify','加固小院','🏡','生存','护盾上限 +2，并恢复 2 护盾'],['repair','修理小精灵','🛠️','生存','现在恢复 2 护盾，以后每波额外恢复 1'],
     ['thorns','仙人掌围墙','🌵','生存','僵尸靠近小院时，每秒受到 25 点伤害'],['magic','魔法放大镜','🔮','大招','激光、西瓜与冰冻冲击伤害 +25%'],
     ['recharge','充能电池','🔋','大招','大招充能速度 +20%'],['beam','彩虹扩音器','🌈','大招','激光攻击宽度 +35'],
+    ['freezeStrength','极寒冰晶','❄️','大招','冰冻减速增加5个百分点，从50%提升，最高80%'],['laserPower','聚能激光','🔆','大招','激光伤害 +25%，可叠加，并与魔法放大镜加成相乘'],
     ['permafrost','漫长冬天','❄️','大招','全场冰霜减速持续时间 +1.5 秒'],['shatter','碎冰糖','🍬','大招','攻击冰霜减速目标额外伤害倍率 +0.5'],
     ['blast','巨无霸西瓜','🍉','大招','西瓜爆炸半径 +45'],['twinmelon','西瓜连连看','🎯','大招','每次西瓜大招多落下 1 枚西瓜'],
     ['barrier','魔法护盾','🛡️','生存','每释放 3 次大招恢复 1 护盾；每层增加恢复量'],['berserk','背水一战','🔥','火力','护盾不超过一半时，子弹伤害 +40%']
@@ -37,13 +38,24 @@
     rage:{name:'狂暴巨化',icon:'🔥',duration:12,description:'变大5秒，射速为当前普通射速×2，最快每0.12秒一轮；每轮10发，伤害×3'},
     lightning:{name:'连锁闪电',icon:'⚡',duration:9,description:'自动连击最多10个敌人，伤害逐跳递增'},
     blackhole:{name:'黑洞吞噬',icon:'🌀',duration:13,description:'自动聚怪3秒，持续伤害后爆发'},
-    clones:{name:'豌豆分身',icon:'🌱',duration:12,description:'复制2个队长持续8秒，按普通射速射击，不额外加速'},
+    clones:{name:'豌豆分身',icon:'🌱',duration:12,description:'复制2个队长持续8秒，分身子弹伤害为普通子弹的2倍，按普通射速射击'},
     deathchain:{name:'死亡连锁',icon:'💥',duration:12,description:'标记全场8秒，击杀触发范围爆炸，可连锁引爆'},
     judgment:{name:'末日审判',icon:'☄️',duration:13,description:'锁定血量最高的前6个敌人：普通敌人斩杀，Boss损失55%最大生命'}
   };
   for(const [skill,definition] of Object.entries(SKILLS))CARDS.push({id:'skill-'+skill,skill,...definition,category:'大招',description:definition.description+'；限用5次，用完恢复基础大招'});
-  CARDS.push({id:'rageDuration',name:'持久狂暴',icon:'⏳',category:'大招',description:'狂暴持续时间 +1 秒，可叠加'});
-  CARDS.push({id:'judgmentTargets',name:'审判扩散',icon:'🎯',category:'大招',description:'末日审判额外锁定1个目标，可叠加'});
+  CARDS.push({id:'rageDuration',name:'持久狂暴',icon:'⏳',category:'大招',description:'狂暴持续时间 +1 秒，最高15秒'});
+  CARDS.push({id:'judgmentTargets',name:'审判扩散',icon:'🎯',category:'大招',description:'末日审判额外锁定1个目标，最高12个'});
+  CARDS.push(
+    {id:'blackholeRadius',name:'引力扩张',icon:'🌀',category:'大招',description:'黑洞吸引和伤害半径 +25，最高230'},
+    {id:'cloneCount',name:'分身军团',icon:'🌱',category:'大招',description:'额外复制1个队长，最高6个；分身子弹保留2倍伤害'},
+    {id:'deathchainPower',name:'连锁烈爆',icon:'💥',category:'大招',description:'死亡连锁每次爆炸伤害 +25%，可叠加'},
+    {id:'lightningTargets',name:'雷电传导',icon:'⚡',category:'大招',description:'连锁闪电额外命中2个目标，最高20个'},
+    {id:'charmTargets',name:'魅惑扩散',icon:'💗',category:'大招',description:'每排额外魅惑1个最前方目标，每排最高3个'}
+  );
+  const SPECIAL_UPGRADES={blackholeRadius:['blackhole',5],cloneCount:['clones',4],deathchainPower:['deathchain'],lightningTargets:['lightning',5],charmTargets:['charm',2],rageDuration:['rage',10],judgmentTargets:['judgment',6],freezeStrength:['freeze',6],laserPower:['laser']};
+  for(const card of CARDS){const rule=SPECIAL_UPGRADES[card.id];if(rule){card.requiresSkill=rule[0];if(rule[1]!==undefined)card.maxStacks=rule[1];}}
+  const EDIBLE_UPGRADES=new Set(['thorns','fortify','knockback','repair','leech','barrier','poison','frost','recharge','magic','crit']);
+  for(const card of CARDS)if(EDIBLE_UPGRADES.has(card.id))card.edible=true;
   const TYPES = {
     walker:{name:'捣蛋鬼',icon:'',hp:1,speed:1},runner:{name:'闪电跑跑',icon:'⚡',hp:.7,speed:2.1},
     armor:{name:'铁桶卫士',icon:'🪣',hp:2,speed:.7},shield:{name:'盾牌兵',icon:'🛡️',hp:1.4,speed:.85},
@@ -152,7 +164,7 @@
     }
     reset() {
       this.promptHistory=this.promptHistory||{};
-      this.stacks = {}; this.offers = [];this.skillAuto=true;this.skillAimLeft=0;this.skillAim={x:690,y:280};this.rage=0;this.clones=0;this.cloneShot=0;this.deathQueue=[];this.processingDeath=false; this.maxHealth = 8; this.healKills=0;
+      this.stacks = {};this.upgradeHealth={}; this.offers = [];this.skillOfferMisses=0;this.skillAuto=true;this.skillAimLeft=0;this.skillAim={x:690,y:280};this.rage=0;this.clones=0;this.cloneShot=0;this.deathQueue=[];this.processingDeath=false; this.maxHealth = 8; this.healKills=0;
       this.flowerHealth=[];this.breachElapsed=0;this.health = 8; this.score = 0; this.practiceScore=0; this.kills = 0; this.casts = 0; this.correct = 0;
       this.wave = 1; this.spawned = 0; this.quota = 9; this.spawnIn = 2; this.waveBreak = 0;
       this.enemies = []; this.bullets = []; this.effects = []; this.dead = [];
@@ -197,7 +209,7 @@
     setSkillAim(x,y){this.skillAim={x:clamp(x,160,980),y:clamp(y,100,455)};this.skillAuto=false;this.skillAimLeft=5;}
     skillTarget(kind){
       if(!this.skillAuto)return this.skillAim;
-      if(kind==='blackhole'||kind==='melon')return this.clusterTarget(kind==='blackhole'?105:225);
+      if(kind==='blackhole'||kind==='melon')return this.clusterTarget(kind==='blackhole'?this.blackholeRadius:225);
       let nearest=null;for(const z of this.enemies)if(z.hp>0&&!z.charmed&&(!nearest||z.x<nearest.x))nearest=z;
       return nearest?{x:nearest.x,y:nearest.y}:this.aim;
     }
@@ -217,20 +229,53 @@
       const lanes=new Map();
       for(const z of this.enemies){
         if(z.hp<=0||z.charmed)continue;
-        const lane=clamp(Math.round((z.y-140)/75),0,4),front=lanes.get(lane);
-        if(!front||z.x<front.x)lanes.set(lane,z);
+        const lane=clamp(Math.round((z.y-140)/75),0,4),members=lanes.get(lane)||[];
+        members.push(z);lanes.set(lane,members);
       }
-      return [...lanes.values()];
+      return [...lanes.values()].flatMap(members=>members.sort((a,b)=>a.x-b.x).slice(0,this.charmPerLane));
+    }
+    get blackholeRadius(){return 105+25*Math.min(5,this.stack('blackholeRadius'));}
+    get cloneCount(){return 2+Math.min(4,this.stack('cloneCount'));}
+    cloneOrigins(){return [-90,90,-145,145,-190,190].slice(0,this.cloneCount).map(dy=>({x:this.hero.x+35,y:clamp(this.hero.y+dy,75,490)}));}
+    get lightningTargets(){return 10+2*Math.min(5,this.stack('lightningTargets'));}
+    get charmPerLane(){return 1+Math.min(2,this.stack('charmTargets'));}
+    get rageDuration(){return 5+Math.min(10,this.stack('rageDuration'));}
+    get judgmentTargets(){return 6+Math.min(6,this.stack('judgmentTargets'));}
+    canOfferCard(card){
+      if(card.skill)return !['laser','freeze','melon'].includes(card.skill)&&!this.skills.some(s=>s.kind===card.skill);
+      return (!card.requiresSkill||this.skills.some(s=>s.kind===card.requiresSkill))&&(card.maxStacks===undefined||this.stack(card.id)<card.maxStacks);
+    }
+    upgradeSites(){
+      const sites=[];let index=0;
+      for(const card of CARDS){if(!card.edible)continue;
+        const slot=index++;if(!this.stack(card.id))continue;
+        if(card.id==='thorns'){for(let row=0;row<8;row++)sites.push({id:card.id,x:216,y:110+row*48});}
+        else sites.push({id:card.id,x:275+Math.floor(slot/5)*52,y:140+(slot%5)*75});
+      }
+      return sites;
+    }
+    damageUpgrade(id,amount){
+      if(!EDIBLE_UPGRADES.has(id)||!this.stack(id)||!Number.isFinite(amount)||amount<=0)return false;
+      const before=this.stack(id),remaining=Math.max(0,(this.upgradeHealth[id]??6*before)-amount),layers=Math.ceil(remaining/6);
+      if(remaining>0)this.upgradeHealth[id]=remaining;else delete this.upgradeHealth[id];
+      if(layers===before)return false;
+      if(layers)this.stacks[id]=layers;else delete this.stacks[id];
+      const lost=before-layers;
+      if(id==='fortify'){this.maxHealth=Math.max(8,this.maxHealth-2*lost);this.flowerHealth=this.flowerHealth.map(h=>Math.min(h,this.maxHealth/8));}
+      const card=CARDS.find(c=>c.id===id);this.emit('upgrade-eaten',{id,name:card.name,layers:this.stack(id),lost});return true;
     }
     stack(id) { return this.stacks[id]||0; }
     get power() { return 1+.25*this.stack('power')+(this.health<=this.maxHealth/2?.4*this.stack('berserk'):0); }
+    get skillGrowth(){return Math.min(1e12,Math.pow(1.19,Math.max(0,this.wave-1)));}
     get magicPower() {return 1+.25*this.stack('magic');}
+    get freezeSlow(){return Math.min(.8,.5+.05*this.stack('freezeStrength'));}
+    get laserDamage(){return 250*this.skillGrowth*this.magicPower*(1+.25*this.stack('laserPower'));}
     spawn(x=1030,y=null,type=null,count=true) {
       if(!type){
         const pool=['walker'];if(this.wave>=2)pool.push('runner','armor');if(this.wave>=3)pool.push('shield','splitter');if(this.wave>=4)pool.push('healer','bomber');
         type=this.wave%5===0&&this.spawned===this.quota-1?'boss':pool[this.spawned%pool.length];
       }
-      const spec=TYPES[type];const scale=Math.min(1e12,Math.pow(1.19,this.wave-1));
+      const spec=TYPES[type];const scale=this.skillGrowth;
       const hp=72*spec.hp*scale;
       const z={id:++this.serial,type,x,y:y??[140,215,290,365,430][Math.floor(this.random()*5)],hp,maxHp:hp,
         speed:Math.min(155,(23+this.wave*2.3)*spec.speed),radius:type==='boss'?53:type==='mini'?20:31,
@@ -254,11 +299,11 @@
     shoot(origin=null) {
       if(!origin&&this.fireStrength<=0&&!(this.rage>0))return;
       if(!origin)this.shotKick=.1;const target=origin?.target||this.target(),muzzle=origin||this.muzzle(),angle=Math.atan2(target.y-muzzle.y,target.x-muzzle.x);
-      const count=!origin&&this.rage>0?10:1+this.stack('multishot'),renderCount=Math.min(15,count);
+      const count=!origin&&this.rage>0?10:1+this.stack('multishot'),renderCount=Math.min(origin?Math.floor(30/this.cloneCount):15,count);
       for(let i=0;i<renderCount;i++){
         const a=angle+(i-(renderCount-1)/2)*.06;
         this.bullets.push({x:muzzle.x,y:muzzle.y,px:muzzle.x,py:muzzle.y,vx:Math.cos(a)*720,vy:Math.sin(a)*720,life:2.5,
-          damage:24*this.power*(!origin&&this.rage>0?3:1)*(count/renderCount),rageShot:!origin&&this.rage>0,pierce:this.stack('pierce'),bounces:this.stack('ricochet'),hitIds:new Set()});
+          damage:24*this.power*(origin?2:this.rage>0?3:1)*(origin||this.rage>0?this.skillGrowth:1)*(count/renderCount),skillShot:Boolean(origin||this.rage>0),rageShot:!origin&&this.rage>0,pierce:this.stack('pierce'),bounces:this.stack('ricochet'),hitIds:new Set()});
       }
       this.emit('shot',{angle});
     }
@@ -276,7 +321,7 @@
         this.dead.push({...z,life:.7,fullLife:.7});this.emit('kill',{x:z.x,y:z.y,boss:z.boss,score});
         if(this.stack('leech')&&++this.healKills>=Math.max(2,20-this.stack('leech')*2)){this.healKills=0;this.health=Math.min(this.maxHealth,this.health+1);}
         if(z.type==='splitter'){this.spawn(z.x+12,clamp(z.y-25,100,455),'mini',false);this.spawn(z.x+22,clamp(z.y+25,100,455),'mini',false);}
-        if(z.deathMark>0){this.deathQueue.push({x:z.x,y:z.y,damage:Math.max(360*this.magicPower,z.maxHp*.5)});this.drainDeathChain();}
+        if(z.deathMark>0){this.deathQueue.push({x:z.x,y:z.y,damage:Math.max(360*this.skillGrowth*this.magicPower,z.maxHp*.5)*(1+.25*this.stack('deathchainPower'))});this.drainDeathChain();}
       }
     }
     drainDeathChain(){
@@ -313,7 +358,7 @@
       const baseAmount=b.damage*Math.pow(.7,b.hitIds.size);
       if(baseAmount<.5){b.life=0;return;}
       b.hitIds.add(z.id);
-      let amount=baseAmount;if(this.freeze>0)amount*=2+.5*this.stack('shatter');
+      let amount=baseAmount;if(this.freeze>0)amount*=(2+.5*this.stack('shatter'))*(b.skillShot||b.rageShot?1:this.skillGrowth);
       if(this.random()<Math.min(.9,.1*this.stack('crit'))){amount*=2+.5*this.stack('critPower');this.emit('critical',{x:z.x,y:z.y});}
       this.damage(z,amount);
       if(this.stack('poison')){z.poison=8*this.stack('poison');z.poisonTime=4;}
@@ -328,17 +373,19 @@
     }
     offerCards(){
       this.status='upgrade';this.shooting=false;this.cancelTyping();this.bullets=[];this.effects=[];
-      const pool=CARDS.filter(c=>c.skill?!['laser','freeze','melon'].includes(c.skill)&&!this.skills.some(s=>s.kind===c.skill):c.id!=='rageDuration'||this.skills.some(s=>s.kind==='rage'));
+      const pool=CARDS.filter(card=>this.canOfferCard(card));
       const attributes=pool.filter(card=>!card.skill),skills=pool.filter(card=>card.skill),take=items=>items.splice(Math.floor(this.random()*items.length),1)[0];
       this.offers=[];
       for(let i=0;i<3;i++){const skillSlot=!this.offers.some(card=>card.skill)&&skills.length&&this.random()<.05;this.offers.push(take(skillSlot?skills:attributes.length?attributes:skills));}
+      if(this.skillOfferMisses>=4&&skills.length&&!this.offers.some(card=>card.skill))this.offers[Math.floor(this.random()*this.offers.length)]=take(skills);
+      this.skillOfferMisses=this.offers.some(card=>card.skill)?0:Math.min(4,this.skillOfferMisses+1);
       this.emit('upgrade',{wave:this.wave,offers:this.offers});
     }
     chooseCard(id,slot){
       if(this.status!=='upgrade'||!this.offers.some(c=>c.id===id))return false;
       const card=this.offers.find(c=>c.id===id);
       if(card.skill){if(!Number.isInteger(slot)||slot<0||slot>2||this.skills.some(s=>s.kind===card.skill))return false;const previous=this.skills[slot],baseKind=previous.baseKind||(['laser','freeze','melon'].includes(previous.kind)?previous.kind:['laser','freeze','melon'][slot]);Object.assign(previous,SKILLS[card.skill],{kind:card.skill,baseKind,remainingUses:5,typed:0,repeatsDone:0,cd:0});this.skills[slot].code=this.nextCode(slot);}
-      else this.stacks[id]=(this.stacks[id]||0)+1;
+      else {if(card.edible)this.upgradeHealth[id]=(this.upgradeHealth[id]??6*this.stack(id))+6;this.stacks[id]=(this.stacks[id]||0)+1;}
       if(id==='fortify'){this.maxHealth+=2;this.health+=2;}
       if(id==='repair')this.health=Math.min(this.maxHealth,this.health+2);
       this.health=Math.min(this.maxHealth,this.health+1+this.stack('repair'));
@@ -391,7 +438,7 @@
     }
     select(index) {
       if(this.status!=='playing')return;
-      if(this.skills[index].cd>0){this.emit('cooldown',{index});return;}
+      if(this.skills[index].cd>0||this.skills[index].held){this.emit('cooldown',{index});return;}
       if(this.typing!==index){ if(this.typing>=0)this.skills[this.typing].typed=0;this.typing=index; }
       this.emit('typing',{index});
     }
@@ -401,17 +448,17 @@
       if(this.status!=='playing'||!((/^[a-z]$/i).test(key)||(key===' '&&learning)||(learning&&/^[.'-]$/.test(key))))return false;
       key=key.toUpperCase();
       let index=this.typing;
-      if(index<0)index=this.skills.findIndex(s=>s.cd<=0&&s.code[0]===key);
+      if(index<0)index=this.skills.findIndex(s=>s.cd<=0&&!s.held&&s.code[0]===key);
       if(index<0){this.emit('wrong',{expected:this.skills.filter(s=>s.cd<=0).map(s=>s.code[0]).join(' / ')});return false;}
       const skill=this.skills[index];
-      if(skill.cd>0)return false;
+      if(skill.cd>0||skill.held)return false;
       this.typing=index;
       if(skill.code[skill.typed]!==key){this.emit('wrong',{expected:skill.code[skill.typed]});return false;}
       skill.typed++;this.correct++;this.emit('letter',{index});
       if(skill.typed===skill.code.length){
         if(['english','sentences'].includes(this.learningMode)){const entry=this.learningEntry(skill.code);this.emit('practice-complete',{index,code:skill.code,text:entry?.text||skill.code.toLowerCase(),meaning:entry?.meaning||'',repeat:skill.repeatsDone+1});}
         if(this.learningMode==='english'&&skill.repeatsDone+1<this.learningLoad){skill.repeatsDone++;skill.typed=0;this.emit('repeat',{index,done:skill.repeatsDone,total:this.learningLoad});return true;}
-        if(!this.enemies.some(z=>z.hp>0&&!z.charmed)){skill.typed=0;this.typing=-1;this.emit('empty');return true;}
+        if(!this.enemies.some(z=>z.hp>0&&!z.charmed)&&!this.canCastWithoutEnemies?.(index)){skill.typed=0;this.typing=-1;this.emit('empty');return true;}
         this.cast(index,true);
       }
       return true;
@@ -431,7 +478,7 @@
       const match=speechMatch(this.learningEntry(skill.code)?.text||skill.code,transcript),{heard,expected}=match;
       this.typing=index;this.emit('speech',{index,heard,expected,matched:match.matched,nameTolerated:match.nameTolerated});
       if(!match.matched)return false;
-      if(!this.enemies.some(z=>z.hp>0&&!z.charmed)){this.typing=-1;this.emit('empty');return true;}
+      if(!this.enemies.some(z=>z.hp>0&&!z.charmed)&&!this.canCastWithoutEnemies?.(index)){this.typing=-1;this.emit('empty');return true;}
       this.correct+=expected.replace(/ /g,'').length;this.cast(index,true);return true;
     }
     backspace() { if(this.typing>=0){const s=this.skills[this.typing];s.typed=Math.max(0,s.typed-1);} }
@@ -449,25 +496,25 @@
       }
       this.typing=-1;skill.typed=0;skill.repeatsDone=0;skill.cd=skill.duration;skill.uses++;this.casts++;
       if(this.stack('barrier')&&this.casts%3===0)this.health=Math.min(this.maxHealth,this.health+this.stack('barrier'));
-      if(kind==='laser'){
+      if(kind==='laser'&&!this.queueLaser?.(target)){
         const angle=Math.atan2(target.y-this.hero.y,target.x-this.hero.x);
         this.effects.push({kind:'laser',angle,width:85+35*this.stack('beam'),life:.65,fullLife:.65});
-        for(const z of this.enemies){const dx=z.x-this.hero.x,dy=z.y-this.hero.y;const d=Math.abs(dx*Math.sin(angle)-dy*Math.cos(angle));if(d<85+35*this.stack('beam')+z.radius)this.damage(z,250*this.magicPower,'laser');}
+        for(const z of this.enemies){const dx=z.x-this.hero.x,dy=z.y-this.hero.y;const d=Math.abs(dx*Math.sin(angle)-dy*Math.cos(angle));if(d<85+35*this.stack('beam')+z.radius)this.damage(z,this.laserDamage,'laser');}
       }
-      if(kind==='freeze'){this.freeze=6+1.5*this.stack('permafrost');if(this.stack('magic'))for(const z of [...this.enemies])this.damage(z,30*this.stack('magic'),'ice');this.effects.push({kind:'freeze',life:1,fullLife:1});}
-      if(kind==='melon'){for(let i=0;i<1+Math.min(10,this.stack('twinmelon'));i++)this.effects.push({kind:'melon',x:clamp(target.x+(i?((i%2?1:-1)*60*Math.ceil(i/2)):0),160,1000),y:target.y,life:.75+i*.2,fullLife:.75+i*.2,damage:380*this.magicPower*Math.max(1,(1+this.stack('twinmelon'))/11),radius:225+45*this.stack('blast')});}
+      if(kind==='freeze'){this.freeze=6+1.5*this.stack('permafrost');if(this.stack('magic'))for(const z of [...this.enemies])this.damage(z,30*this.skillGrowth*this.stack('magic'),'ice');this.effects.push({kind:'freeze',life:1,fullLife:1});}
+      if(kind==='melon'){for(let i=0;i<1+Math.min(10,this.stack('twinmelon'));i++)this.effects.push({kind:'melon',x:clamp(target.x+(i?((i%2?1:-1)*60*Math.ceil(i/2)):0),160,1000),y:target.y,life:.75+i*.2,fullLife:.75+i*.2,damage:380*this.skillGrowth*this.magicPower*Math.max(1,(1+this.stack('twinmelon'))/11),radius:225+45*this.stack('blast')});}
       this.pruneEnemies();
       if(kind==='charm'){const targets=this.charmFrontlines();for(const z of targets){z.charmed=true;z.deathMark=0;z.eating=false;z.engaged=false;z.poisonTime=0;z.slowTime=0;z.biteIn=.6;}this.effects.push({kind:'charm',targets:targets.map(z=>({x:z.x,y:z.y})),life:.8,fullLife:.8});}
-      if(kind==='rage'){this.rage=5+this.stack('rageDuration');this.shotIn=0;}
+      if(kind==='rage'){this.rage=this.rageDuration;this.shotIn=0;}
       if(kind==='lightning'){
         const remaining=this.enemies.filter(z=>z.hp>0&&!z.charmed),points=[];let from={x:this.hero.x,y:this.hero.y};
-        for(let i=0;i<10&&remaining.length;i++){remaining.sort((a,b)=>i===0?(this.skillAuto?a.x-b.x:Math.hypot(a.x-target.x,a.y-target.y)-Math.hypot(b.x-target.x,b.y-target.y)):Math.hypot(a.x-from.x,a.y-from.y)-Math.hypot(b.x-from.x,b.y-from.y));const z=remaining.shift();points.push({x:z.x,y:z.y});this.damage(z,Math.max(300,z.maxHp*.25)*(1+i*.22)*this.magicPower,'lightning');from=z;}
+        for(let i=0;i<this.lightningTargets&&remaining.length;i++){remaining.sort((a,b)=>i===0?(this.skillAuto?a.x-b.x:Math.hypot(a.x-target.x,a.y-target.y)-Math.hypot(b.x-target.x,b.y-target.y)):Math.hypot(a.x-from.x,a.y-from.y)-Math.hypot(b.x-from.x,b.y-from.y));const z=remaining.shift();points.push({x:z.x,y:z.y});this.damage(z,Math.max(300*this.skillGrowth,z.maxHp*.25)*(1+i*.22)*this.magicPower,'lightning');from=z;}
         this.effects.push({kind:'lightning',points,life:.65,fullLife:.65});
       }
-      if(kind==='blackhole')this.effects.push({kind:'blackhole',x:target.x,y:target.y,radius:105,tick:0,life:3,fullLife:3});
+      if(kind==='blackhole')this.effects.push({kind:'blackhole',x:target.x,y:target.y,radius:this.blackholeRadius,radiusVersion:2,tick:0,life:3,fullLife:3});
       if(kind==='clones'){this.clones=8;this.cloneShot=0;}
       if(kind==='deathchain'){for(const z of this.enemies)if(z.hp>0&&!z.charmed)z.deathMark=8;this.effects.push({kind:'mark',life:.65,fullLife:.65});}
-      if(kind==='judgment'){const targets=this.enemies.filter(z=>z.hp>0&&!z.charmed).sort((a,b)=>this.skillAuto?(b.hp+b.shield)-(a.hp+a.shield):Math.hypot(a.x-target.x,a.y-target.y)-Math.hypot(b.x-target.x,b.y-target.y));const count=6+this.stack('judgmentTargets');for(const z of targets.slice(0,count))this.damage(z,z.boss?z.maxHp*.55+z.shield:z.hp+z.shield+1,'judgment');if(targets.length)this.effects.push({kind:'judgment',x:target.x,y:target.y,targets:targets.slice(0,count).map(z=>({x:z.x,y:z.y})),life:1,fullLife:1});}
+      if(kind==='judgment'){const targets=this.enemies.filter(z=>z.hp>0&&!z.charmed).sort((a,b)=>this.skillAuto?(b.hp+b.shield)-(a.hp+a.shield):Math.hypot(a.x-target.x,a.y-target.y)-Math.hypot(b.x-target.x,b.y-target.y));const count=this.judgmentTargets;for(const z of targets.slice(0,count))this.damage(z,z.boss?z.maxHp*.55+z.shield:z.hp+z.shield+1,'judgment');if(targets.length)this.effects.push({kind:'judgment',x:target.x,y:target.y,targets:targets.slice(0,count).map(z=>({x:z.x,y:z.y})),life:1,fullLife:1});}
       this.pruneEnemies();
       this.emit('cast',{index,kind,name:skill.name});
       if(!['laser','freeze','melon'].includes(kind)){
@@ -487,17 +534,18 @@
         const s=this.skills[i];if(s.cd>0){s.cd=Math.max(0,s.cd-dt*this.rechargeRate);if(s.cd===0){s.code=this.nextCode(i);this.emit('ready',{index:i});}}
       }
       this.freeze=Math.max(0,this.freeze-worldDt);const wasRage=this.rage>0;this.rage=Math.max(0,this.rage-dt);if(wasRage&&this.rage===0){let write=0;for(let read=0;read<this.bullets.length;read++){const bullet=this.bullets[read];if(!bullet.rageShot)this.bullets[write++]=bullet;}this.bullets.length=write;}this.clones=Math.max(0,this.clones-dt);
-      if(this.clones>0){this.cloneShot-=dt;if(this.cloneShot<=0){this.cloneShot=this.ordinaryShotInterval;const targets=this.enemies.filter(z=>z.hp>0&&!z.charmed).sort((a,b)=>a.x-b.x);if(targets.length){this.shoot({x:this.hero.x+35,y:this.hero.y-90,target:this.skillAuto?targets[0]:this.skillAim});this.shoot({x:this.hero.x+35,y:this.hero.y+90,target:this.skillAuto?(targets[1]||targets[0]):this.skillAim});}}}
+      if(this.clones>0){this.cloneShot-=dt;if(this.cloneShot<=0){this.cloneShot=this.ordinaryShotInterval;const targets=this.enemies.filter(z=>z.hp>0&&!z.charmed).sort((a,b)=>a.x-b.x);if(targets.length){this.cloneOrigins().forEach((origin,i)=>this.shoot({...origin,target:this.skillAuto?targets[i%targets.length]:this.skillAim}));}}}
       this.shotKick=Math.max(0,(this.shotKick||0)-dt);this.shotIn-=dt;
       if(((this.fireStrength>0&&(this.shooting||this.auto))||this.rage>0)&&this.shotIn<=0){this.shoot();this.shotIn=this.rage>0?this.rageShotInterval:this.ordinaryShotInterval;}
       for(const e of this.effects){e.life-=dt;
         if(e.kind==='blackhole'){
           e.tick=(e.tick??0)-dt;const pulse=e.tick<=0;if(pulse)e.tick=.25;
-          for(const z of this.enemies)if(z.hp>0&&!z.charmed){const d=Math.hypot(z.x-e.x,z.y-e.y);if(d<=e.radius){if(d>12){const step=Math.min(d-12,(z.boss?25:100)*dt);z.x+=(e.x-z.x)/d*step;z.y+=(e.y-z.y)/d*step;}if(pulse)this.damage(z,Math.max(35,z.maxHp*.02)*this.magicPower,'blackhole');}}
-          if(e.life<=0){for(const z of [...this.enemies])if(z.hp>0&&!z.charmed&&Math.hypot(z.x-e.x,z.y-e.y)<=e.radius)this.damage(z,Math.max(450,z.maxHp*.25)*this.magicPower,'blackhole');this.effects.push({kind:'explosion',x:e.x,y:e.y,life:.6,fullLife:.6});this.emit('explosion',{x:e.x,y:e.y});}
+          for(const z of this.enemies)if(z.hp>0&&!z.charmed){const d=Math.hypot(z.x-e.x,z.y-e.y);if(d<=e.radius){if(d>12){const step=Math.min(d-12,(z.boss?25:100)*dt);z.x+=(e.x-z.x)/d*step;z.y+=(e.y-z.y)/d*step;}if(pulse)this.damage(z,Math.max(35*this.skillGrowth,z.maxHp*.02)*this.magicPower,'blackhole');}}
+          if(e.life<=0){for(const z of [...this.enemies])if(z.hp>0&&!z.charmed&&Math.hypot(z.x-e.x,z.y-e.y)<=e.radius)this.damage(z,Math.max(450*this.skillGrowth,z.maxHp*.25)*this.magicPower,'blackhole');this.effects.push({kind:'explosion',x:e.x,y:e.y,life:.6,fullLife:.6});this.emit('explosion',{x:e.x,y:e.y});}
         }
         if(e.kind==='melon'&&e.life<=0&&!e.exploded){e.exploded=true;for(const z of [...this.enemies])if(Math.hypot(z.x-e.x,z.y-e.y)<e.radius+z.radius)this.damage(z,e.damage,'melon');this.effects.push({kind:'explosion',x:e.x,y:e.y,life:.7,fullLife:.7});this.emit('explosion',{x:e.x,y:e.y});}}
       this.effects=this.effects.filter(e=>e.life>0);
+      const upgradeSites=this.upgradeSites();
       let hasAllies=false;for(const z of this.enemies)if(z.charmed&&z.hp>0){hasAllies=true;break;}
       let allies=null,hostiles=null;
       if(hasAllies){allies=[];hostiles=[];for(const z of this.enemies)if(z.hp>0)(z.charmed?allies:hostiles).push(z);}
@@ -518,11 +566,13 @@
         {
           // Ice slows movement, never attacks/abilities. Slow effects use the
           // strongest individual rate rather than multiplying toward zero.
-          const movementRate=Math.min(this.freeze>0?.5:1,z.slowTime>0?Math.max(.3,1-z.chill):1);
+          const movementRate=Math.min(this.freeze>0?1-this.freezeSlow:1,z.slowTime>0?Math.max(.3,1-z.chill):1);
           const movementDt=worldDt*movementRate;
           const cadence=z.type==='runner'||z.type==='mini'?6.3:z.boss?2.25:3.35;
-          z.eating=this.canBiteDefense(z)&&z.x<=195&&this.health>0;
-          if(z.eating){
+          let plant=null;for(const site of upgradeSites)if(this.stack(site.id)>0&&Math.abs(z.y-site.y)<40&&z.x>=site.x-18&&z.x<=site.x+z.radius+18&&(!plant||site.x>plant.x))plant=site;
+          z.eating=Boolean(plant)||(this.canBiteDefense(z)&&z.x<=195&&this.health>0);
+          if(plant){z.biteIn=(z.biteIn??.6)-worldDt;if(z.biteIn<=0){z.biteIn=.6;this.damageUpgrade(plant.id,z.boss?2:1);this.emit('nibble',{x:plant.x,y:plant.y});}}
+          else if(z.eating){
             z.biteIn=(z.biteIn??.6)-worldDt;
             if(z.biteIn<=0){z.biteIn=.3;this.damageDefense(z.boss?.75:.25,z.y);}
           }else{z.gait+=movementDt*cadence;z.x-=z.speed*movementDt*(1+.38*Math.sin(z.gait));}

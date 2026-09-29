@@ -7,3 +7,28 @@
 
 .waiting-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.waiting-actions button{flex:1;min-height:44px}.duel-app #leave,.duel-app #leaveWaiting{border:1px solid #e6ac84;color:#ffe0c8;min-height:40px}
 .duel-app .waiting-actions button{background:#294534;color:#fff1bd;border-color:#829664}.duel-app .waiting-actions button:hover:not(:disabled){background:#36563e}
+
+.lobby-card-heading{display:grid;gap:8px}.lobby-card-heading h2{font-size:23px}.lobby-mode-badge{justify-self:start;border-radius:999px;padding:3px 9px;background:#e4ebdc;color:var(--green);font-size:11px;font-weight:800}.lan-guide{margin-top:18px;padding:14px;border:1px solid #cbd8c1;border-radius:12px;background:#f4f8f0}.lan-guide h3,.duel-setup h3,.duel-join h3{font-size:14px}.lan-guide ol{margin:8px 0;padding-left:21px;color:#566554;font-size:13px}.lan-guide li+li{margin-top:4px}.lan-guide code{padding:2px 5px;border-radius:4px;background:#e2ebda;color:#26372d}.duel-setup{margin-top:20px}.duel-setup h3,.duel-join h3{display:flex;align-items:center;gap:8px;margin-bottom:12px}.duel-setup h3 span,.duel-join h3 span{display:grid;place-items:center;width:21px;height:21px;border-radius:50%;background:var(--green);color:#fff;font-size:11px}.duel-setup>label{margin-top:15px}.duel-setup>.primary{width:100%;margin-top:18px;padding:13px}.duel-join .divider{margin:24px 0 16px}.duel-join .small{margin-top:10px}
+@media(max-width:760px){.lobby-card-heading h2{font-size:21px}.lan-guide{padding:12px}.duel-setup{margin-top:18px}}
+.duel-app .lan-guide{color:#26372d}.duel-app .lan-guide h3{color:#446641}.duel-app .lan-guide ol,.duel-app .lan-guide li,.duel-app .lan-guide p{color:#566554}.duel-app .lan-guide code{color:#26372d}
+
+/* Keep six live spells within one compact row so the battlefield retains its height. */
+.duel-app #skills{display:flex;overflow-x:auto;gap:8px;scroll-snap-type:x proximity;padding-bottom:5px}
+.duel-app #skills .skill{flex:1 0 155px;min-width:155px;padding:9px 10px;scroll-snap-align:start}
+.duel-app #skills .skill.active{padding:8px 9px}
+.duel-app #skills .skill-top strong{font-size:11px}
+.duel-app #skills .skill-code{font-size:15px;min-height:24px}
+.duel-app #units{grid-template-columns:repeat(2,minmax(0,1fr))}
+.duel-app #units button{min-width:0;padding:8px;font-size:11px;gap:4px}
+.duel-app #units button span{min-width:0}
+.duel-app .spell-reserve{display:grid;grid-template-columns:1fr;gap:5px;margin:8px 0;padding:8px;border:1px solid #bccd8b66;border-radius:9px;background:#183525}
+.duel-app .spell-reserve button{min-height:40px;padding:7px 9px;font-size:12px;color:#fff0bc;background:#35533a;border:1px solid #90a46f}
+.duel-app .spell-reserve button[aria-pressed=true]{background:#d9b962;color:#23321b}
+.duel-app #releaseSpell:not(:disabled){background:#cfb559;color:#142d20;border-color:#f9e29b;font-weight:800}
+.duel-app .spell-reserve p{margin:0;color:#d0dbb3;font-size:11px;line-height:1.4}
+.duel-app .laser-report{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:4;max-width:94%;width:max-content;padding:8px 12px;border:1px solid #bafaff;border-radius:10px;background:#143c39eb;color:#fff5be;font-size:13px;font-weight:700;text-align:center;white-space:pre-line;pointer-events:none}
+.duel-app .laser-report[data-side=opponent]{background:#613b22eb;border-color:#ffd29a}
+.duel-app[data-battle-mode=score] .dispatch-title,.duel-app[data-battle-mode=score] .dispatch>p,.duel-app[data-battle-mode=score] #units{display:none!important}
+.duel-app[data-battle-mode=score] .opponent-yard p:last-child{display:none}
+@media(max-width:760px){.duel-app .laser-report{font-size:11px;padding:6px 8px;bottom:8px}}
+@media(max-width:760px){.duel-app .spell-reserve{grid-template-columns:1fr 1.5fr;padding:5px}.duel-app .spell-reserve p{grid-column:1/-1}}

@@ -53,6 +53,7 @@
 .mobile-game.duel-app #units button{padding:8px 4px;font-size:12px;display:flex;flex-wrap:wrap}
 .mobile-game.duel-app .scoreboard{min-height:54px;padding:8px;font-size:12px}.mobile-game.duel-app .skills{flex:none}
 .mobile-game.duel-app .keyboard-hint{display:none}.mobile-game.duel-app .room-heading{flex-wrap:wrap;gap:8px}
+.phone-duel .duel-keyboard-toggle{width:100%;margin:4px 0;padding:7px 10px;color:#fff1bd;background:#294534;border:1px solid #64734a}
 .mobile-game.duel-app .room-tools{flex-wrap:wrap}.mobile-game.duel-app .waiting{display:block;padding:16px}
 .mobile-game.duel-app .ready-box{border:0;padding:12px 0}.mobile-game.duel-app .connection{position:static!important}
 @media(orientation:landscape){.mobile-game .skill-card,.mobile-game .skill{flex-basis:45%}.mobile-game .battlefield,.mobile-game.duel-app .yard{height:65dvh;min-height:230px}.mobile-game .start-panel{max-width:560px}}
@@ -139,8 +140,8 @@ body.phone-duel[data-duel-state=playing]{height:100dvh;min-height:0;overflow:hid
 .phone-duel[data-duel-state=playing] .dispatch-title small{display:none}
 .phone-duel[data-duel-state=playing] #units{flex:1;margin:0;gap:3px}
 .phone-duel[data-duel-state=playing] #units button{min-height:34px;padding:2px;font-size:10px;gap:1px}
-.phone-duel .duel-skill-tabs{display:flex;gap:4px;flex:none}
-.phone-duel .duel-skill-tabs button{flex:1;min-width:0;height:36px;min-height:36px;padding:3px;font-size:12px;color:var(--skill-color);background:var(--skill-wash);border:1px solid var(--skill-color)}
+.phone-duel .duel-skill-tabs{display:flex;gap:4px;flex:none;overflow-x:auto;scrollbar-width:thin}
+.phone-duel .duel-skill-tabs button{flex:0 0 auto;min-width:78px;height:36px;min-height:36px;padding:3px 7px;font-size:12px;color:var(--skill-color);background:var(--skill-wash);border:1px solid var(--skill-color)}
 .phone-duel .duel-skill-tabs button[aria-pressed=true]{background:var(--skill-color);color:#152b24}
 .phone-duel[data-duel-state=playing] .skills-heading{display:none}
 .phone-duel[data-duel-state=playing] #skills{flex:1;min-height:0;display:block;overflow:hidden;padding:0}
@@ -156,3 +157,29 @@ body.phone-duel[data-duel-state=playing]{height:100dvh;min-height:0;overflow:hid
 @media(max-height:650px){.phone-duel[data-duel-state=playing] .yard{flex-basis:32dvh;min-height:85px}.phone-duel[data-duel-state=playing] .touch-key{height:30px;min-height:30px}.phone-duel[data-duel-state=playing] .duel-skill-tabs button{height:30px;min-height:30px}}
 @media(orientation:landscape) and (max-height:500px){body.phone-duel[data-duel-state=playing]{overflow:auto!important;height:auto;min-height:100dvh}.phone-duel[data-duel-state=playing] main{height:auto;min-height:600px}.phone-duel[data-duel-state=playing] #skills{min-height:100px}}
 .phone-duel[data-duel-state=playing] #skills .skill.phone-visible{width:100%;max-width:none;box-sizing:border-box}
+.mobile-game [data-skill="3"],.mobile-game [data-hint-skill="3"]{--skill-color:#d7baff;--skill-wash:#35264d}
+.mobile-game [data-skill="4"],.mobile-game [data-hint-skill="4"]{--skill-color:#92ead9;--skill-wash:#214b44}
+.mobile-game [data-skill="5"],.mobile-game [data-hint-skill="5"]{--skill-color:#b6e88b;--skill-wash:#344a24}
+.phone-duel[data-duel-state=playing] .dispatch{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px}
+.phone-duel[data-duel-state=playing] .dispatch-title{grid-column:1;grid-row:1}
+.phone-duel[data-duel-state=playing] #units{grid-column:2;grid-row:1}
+.phone-duel[data-duel-state=playing] .spell-reserve{grid-column:1/-1;grid-row:2;display:flex;margin:0;padding:0;border:0;gap:4px}
+.phone-duel[data-duel-state=playing] .spell-reserve button{min-height:34px;padding:3px 6px;font-size:11px;flex:1}
+.phone-duel[data-duel-state=playing] .spell-reserve p{display:none}
+@media(orientation:landscape) and (min-width:740px) and (min-height:360px) and (max-height:500px){
+ body.phone-duel[data-duel-state=playing]{height:100dvh;min-height:0;overflow:hidden!important}
+ .phone-duel[data-duel-state=playing] main{height:100%;min-height:0}
+ .phone-duel[data-duel-state=playing] #battle{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(310px,1fr);grid-template-rows:34px 94px 30px minmax(36px,1fr) 120px;gap:3px}
+ .phone-duel[data-duel-state=playing] .scoreboard{grid-column:1/-1;grid-row:1}
+ .phone-duel[data-duel-state=playing] .yard{grid-column:1;grid-row:2/-1;height:auto;min-height:0;flex:auto}
+ .phone-duel[data-duel-state=playing] .attack-panel{grid-column:2;grid-row:2;overflow:auto}
+ .phone-duel[data-duel-state=playing] .dispatch>p{display:none}
+ .phone-duel[data-duel-state=playing] #units button{height:27px;min-height:27px;font-size:9px}
+ .phone-duel[data-duel-state=playing] .spell-reserve button{min-height:27px;height:27px;font-size:10px}
+ .phone-duel[data-duel-state=playing] .duel-skill-tabs{grid-column:2;grid-row:3;min-width:0}
+ .phone-duel[data-duel-state=playing] #skills{grid-column:2;grid-row:4}
+ .phone-duel[data-duel-state=playing] .duel-touch-keyboard{grid-column:2;grid-row:5;padding:0}
+ .phone-duel[data-duel-state=playing] .touch-key{height:27px;min-height:27px;font-size:13px}
+ .phone-duel[data-duel-state=playing] .duel-keyboard-toggle{grid-column:2;grid-row:5;align-self:start}
+ .phone-duel[data-duel-state=playing] .yard-footer>span{display:none}
+}

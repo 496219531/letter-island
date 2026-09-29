@@ -3,19 +3,38 @@ import WebKit
 import Speech
 import AVFoundation
 import SafariServices
+import PhotosUI
+import GameController
 
-@main class AppDelegate: UIResponder, UIApplicationDelegate {
+@main class AppDelegate: UIResponder, UIApplicationDelegate {}
+
+final class GameSceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
-    func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        guard url.scheme == "gulugarden", url.host == "home" else { return false }
-        window?.rootViewController?.dismiss(animated: true)
-        return true
+
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+        guard let windowScene = scene as? UIWindowScene else { return }
+        let window = UIWindow(windowScene: windowScene)
+        window.rootViewController = GameController()
+        self.window = window
+        window.makeKeyAndVisible()
+        handleURLs(connectionOptions.urlContexts)
     }
-    func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        window = UIWindow(frame: UIScreen.main.bounds)
-        window?.rootViewController = GameController()
-        window?.makeKeyAndVisible()
-        return true
+
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        handleURLs(URLContexts)
+    }
+
+    private func handleURLs(_ contexts: Set<UIOpenURLContext>) {
+        guard contexts.contains(where: { $0.url.scheme == "gulugarden" && $0.url.host == "home" }) else { return }
+        window?.rootViewController?.dismiss(animated: true)
+    }
+
+    func sceneWillResignActive(_ scene: UIScene) {
+        (window?.rootViewController as? GameController)?.background()
+    }
+
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        (window?.rootViewController as? GameController)?.restoreGameAudio()
     }
 }
 final class AssetHandler: NSObject, WKURLSchemeHandler {
@@ -31,6 +50,8 @@ final class AssetHandler: NSObject, WKURLSchemeHandler {
     func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {}
 }
 final class GameController: UIViewController, WKScriptMessageHandler, WKNavigationDelegate {
+    var libraryPickerRequest: Int?
+
     var web: WKWebView!
     let engine = AVAudioEngine()
     let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
@@ -120,6 +141,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     var tapped = false
     var timeout: DispatchWorkItem?
     var settingsPortrait = true
+    var hardwareKeyboardObserver: [NSObjectProtocol] = []
     var settingsOrientationRevision = 0
     var screenDirection: String { settingsPortrait ? "portrait" : preferredScreenDirection }
     var preferredScreenDirection: String { UserDefaults.standard.string(forKey: "screenDirection") == "portrait" ? "portrait" : "landscape" }
@@ -182,9 +204,16 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         view.addSubview(web)
         NSLayoutConstraint.activate([web.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor), web.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor), web.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), web.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)])
         web.load(URLRequest(url: URL(string: "gulu://game/index.html")!))
-        NotificationCenter.default.addObserver(self, selector: #selector(background), name: UIApplication.willResignActiveNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(restoreGameAudio), name: UIApplication.didBecomeActiveNotification, object: nil)
+        hardwareKeyboardObserver = [
+            NotificationCenter.default.addObserver(forName: .GCKeyboardDidConnect, object: nil, queue: .main) { [weak self] _ in self?.syncHardwareKeyboard() },
+            NotificationCenter.default.addObserver(forName: .GCKeyboardDidDisconnect, object: nil, queue: .main) { [weak self] _ in self?.syncHardwareKeyboard() }
+        ]
         restoreGameAudio()
+    }
+    deinit { for observer in hardwareKeyboardObserver { NotificationCenter.default.removeObserver(observer) } }
+    func syncHardwareKeyboard() {
+        let connected = GCKeyboard.coalesced != nil ? "true" : "false"
+        web?.evaluateJavaScript("window.GuluNativeHardwareKeyboard=\(connected);window.dispatchEvent(new Event('gulu-hardware-keyboard'))")
     }
     @objc func restoreGameAudio() {
         guard activeID == 0 else { return }
@@ -207,6 +236,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     @objc func background() { stopEffects(true);cancel(restorePlayback: false); web.evaluateJavaScript("window.dispatchEvent(new Event('blur')); document.dispatchEvent(new Event('gulu-background'))") }
     var ranPerformanceQA = false
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        syncHardwareKeyboard()
         if ProcessInfo.processInfo.arguments.contains("--live-perf") {
             let muted=ProcessInfo.processInfo.arguments.contains("--live-perf-muted")
             if muted { setEffectGain(0) }
@@ -422,11 +452,11 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
     func communityRequest(_ data: [String: Any], id: Int) {
         guard let path = data["path"] as? String,
               let parts = URLComponents(string: path), parts.scheme == nil, parts.host == nil,
-              ["account", "account/register", "account/restore", "account/recovery", "account/logout", "leaderboards", "solo/start", "solo/finish", "library/organize", "library/share", "library/share/claim"].contains(parts.path),
+              ["account", "account/register", "account/restore", "account/recovery", "account/logout", "leaderboards", "solo/start", "solo/finish", "library/organize", "library/share", "library/share/claim", "library/public/publish", "library/public/list", "library/public/detail", "library/public/download", "library/public/remove", "library/ocr/create", "library/ocr/upload", "library/ocr/submit", "library/ocr/list", "library/ocr/result", "library/ocr/ack", "library/ocr/retry", "library/ocr/remove"].contains(parts.path),
               let url = URL(string: "http://101.132.227.80/letter-island/api/" + path) else {
             send(["type":"nativeReply", "id":id, "ok":false, "error":"无效的小院请求"]); return
         }
-        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: parts.path == "library/organize" ? 130 : 10)
+        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: parts.path == "library/organize" ? 130 : parts.path == "library/ocr/upload" ? 60 : 10)
         if let body = data["data"] {
             req.httpMethod = "POST"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -458,6 +488,7 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
             let enabled = data["enabled"] as? Bool ?? false
             if enabled != speechModeEnabled { speechModeEnabled = enabled; if !enabled { cancel() } else { restoreGameAudio() } }
         case "communityRequest": communityRequest(data, id: id)
+        case "pickLibraryImages": pickLibraryImages(data, id: id)
         case "playEffect": playEffect(data)
         case "setEffectGain":
             if let gain=(data["gain"] as? NSNumber)?.floatValue,gain.isFinite { setEffectGain(gain) }
@@ -593,10 +624,14 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
         guard let url = action.request.url else { decisionHandler(.cancel); return }
         if url.scheme == "gulu" && url.lastPathComponent == "duel.html" {
             decisionHandler(.cancel)
-            let alert = UIAlertController(title: "连接局域网对战", message: "电脑启动对战服务后，填写显示的局域网地址。手机需连接同一 Wi-Fi；结束对战后点“完成”即可回到本地单机。", preferredStyle: .alert)
+            let alert = UIAlertController(title: "和朋友对战", message: "在线对战可选择公共分享榜里的词组。也可以填写电脑的局域网地址；结束后点“完成”回到本地单机。", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "在线对战 · 公共词组", style: .default) { _ in
+                guard let target = URL(string: "http://101.132.227.80/letter-island/duel.html?source=ios") else { return }
+                self.present(SFSafariViewController(url: target), animated: true)
+            })
             alert.addTextField { field in field.placeholder = "http://192.168.1.10:4174"; field.keyboardType = .URL; field.autocapitalizationType = .none; field.text = UserDefaults.standard.string(forKey: "duelAddress") }
             alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-            alert.addAction(UIAlertAction(title: "连接", style: .default) { _ in
+            alert.addAction(UIAlertAction(title: "连接局域网", style: .default) { _ in
                 let text = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 guard var parts = URLComponents(string: text), ["http", "https"].contains(parts.scheme ?? ""), parts.host != nil else { return }
                 parts.path = "/duel.html"; parts.fragment = nil
@@ -608,5 +643,49 @@ final class GameController: UIViewController, WKScriptMessageHandler, WKNavigati
             })
             present(alert, animated: true)
         } else if url.scheme == "gulu" && url.host == "game" { decisionHandler(.allow) } else { decisionHandler(.cancel); if ["http","https"].contains(url.scheme ?? "") { UIApplication.shared.open(url) } }
+    }
+}
+
+
+extension GameController: PHPickerViewControllerDelegate {
+    func pickLibraryImages(_ data: [String: Any], id: Int) {
+        guard libraryPickerRequest == nil else { libraryReply(id, error: "请先完成当前选图"); return }
+        libraryPickerRequest = id
+        var configuration = PHPickerConfiguration()
+        configuration.filter = .images
+        configuration.selectionLimit = max(1, min(9, data["limit"] as? Int ?? 9))
+        configuration.selection = .ordered
+        let picker = PHPickerViewController(configuration: configuration)
+        picker.delegate = self
+        present(picker, animated: true)
+    }
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true)
+        guard let id = libraryPickerRequest else { return }
+        libraryPickerRequest = nil
+        guard results.count <= 9 else { libraryReply(id, error: "最多选择9张图片"); return }
+        var images: [String] = []
+        func load(_ index: Int) {
+            if index == results.count { self.libraryReply(id, ["images": images]); return }
+            results[index].itemProvider.loadObject(ofClass: UIImage.self) { object, error in
+                guard let original = object as? UIImage, error == nil else {
+                    DispatchQueue.main.async { self.libraryReply(id, error: "图片读取失败，请重新选择") }; return
+                }
+                let encoded: String? = autoreleasepool {
+                    let ratio = min(1, 3000 / max(original.size.width, original.size.height))
+                    let size = CGSize(width: max(1, original.size.width * ratio), height: max(1, original.size.height * ratio))
+                    let format = UIGraphicsImageRendererFormat(); format.scale = 1
+                    let image = UIGraphicsImageRenderer(size: size, format: format).image { _ in original.draw(in: CGRect(origin: .zero, size: size)) }
+                    guard let bytes = image.jpegData(compressionQuality: 0.9), bytes.count <= 8 * 1024 * 1024 else { return nil }
+                    return "data:image/jpeg;base64," + bytes.base64EncodedString()
+                }
+                DispatchQueue.main.async {
+                    guard let encoded = encoded else { self.libraryReply(id, error: "图片过大，请选择8MB以内的图片"); return }
+                    images.append(encoded)
+                    load(index + 1)
+                }
+            }
+        }
+        load(0)
     }
 }

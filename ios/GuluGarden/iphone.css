@@ -73,6 +73,8 @@ body.native-iphone input,body.native-iphone textarea,body.native-iphone select,b
 .native-iphone .wave-progress{top:8px;right:8px;padding:4px 7px;border-radius:9px;background:#173629c9;color:#fff;font-size:9px}.native-iphone .wave-progress>div{display:none}
 .native-iphone .arsenal{min-height:0;padding:7px 7px 6px;display:flex;flex-direction:column;gap:6px;background:var(--app-paper);overflow:hidden}
 .native-iphone .arsenal-heading,.native-iphone .run-strip,.native-iphone .keyboard-toggle-row{display:none}
+body.native-iphone[data-hardware-keyboard=true] .keyboard-toggle-row{display:flex!important;align-items:center;justify-content:flex-end;margin-top:6px}
+body.native-iphone[data-hardware-keyboard=true] .keyboard-toggle-row>span{display:none}
 .native-iphone .iphone-skill-tabs{display:flex;gap:6px;flex:0 0 auto}
 .native-iphone .iphone-skill-tabs button{flex:1;min-width:0;min-height:38px;padding:3px;border:1px solid var(--app-line);border-radius:12px;background:#fff;color:var(--app-muted);font-size:12px;font-weight:800}
 .native-iphone .iphone-skill-tabs button[aria-pressed=true]{border-color:var(--app-ink);background:var(--app-ink);color:#fff}
@@ -129,7 +131,7 @@ body.native-iphone[data-learning-mode=speaking] #skillGrid .skill-info strong{co
 body.native-iphone[data-learning-mode=speaking] #skillGrid .word-meaning{display:block!important;color:var(--app-leaf);font-size:14px;line-height:1.55}
 body.native-iphone[data-learning-mode=speaking] #skillGrid .skill-status{display:none}
 body.native-iphone[data-learning-mode=speaking] #speechControl{grid-template-columns:1fr 1fr;gap:7px;margin-top:8px;padding:10px;border:1px solid var(--app-line);border-radius:15px;background:#fff}
-body.native-iphone[data-learning-mode=speaking] #speechEnable,body.native-iphone[data-learning-mode=speaking] #speechExample,body.native-iphone[data-learning-mode=speaking] #speechReview{display:none!important}
+body.native-iphone[data-learning-mode=speaking] #speechEnable,body.native-iphone[data-learning-mode=speaking] #speechReview{display:none!important}
 body.native-iphone[data-learning-mode=speaking] #speechButton{min-height:62px;border:1px solid var(--app-line);background:transparent!important;color:var(--app-ink);box-shadow:none;font-size:16px}
 body.native-iphone[data-learning-mode=speaking] #speechSkip{border:1px solid var(--app-line);background:transparent;color:var(--app-leaf);box-shadow:none}
 body.native-iphone[data-learning-mode=speaking] #speechTranscript{max-height:none;padding:3px 2px;color:var(--app-text);font-size:13px;line-height:1.5;text-align:left}
@@ -360,6 +362,8 @@ body.native-iphone .library-dialog .library-pipeline{position:relative}
 body.native-iphone .library-dialog .library-pipeline>.library-info{margin-top:6px}
 body.native-iphone .library-dialog .library-group-actions{justify-content:center}
 body.native-iphone .library-dialog .library-group-actions>button{flex:0 1 180px}
+body.native-iphone .library-dialog .ocr-submitted{border-color:var(--app-line);border-radius:14px;background:#edf3e8;color:var(--app-text)}
+body.native-iphone .library-dialog .ocr-submitted p{color:var(--app-muted)}
 
 /* Home icons share the reference’s leaf-green outline and soft fill. */
 body.native-iphone{--home-icon-book:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2324533c%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20fill%3D%22%23dcebdd%22%20d%3D%22M12%205C8%202%204%203%202%204v15c4-1%207-1%2010%201%203-2%206-2%2010-1V4c-3-1-6-2-10%201Z%22%2F%3E%3Cpath%20d%3D%22M12%205v15M5%207l4%201M5%2011l4%201M15%208l4-1M15%2012l4-1%22%2F%3E%3C%2Fsvg%3E")}
@@ -401,3 +405,7 @@ body.solo-app[data-learning-mode=speaking] #speechControl[data-held=true] #speec
 body.solo-app[data-learning-mode=speaking] #speechControl:not([data-speech-phase=idle]) #speechButton{opacity:1;color:#fff!important;background:transparent!important;text-shadow:0 1px 2px #173629}
 body.solo-app[data-learning-mode=speaking] #speechControl:not([data-speech-phase=idle]) #speechButton strong{color:#fff!important}
 body.solo-app[data-learning-mode=speaking] #speechControl[data-speech-phase=recording] #speechButton strong:before{content:'● ';color:#ffd1be}
+
+body.native-iphone .library-main-tabs{background:#fff;border-color:var(--app-line)}
+body.native-iphone .library-main-tabs button{background:#edf3e8;border-color:var(--app-line);color:var(--app-ink)}
+body.native-iphone .library-main-tabs button.active{background:var(--app-ink);border-color:var(--app-ink);color:#fff}

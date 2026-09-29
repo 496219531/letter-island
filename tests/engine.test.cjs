@@ -66,7 +66,7 @@ test('special enemies armor, shields, healer, splitters, bombers and bosses work
  g.wave=5;g.spawned=g.quota-1;const boss=g.spawn();assert.equal(boss.type,'boss');boss.ability=0;g.update(.016);assert.ok(g.enemies.some(z=>z.type==='runner'));
 });
 test('enemy health, speed and population scale across waves',()=>{
- const g=make();g.start();const early=g.spawn(900,200,'walker');g.wave=10;const late=g.spawn(900,200,'walker');assert.ok(late.hp>early.hp*4);assert.ok(late.speed>early.speed);assert.equal(CARDS.length,36);assert.equal(Object.keys(TYPES).length,9);
+ const g=make();g.start();const early=g.spawn(900,200,'walker');g.wave=10;const late=g.spawn(900,200,'walker');assert.ok(late.hp>early.hp*4);assert.ok(late.speed>early.speed);assert.equal(CARDS.length,43);assert.equal(Object.keys(TYPES).length,9);
 });
 
 test('walking continues under ice and only stops when paused',()=>{

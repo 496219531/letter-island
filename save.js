@@ -2,7 +2,7 @@
 (function(root){
   'use strict';
   const CUSTOM=typeof module!=='undefined'&&module.exports?require('./custom-library.js'):root.GuluCustomLibrary;
-  const FIELDS=['skillAimLeft','skillAuto','skillAim','clones','cloneShot','rage','practiceScore','rankingRun','customBank','promptHistory','learningMode','englishLevel','flowerHealth','breachElapsed','stacks','maxHealth','healKills','health','score','kills','casts','correct','wave','spawned','quota','spawnIn','waveBreak','shotIn','time','freeze','combo','typing','activeTime','serial','adaptive','auto','fireStrength','maxSpellLength','maxLearningLoad','magicSlow','aim','hero','skills','enemies','effects'];
+  const FIELDS=['upgradeHealth','skillOfferMisses','skillAimLeft','skillAuto','skillAim','clones','cloneShot','rage','practiceScore','rankingRun','customBank','promptHistory','learningMode','englishLevel','flowerHealth','breachElapsed','stacks','maxHealth','healKills','health','score','kills','casts','correct','wave','spawned','quota','spawnIn','waveBreak','shotIn','time','freeze','combo','typing','activeTime','serial','adaptive','auto','fireStrength','maxSpellLength','maxLearningLoad','magicSlow','aim','hero','skills','enemies','effects'];
   const numeric=['maxHealth','healKills','health','score','kills','casts','correct','wave','spawned','quota','spawnIn','waveBreak','shotIn','time','freeze','combo','typing','activeTime','serial','fireStrength'];
   function encode(game){
     if(!['playing','paused','upgrade'].includes(game.status)||game.health<0)return null;
@@ -22,6 +22,8 @@
     if(!save||save.version!==1||!Number.isFinite(save.savedAt)||!save.state||!finiteTree(save.state))return false;
     if(save.state.practiceScore!==undefined&&(!Number.isSafeInteger(save.state.practiceScore)||save.state.practiceScore<0||save.state.practiceScore>save.state.score))return false;
     const s=save.state,cardIds=new Set(root.GARDEN_CARDS.map(c=>c.id));
+    if(s.upgradeHealth!==undefined&&(!s.upgradeHealth||Array.isArray(s.upgradeHealth)||typeof s.upgradeHealth!=='object'||Object.entries(s.upgradeHealth).some(([id,hp])=>!root.GARDEN_CARDS.some(c=>c.id===id&&c.edible)||!(s.stacks?.[id]>0)||!Number.isFinite(hp)||hp<=0||hp>6*s.stacks[id]||Math.ceil(hp/6)!==s.stacks[id])))return false;
+    if(s.skillOfferMisses!==undefined&&(!Number.isInteger(s.skillOfferMisses)||s.skillOfferMisses<0||s.skillOfferMisses>4))return false;
     if(!['paused','upgrade'].includes(s.status)||numeric.some(k=>typeof s[k]!=='number'))return false;
     if(s.health<0||(s.health===0&&s.breachElapsed===undefined)||s.maxHealth<s.health||s.wave<1||!Number.isInteger(s.wave)||s.fireStrength<0||s.fireStrength>1||s.typing< -1||s.typing>2||!Number.isInteger(s.typing))return false;
     if(s.customBank!==undefined&&s.customBank!==null&&(!CUSTOM.validate(s.customBank)||(s.learningMode==='english')!==(s.customBank.kind==='word')||s.learningMode==='letters'))return false;
@@ -58,9 +60,9 @@
     }
     const enemyNumbers=['id','x','y','hp','maxHp','speed','radius','hit','phase','gait','shield','poison','poisonTime','chill','ability','slowTime'];
     if(!Array.isArray(s.enemies)||s.enemies.length>500||s.enemies.some(z=>!z||!Object.hasOwn(root.ZOMBIE_TYPES,z.type)||enemyNumbers.some(k=>!Number.isFinite(z[k]))||z.hp<=0||(z.charmed!==undefined&&typeof z.charmed!=='boolean')||(z.deathMark!==undefined&&(!Number.isFinite(z.deathMark)||z.deathMark<0||z.deathMark>8))))return false;
-    if(!Array.isArray(s.bullets)||s.bullets.length>4000||s.bullets.some(b=>!b||['x','y','px','py','vx','vy','life','damage','pierce','bounces'].some(k=>!Number.isFinite(b[k]))||(b.rageShot!==undefined&&typeof b.rageShot!=='boolean')||!Array.isArray(b.hitIds)||b.hitIds.some(x=>!Number.isInteger(x))))return false;
+    if(!Array.isArray(s.bullets)||s.bullets.length>4000||s.bullets.some(b=>!b||['x','y','px','py','vx','vy','life','damage','pierce','bounces'].some(k=>!Number.isFinite(b[k]))||(b.rageShot!==undefined&&typeof b.rageShot!=='boolean')||(b.skillShot!==undefined&&typeof b.skillShot!=='boolean')||!Array.isArray(b.hitIds)||b.hitIds.some(x=>!Number.isInteger(x))))return false;
     if(!Array.isArray(s.effects)||s.effects.length>200||s.effects.some(e=>!e||!['laser','freeze','melon','explosion','charm','lightning','blackhole','mark','judgment'].includes(e.kind)||!Number.isFinite(e.life)||!Number.isFinite(e.fullLife)||e.fullLife<=0||(['melon','explosion','blackhole','judgment'].includes(e.kind)&&(!Number.isFinite(e.x)||!Number.isFinite(e.y)))||(e.kind==='melon'&&(!Number.isFinite(e.damage)||!Number.isFinite(e.radius)))||(e.kind==='laser'&&!Number.isFinite(e.angle))))return false;
-    if(s.effects.some(e=>(e.kind==='lightning'&&(!Array.isArray(e.points)||e.points.length>10||e.points.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y))))||(e.kind==='charm'&&(!Array.isArray(e.targets)?(!Number.isFinite(e.x)||!Number.isFinite(e.y)||!Number.isFinite(e.radius)):e.targets.length>5||e.targets.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y))))||(e.kind==='blackhole'&&(!Number.isFinite(e.radius)||![105,210].includes(e.radius)||!Number.isFinite(e.tick)))))return false;
+    if(s.effects.some(e=>(e.kind==='lightning'&&(!Array.isArray(e.points)||e.points.length>20||e.points.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y))))||(e.kind==='charm'&&(!Array.isArray(e.targets)?(!Number.isFinite(e.x)||!Number.isFinite(e.y)||!Number.isFinite(e.radius)):e.targets.length>15||e.targets.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y))))||(e.kind==='blackhole'&&(!Number.isFinite(e.radius)||!(e.radiusVersion===2?[105,130,155,180,205,230].includes(e.radius):[105,210].includes(e.radius))||!Number.isFinite(e.tick)))))return false;
     if(!Array.isArray(s.offers)||s.offers.some(id=>!cardIds.has(id)))return false;
     if(s.status==='upgrade'&&(s.offers.length!==3||new Set(s.offers).size!==3))return false;
     return true;
@@ -71,8 +73,10 @@
     for(const key of FIELDS)game[key]=s[key];
     // Older suspended games may still contain the former 210px black hole.
     // Resume them safely, but apply the current balance immediately.
-    game.effects=game.effects.map(effect=>effect.kind==='blackhole'?{...effect,radius:105}:effect);
+    game.effects=game.effects.map(effect=>effect.kind==='blackhole'&&effect.radiusVersion!==2?{...effect,radius:105}:effect);
     game.flowerHealth=s.flowerHealth?[...s.flowerHealth]:Array(8).fill(0);game.health=s.health;game.breachElapsed=s.breachElapsed??0;
+    game.upgradeHealth=s.upgradeHealth||{};
+    game.skillOfferMisses=s.skillOfferMisses??0;
     game.customBank=s.customBank||null;game.promptHistory=s.promptHistory||{};
     game.learningMode=s.learningMode??'letters';game.englishLevel=s.englishLevel??0;
     game.maxSpellLength=s.maxSpellLength??10;game.maxLearningLoad=s.maxLearningLoad??1;game.magicSlow=s.magicSlow??false;

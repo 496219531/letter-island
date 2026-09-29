@@ -28,3 +28,21 @@ test('actual recharge faster than ice duration cannot keep an enemy motionless',
  }
  assert.ok(g.casts>=8);assert.ok(z.x<start-5);
 });
+test('ice strength cards improve movement slow up to 80 percent without compounding frost',()=>{
+ for(const stacks of [1,3,6,100]){
+  const a=fixture(),b=fixture();a.g.stacks.freezeStrength=stacks;a.g.freeze=6;a.z.slowTime=6;a.z.chill=.7;
+  const pa=a.z.gait,pb=b.z.gait;advance(a.g,1);advance(b.g,1);
+  const expected=Math.min(1-Math.min(.8,.5+.05*stacks),.3);
+  assert.ok(Math.abs((a.z.gait-pa)/(b.z.gait-pb)-expected)<1e-8);assert.ok(a.z.x<900);
+ }
+});
+test('maxed ice strength leaves the offer pool and its stacks survive saves',()=>{
+ const {encode,restore}=require('../save.js'),{g}=fixture();g.stacks.freezeStrength=6;
+ for(let i=0;i<50;i++){g.offerCards();assert.ok(g.offers.every(c=>c.id!=='freezeStrength'));}
+ const loaded=new GardenGame();assert.ok(restore(loaded,encode(g)));assert.equal(loaded.freezeSlow,.8);
+});
+test('laser strength combines with magic cards without changing beam width or other skills',()=>{
+ const {g,z}=fixture();z.hp=z.maxHp=10000;g.setAim(z.x,z.y);g.skillAuto=false;g.stacks.magic=2;g.stacks.laserPower=2;
+ g.cast(0);assert.equal(z.hp,10000-250*1.5*1.5);assert.equal(g.effects.find(e=>e.kind==='laser').width,85);assert.equal(g.magicPower,1.5);
+ const {encode,restore}=require('../save.js'),loaded=new GardenGame();assert.ok(restore(loaded,encode(g)));assert.equal(loaded.laserDamage,562.5);
+});

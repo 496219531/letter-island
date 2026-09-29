@@ -1,3 +1,4 @@
+import {OCRQueue} from './ocr-queue.mjs';
 import {importImage,organizeContent} from './library-service.mjs';
 import http from 'node:http';
 import https from 'node:https';
@@ -17,7 +18,7 @@ import {createSpeechBridge} from './speech-bridge.mjs';
 
 const root=new URL(process.env.WEB_ROOT==='dist'?'./dist/':'./',import.meta.url);
 const assets=new Set(['duel-garden-v2.png','zombie.png','pea-captain-v1.png','garden.png','gulu-island.png']);
-const publicFiles=new Set(['zombie-recorder.html','zombie-recorder.js','custom-library.js','library-ui.js','library.css','speech-review.js','mode-copy.js','mobile.js','mobile.css','dialogues.js','dialogue-guide.html','press-to-talk.js','pcm-capture.js','system-speech.js','immersive.css','game-ui.js','vocabulary.js','vocabulary-guide.html','licenses/ECDICT.txt','index.html','styles.css','game.js','engine.js','save.js','sound.js','adventure.html','adventure.css','adventure.js','duel.html','duel.css','duel-client.js']);
+const publicFiles=new Set(['zombie-recorder.html','zombie-recorder.js','custom-library.js','ocr-client.js','library-ui.js','library.css','speech-review.js','mode-copy.js','mobile.js','mobile.css','dialogues.js','dialogue-guide.html','press-to-talk.js','pcm-capture.js','system-speech.js','immersive.css','game-ui.js','vocabulary.js','vocabulary-guide.html','licenses/ECDICT.txt','index.html','styles.css','game.js','engine.js','save.js','sound.js','adventure.html','adventure.css','adventure.js','duel.html','duel.css','duel-client.js']);
 const mime={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.png':'image/png'};
 function json(res,status,value){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(value));}
 async function body(req,maxBytes=4096) {
@@ -32,7 +33,8 @@ export function createLanServer(tlsOptions=null,options={}) {
   const speech=createSpeechBridge();
   publicFiles.add('performance.js');publicFiles.add('performance.css');publicFiles.add('community.js');publicFiles.add('community.css');
   const community=new CommunityStore(options.dbPath||':memory:',options.storeOptions);
-  // Library shares deliberately live only in process memory. They never enter
+  const ocr=new OCRQueue(community,options.organizeContent||organizeContent);
+  // Private code shares deliberately live only in process memory. They never enter
   // SQLite, deployment backups, or a durable user profile.
   const libraryShares=new Map();
   const cleanLibraryShares=()=>{const now=Date.now();for(const [code,share] of libraryShares)if(share.expiresAt<=now)libraryShares.delete(code);};
@@ -50,7 +52,7 @@ export function createLanServer(tlsOptions=null,options={}) {
   function settle(room){
     if(room.match.status!=='finished'||room.settledRound===room.match.round)return;
     if(room.nextSettlementAt>Date.now())return;
-    try{room.ranking=community.recordDuel(`${serverId}:${room.code}:${room.match.round}`,room.rankUsers||[],room.match.winner,room.match.elapsed);room.settledRound=room.match.round;}
+    try{room.ranking=community.recordDuel(`${serverId}:${room.code}:${room.match.round}`,room.rankUsers||[],room.match.winner,room.match.elapsed,room.match.games?.map(game=>game.casts)||[]);room.settledRound=room.match.round;}
     catch{room.nextSettlementAt=Date.now()+10000;room.ranking={counted:false,reason:'成绩保存暂时失败，请稍后刷新榜单'};}
   }
   function release(room,side) {
@@ -96,6 +98,15 @@ export function createLanServer(tlsOptions=null,options={}) {
       if(url.pathname==='/api/leaderboards'&&req.method==='GET'){const u=user();json(res,200,{user:u,...community.leaderboard(url.searchParams.get('kind')||'solo',url.searchParams.get('mode')||'english',url.searchParams.get('level')||0,u)});return;}
       if(url.pathname==='/api/solo/start'&&req.method==='POST'){const u=requireUser();json(res,200,community.startSolo(u,await body(req)));return;}
       if(url.pathname==='/api/solo/finish'&&req.method==='POST'){const u=requireUser();rate(req,'finish',60);json(res,200,community.finishSolo(u,await body(req)));return;}
+      if(url.pathname.startsWith('/api/library/public/')&&req.method==='POST'){
+        const operation=url.pathname.slice('/api/library/public/'.length);
+        if(operation==='publish'){const owner=requireUser();rate(req,'public-publish',10);json(res,200,community.publishLibrary(owner,await body(req,1600000)));return;}
+        const data=await body(req);
+        if(operation==='list'){json(res,200,community.listLibraries(data,user()));return;}
+        if(operation==='detail'){const row=community.publicLibrary(data.id);json(res,200,{id:row.id,title:row.title,author:row.author,authorId:row.owner,updatedAt:row.created,payload:JSON.parse(row.payload)});return;}
+        if(operation==='download'){rate(req,'public-download',100);json(res,200,community.downloadLibrary(data,user()));return;}
+        if(operation==='remove'){json(res,200,community.removeLibrary(requireUser(),data.id));return;}
+      }
       if(url.pathname==='/api/library/share'&&req.method==='POST'){
         const owner=requireUser();rate(req,'library-share',10);cleanLibraryShares();
         const data=await body(req,1600000),payload=typeof data.payload==='string'?data.payload:'';
@@ -110,6 +121,23 @@ export function createLanServer(tlsOptions=null,options={}) {
         rate(req,'library-claim',20);cleanLibraryShares();const data=await body(req),code=String(data.code||'').trim();
         const share=libraryShares.get(code);if(!share){json(res,404,{error:'发送码不存在或已过期。'});return;}
         json(res,200,{payload:share.payload,expiresAt:share.expiresAt});return;
+      }
+      if(url.pathname.startsWith('/api/library/ocr/')&&req.method==='POST'){
+        const owner=requireUser(),operation=url.pathname.slice('/api/library/ocr/'.length);
+        const data=await body(req,operation==='upload'?12500000:40000);
+        const peer=req.socket.remoteAddress,forward=req.headers['x-real-ip'],ip=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(peer)&&isIP(String(forward))?forward:peer;
+        if(['create','submit','retry'].includes(operation))rate(req,'ocr-submit',60);
+        let result;
+        if(operation==='create')result=ocr.create(owner,data);
+        else if(operation==='upload')result=ocr.upload(owner,data);
+        else if(operation==='submit')result=ocr.submit(owner,data,ip);
+        else if(operation==='list')result=ocr.list(owner);
+        else if(operation==='result')result=ocr.result(owner,data);
+        else if(operation==='ack')result=ocr.ack(owner,data);
+        else if(operation==='retry')result=ocr.retry(owner,data);
+        else if(operation==='remove')result=ocr.remove(owner,data);
+        else throw Object.assign(Error('OCR接口不存在'),{status:404});
+        json(res,200,result);return;
       }
       if(['/api/library/import-image','/api/library/organize'].includes(url.pathname)&&req.method==='POST'){
         const owner=requireUser();rate(req,'ai',6);
@@ -158,7 +186,9 @@ export function createLanServer(tlsOptions=null,options={}) {
         }else{
           if(rooms.size>=64){json(res,503,{error:'房间已满，请稍后再试'});return;}
           let code;do{code=randomBytes(3).toString('hex').toUpperCase();}while(rooms.has(code));
-          room={code,match:new DuelMatch({mode:data.mode,level:data.level}),tokens:[],streams:[],accounts:[],lastSeen:[],lastActive:Date.now(),rates:[[],[]]};
+          let customBank=null,publicResource=null;
+          if(data.publicResourceId){const resource=community.publicLibrary(data.publicResourceId);customBank=JSON.parse(resource.payload).groups.find(g=>g.id===data.publicGroupId);if(!customBank||data.mode!==(customBank.kind==='word'?'english':'sentences'))throw Error('请选择与对战模式匹配的公共词组');publicResource={id:resource.id,title:resource.title};}
+          room={code,match:new DuelMatch({mode:data.mode,level:data.level,customBank,publicResource,battleMode:data.battleMode,duration:data.duration}),tokens:[],streams:[],accounts:[],lastSeen:[],lastActive:Date.now(),rates:[[],[]]};
           side=room.match.join(account?.name||data.name);rooms.set(code,room);
         }
         room.accounts[side]=account?.id||null;startRoomLoop();
@@ -222,8 +252,8 @@ export function createLanServer(tlsOptions=null,options={}) {
       }
     }
   }
-  server.on('close',()=>{clearInterval(timer);speech.close();community.close();});
-  return {server,rooms,community,stop(){speech.close();clearInterval(timer);for(const room of rooms.values())room.streams.forEach(res=>res?.end());server.closeAllConnections();return new Promise(resolve=>server.close(resolve));}};
+  server.on('close',()=>{clearInterval(timer);ocr.close();speech.close();community.close();});
+  return {server,rooms,community,stop(){ocr.close();speech.close();clearInterval(timer);for(const room of rooms.values())room.streams.forEach(res=>res?.end());server.closeAllConnections();return new Promise(resolve=>server.close(resolve));}};
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]) {
   if(Boolean(process.env.GULU_TLS_CERT)!==Boolean(process.env.GULU_TLS_KEY))throw new Error('请同时提供 GULU_TLS_CERT 和 GULU_TLS_KEY');

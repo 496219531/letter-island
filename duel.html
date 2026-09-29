@@ -2,19 +2,23 @@
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#eff3ea"><title>后院对决 · 咕噜游乐场</title><link rel="icon" href="data:,"><link rel="stylesheet" href="duel.css"><link rel="stylesheet" href="immersive.css"><link rel="stylesheet" href="mobile.css"><link rel="stylesheet" href="performance.css"></head>
 <body class="game-app duel-app" data-duel-state="lobby">
-<header class="topbar"><a href="./" class="brand">✳ 咕噜游乐场</a><span class="pill">局域网 · 双人对战</span><a href="./" class="back">返回单人模式 ↗</a></header>
+<header class="topbar"><a href="./" class="brand">✳ 咕噜游乐场</a><span class="pill" id="connectionMode">正在连接对战服务…</span><a href="./" class="back">返回单人模式 ↗</a></header>
 <main>
   <section id="lobby" class="lobby">
     <div class="intro"><div class="eyebrow">BACKYARD BATTLE / 01</div><h1>我的后院，<br><em>我来守。</em></h1><p>和另一台设备上的朋友来一场后院对决。<br>从自家后院派出僵尸，相遇互啃，突破敌方防线。</p><div class="rules"><span>🌻 各守一座小院</span><span>🧟 僵尸进攻对方</span><span>⌨ 大招题目独立</span></div></div>
     <div class="lobby-card">
-      <h2>约朋友开一局</h2><p class="muted">手机或电脑连接同一局域网，电脑启动游戏服务。</p>
-      <label>你的名字<input id="playerName" maxlength="16" placeholder="小院守卫" autocomplete="nickname"></label>
+      <header class="lobby-card-heading"><span class="lobby-mode-badge" id="lobbyModeBadge">对战房间</span><h2 id="lobbyTitle">约朋友开一局</h2><p class="muted" id="lobbyDescription">正在确认连接方式…</p></header>
+      <section class="lan-guide" id="lanGuide" hidden aria-label="局域网组局说明"><h3>局域网组局</h3><ol><li>房主在电脑游戏目录运行 <code>npm run lan</code>。</li><li>两台设备连接同一 Wi‑Fi，并打开下方显示的地址。</li><li>房主设置题目并创建房间，再把邀请链接发给朋友。</li></ol><p class="muted small">电脑需保持运行；关闭房主浏览器会让该玩家离场。</p></section>
+      <section class="duel-setup" aria-label="房主设置"><h3><span>1</span> 房主设置题目</h3>
+      <label>对战玩法<select id="battleMode"><option value="siege">兵潮攻防 · 攻破对方后院</option><option value="score">限时竞分 · 各自打僵尸</option></select></label><label id="durationLabel" hidden>比赛时间<select id="duration"><option value="60">1 分钟</option><option value="180" selected>3 分钟</option><option value="300">5 分钟</option><option value="600">10 分钟</option></select></label><p id="scoreRules" class="muted small" hidden>双方各守一块战场，面对相同的僵尸波次。普通僵尸10分，其他兵种25分；只算击杀分，输入练习分不参与比较。漏怪不加分，继续战斗直到时间结束；同分平局，断线双方一起暂停。</p><label>你的名字<input id="playerName" maxlength="16" placeholder="小院守卫" autocomplete="nickname"></label>
       <div class="mode-row"><label>大招题目<select id="mode"><option value="letters">字母组合</option><option value="english">英语单词</option><option value="sentences">英语句子</option></select></label><label id="levelLabel" hidden><span id="levelTitle">词汇学段</span><select id="level"><option value="0">1 级 · 入门</option><option value="1">2 级 · 基础</option><option value="2">3 级 · 进阶</option><option value="3">4 级 · 提升</option><option value="4">5 级 · 挑战</option></select></label></div>
+      <label>对战词句来源<select id="duelSource"><option value="">系统标准词句库</option><option value="public">公共分享榜</option></select></label>
+      <section id="publicPicker" hidden aria-label="选择公共对战词句"><label>榜单排序<select id="publicSort"><option value="popular">下载最多</option><option value="newest">最新发布</option></select></label><label>选择词组<select id="publicGroup"></select></label><p id="publicStatus" role="status" class="muted small"></p><div class="join-row"><button id="publicPrev" type="button">上一页</button><button id="publicNext" type="button">下一页</button><button id="publicReload" type="button">刷新</button></div></section>
       <button id="create" class="primary">创建房间 →</button>
-      <div class="divider">或加入朋友的房间</div>
+      </section><section class="duel-join" aria-label="加入已有房间"><div class="divider">或</div><h3><span>2</span> 加入朋友的房间</h3>
       <p id="inviteStatus" class="muted small" role="status" aria-live="polite" hidden></p>
       <form id="joinForm" class="join-row"><input id="roomCode" maxlength="6" pattern="[A-Fa-f0-9]{6}" required placeholder="6 位房间码" aria-label="房间码" autocomplete="off"><button id="join" type="submit">加入</button></form>
-      <p class="muted small">加入时使用房主设置的题目模式与难度。<a href="vocabulary-guide.html" target="_blank" rel="noopener">词库与课标依据 ↗</a></p>
+      <p class="muted small">加入后使用房主设置的题目和词组。<a href="vocabulary-guide.html" target="_blank" rel="noopener">词库与课标依据 ↗</a></p></section>
     </div>
     <div class="network-note" id="networkNote">正在检查局域网服务…</div>
   </section>
@@ -24,10 +28,10 @@
     <div id="connection" class="connection" role="status" aria-live="polite"></div>
     <div id="waiting" class="waiting"><div><h2 id="waitingTitle">等待朋友入场</h2><p id="waitingDetail"></p><input id="invite" readonly aria-label="邀请地址"><p class="muted small">把这个地址发给朋友，对方打开后输入自己的名字并加入。</p></div><div class="ready-box"><div id="playerList"></div><button id="ready" class="primary">我准备好了</button><div class="waiting-actions"><button id="unready" hidden>取消准备</button><button id="leaveWaiting" class="quiet">退出房间</button><button id="exitSoloWaiting" class="quiet">返回单机</button></div></div></div>
     <div id="battle" hidden>
-      <div class="scoreboard"><div class="player-score"><span class="side-dot"></span><strong id="myName"></strong><span id="myHealth"></span></div><div class="timer"><b id="timer">00:00</b><span>VS</span></div><div class="player-score opponent"><span id="theirHealth"></span><strong id="theirName"></strong><span class="side-dot"></span></div></div>
-      <div class="arena-grid"><section class="yard"><div class="yard-title"><h2>🌻 双方后院 · 共同战场</h2><span>绿方是我 · 橙方是对手</span></div><div class="canvas-wrap"><canvas id="myCanvas" width="1000" height="530" tabindex="0" aria-label="共同战场：我方从左侧后院出发，对手从右侧出发，相遇互啃。输入题目释放大招。"></canvas><div id="overlay" class="overlay" hidden></div></div><div class="yard-footer"><label><input id="auto" type="checkbox" checked> 自动瞄准射击</label><span>普通射击守近院 · 大招可支援前线</span></div></section>
-      <aside class="attack-panel"><section class="opponent-yard"><div class="yard-title"><h2>⚔ 前线战况</h2></div><p id="sentLabel" class="muted small"></p><p class="muted small">僵尸从各自后院出发，同路相遇后互相啃食。获胜者继续前进。</p></section><section class="dispatch"><div class="dispatch-title"><h2>派出援军</h2><strong>☀ <span id="sun">24</span><small> / 100</small></strong></div><p class="muted small">每秒 +2 阳光 · 基础僵尸自动出发</p><div id="units"></div><p class="muted small">派兵间隔 2 秒。僵尸攻击敌军，突破后啃食对方后院。</p></section></aside></div>
-      <div class="skills-heading"><h2>我的大招</h2><span id="skillHint">点击卡片选技能，输入题目施放。只伤害敌方僵尸。</span></div><div id="skills" class="skills"></div><div class="keyboard-hint">输入字母选招 · 空格也要输入 · Backspace 退一格 · Esc 取消输入 <button id="surrender" class="quiet">认输</button></div>
+      <div class="scoreboard"><div class="player-score"><span class="side-dot"></span><strong id="myName"></strong><span id="myHealth"></span></div><div class="timer"><b id="timer">00:00</b><span id="battlePhase">交锋 · 自动兵潮 1 / 4</span></div><div class="player-score opponent"><span id="theirHealth"></span><strong id="theirName"></strong><span class="side-dot"></span></div></div>
+      <div class="arena-grid"><section class="yard"><div class="yard-title"><h2>🌻 双方后院 · 共同战场</h2><span>绿方是我 · 橙方是对手</span></div><div class="canvas-wrap"><canvas id="myCanvas" width="1000" height="530" tabindex="0" aria-label="共同战场：我方从左侧后院出发，对手从右侧出发，相遇互啃。输入题目释放大招。"></canvas><div id="laserReport" class="laser-report" role="status" hidden></div><div id="overlay" class="overlay" hidden></div></div><div class="yard-footer"><label><input id="auto" type="checkbox" checked> 自动瞄准射击</label><span>普通射击守近院 · 大招可支援前线</span></div></section>
+      <aside class="attack-panel"><section class="opponent-yard"><div class="yard-title"><h2>⚔ 前线战况</h2></div><p id="sentLabel" class="muted small"></p><p class="muted small">双方持续自动出兵；僵尸同路相遇后互啃，获胜者继续前进。</p></section><section class="dispatch"><div class="dispatch-title"><h2>额外召唤</h2><strong>☀ <span id="sun">24</span><small> / 100</small></strong></div><p class="muted small">点一次花阳光召唤一只，随机进入五条路线；基础兵潮不花阳光。</p><div class="spell-reserve" aria-label="保留一张大招"><button id="reserveNext" type="button" aria-pressed="false">蓄下一招</button><button id="releaseSpell" type="button" disabled>尚未蓄招</button><p id="reserveHint">先点蓄下一招，再输入题目；最多保留一张。</p></div><div id="units"></div><p class="muted small">两次额外召唤间隔 0.8 秒。兵潮随赛程变快、变强。</p></section></aside></div>
+      <div class="skills-heading"><h2>我的大招</h2><span id="skillHint">双方实时施法：攻击敌兵，或保护己方兵潮。</span></div><div id="skills" class="skills"></div><div class="keyboard-hint">输入字母选招 · 空格也要输入 · Backspace 退一格 · Esc 取消输入 <button id="surrender" class="quiet">认输</button></div>
     </div>
   </section>
   <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
